@@ -61,6 +61,8 @@ ctest --preset release
 
 GCC 且不用预编译头时，内存要多得多。一台 30 GB 的机器用满 32 线程时，内核的 OOM 记录里 32–34 个 `cc1plus` 合计占 12–19 GB，再加上 clangd 的 6–10 GB，内存就耗尽了，被杀的是浏览器这类分数高的进程。预设的并行数只管 `cmake --build --preset`，Docker 镜像里的构建不受它限制。
 
+GitHub 上，只改 `docs/`、Markdown 或 `LICENSE` 的提交不跑 CI，也不部署。其余推到 main 的提交，CI 通过后自动部署：镜像直接用 CI 的 Release 任务编译并测试过的 `blog`，Docker 的层在两次部署之间缓存；CI 那份过期（14 天）时，镜像自己编译。在 Actions 里手动运行 Deploy 时，所在提交要有成功的 CI，只改文档的提交需要先手动跑一次 CI。
+
 测试要串行跑（不加 `-j`）：日志的用例共用同一个临时文件 `rooftree_test.log`，网络的用例依赖时序，并行时偶尔失败或卡住。
 
 数据库测试默认跳过（CTest 中显示为 Skipped），在 `build/bin/rooftree_test.yaml` 的 `Database.Test` 里填好 `Host`、`User`、`Password`、`Name` 后才会运行。这个文件在配置时从 `tests/rooftree_test.yaml.dist` 复制一次，本地修改不会被覆盖，也不会进 git；也可以用 `ROOFTREE_TEST_CONFIG=/path/to/file.yaml` 指定别的文件，或用 `ROOFTREE_DATABASE_TEST_PASSWORD` 这类环境变量逐项覆盖。测试会在该库里创建并删除 `rooftree_test`、`rooftree_test_logs` 表。
