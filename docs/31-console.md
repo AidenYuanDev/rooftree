@@ -108,7 +108,6 @@ post list|show|create|edit|publish|unpublish|decline|delete，post translation s
 post revisions <post> [<version>]，post save-version <post> [note]，post restore <post> <version>
 post editors <post>，post editor add|remove <post> <account>，post owner <post> <account>
 tag list|add|edit|delete
-note ...（和 post 一样，按编号），thinking list|add|edit|publish|unpublish|delete
 comment list|keep|hide|show
 chat groups|messages|delete|clear|dissolve   广场和群聊的管理，不碰私聊
 friend list|approve|reject|add|edit|delete（友链，不是读者之间的好友），project list|add|edit|delete

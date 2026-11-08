@@ -1,4 +1,4 @@
-import { FileTextIcon, LanguagesIcon, MoonIcon, NotebookPenIcon, SearchIcon, SunIcon } from 'lucide-react'
+import { FileTextIcon, LanguagesIcon, MoonIcon, SearchIcon, SunIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router'
@@ -46,7 +46,6 @@ export function CommandPalette() {
   const typed = query.trim().toLowerCase()
   const pages = [...mainNav, ...moreNav].filter((item) => !typed || t(`nav.${item.key}`).toLowerCase().includes(typed))
   const posts = long ? (search.data?.posts ?? []) : []
-  const notes = long ? (search.data?.notes ?? []) : []
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -73,20 +72,8 @@ export function CommandPalette() {
                 </CommandItem>
               </CommandGroup>
             )}
-            {notes.length > 0 && (
-              <CommandGroup heading={t('nav.notes')}>
-                {notes.map((note) => (
-                  <CommandItem key={note.id} value={`note-${note.id}`} onSelect={() => go(localePath(lang, `/notes/${note.id}`))}>
-                    <NotebookPenIcon />
-                    <span className="truncate" lang={note.lang}>
-                      {note.title}
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
             {long && search.isSuccess && (
-              <CommandGroup heading={posts.length + notes.length ? undefined : t('search.empty', { query })}>
+              <CommandGroup heading={posts.length ? undefined : t('search.empty', { query })}>
                 <CommandItem
                   value="search-all-langs"
                   onSelect={() => go(`${localePath(lang, '/search')}?q=${encodeURIComponent(query)}&all=1`)}

@@ -5,7 +5,7 @@
  * after another, at Blog.Newsletter.MailsPerMinute so the SMTP server doesn't take us for spam), and
  * the workers stay free for requests.
  *
- * A post is mailed on its first publication, a note when the author asks for it. The thread marks it
+ * A post is mailed on its first publication. The thread marks it
  * mailed (mailed_at) before the first mail, so a post published, unpublished and published again is
  * mailed once; a mailing cut short by a restart isn't resumed.
  */
@@ -27,7 +27,7 @@ namespace Blog
 // Everything the thread needs, copied from the main thread when queued
 struct NewsletterIssue
 {
-    std::string Kind;           // "post" or "note"
+    std::string Kind;           // "post"
     uint32 Id = 0;
     std::string PublicOrigin;
     std::map<std::string, std::string> SiteNames;   // by language

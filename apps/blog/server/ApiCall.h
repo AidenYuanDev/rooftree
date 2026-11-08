@@ -132,7 +132,7 @@ void RespondInternalError(ApiRequest const& request);
 void RespondOk(ApiRequest const& request);
 // 403 banned, until when and why
 void RespondBanned(ApiRequest const& request, UserRow const& user);
-// A post or note there, not in the language asked for: 404 not_in_lang naming the languages it has
+// A post there, not in the language asked for: 404 not_in_lang naming the languages it has
 void RespondNotInLang(ApiRequest const& request, std::vector<std::string> const& langs);
 
 // What RespondBanned says, for the edges that check a login before an operation runs
@@ -195,9 +195,6 @@ Rooftree::Task<void> ListSlugs(Rooftree::Server::Session& session, ApiRequest re
 Rooftree::Task<void> SearchPosts(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> ListTags(Rooftree::Server::Session& session, ApiRequest request);
 // ContentHandlers.cpp
-Rooftree::Task<void> ListNotes(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> GetNote(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> ListThinking(Rooftree::Server::Session& session, ApiRequest request);
 // SiteHandlers.cpp
 Rooftree::Task<void> GetSite(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> GetAbout(Rooftree::Server::Session& session, ApiRequest request);
@@ -284,16 +281,6 @@ Rooftree::Task<void> AdminCreateTag(Rooftree::Server::Session& session, ApiReque
 Rooftree::Task<void> AdminUpdateTag(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> AdminDeleteTag(Rooftree::Server::Session& session, ApiRequest request);
 // ContentHandlers.cpp
-Rooftree::Task<void> AdminListNotes(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminGetNote(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminCreateNote(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminUpdateNote(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminDeleteNote(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminListThinking(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminGetThinking(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminCreateThinking(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminUpdateThinking(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminDeleteThinking(Rooftree::Server::Session& session, ApiRequest request);
 // SiteHandlers.cpp
 Rooftree::Task<void> AdminStatus(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> AdminListFriends(Rooftree::Server::Session& session, ApiRequest request);

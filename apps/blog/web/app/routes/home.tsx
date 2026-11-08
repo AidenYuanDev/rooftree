@@ -4,55 +4,31 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import type { Route } from './+types/home'
 import { LocalDate } from '~/components/local-date'
-import { Badge } from '~/components/ui/badge'
 import { SocialLinks } from '~/components/social-links'
 import { SubscribeForm } from '~/components/subscribe-form'
 import { TagList } from '~/components/tag-list'
 import { getI18n } from '~/i18n'
-import { fetchNoteList, fetchPostList, fetchSiteCached, fetchTags, fetchThinkingList } from '~/lib/content'
+import { fetchPostList, fetchSiteCached, fetchTags } from '~/lib/content'
 import { localePath } from '~/lib/lang'
 import { pageMeta } from '~/lib/meta'
 import { requireLang } from '~/lib/route'
 import type { Lang, Site } from '~/lib/schemas'
-import { plainText } from '~/lib/text'
 
 async function load(lang: string | undefined) {
   const valid = requireLang(lang)
-  const [firstPage, notes, thinking, tags, site] = await Promise.all([
-    fetchPostList(valid),
-    fetchNoteList(valid),
-    fetchThinkingList(valid),
-    fetchTags(valid),
-    fetchSiteCached(valid),
-  ])
-  // Posts and notes together, newest first
-  const recent: Recent[] = [
-    ...firstPage.posts.map((post) => ({
-      kind: 'post' as const,
-      key: `post-${post.id}`,
-      title: post.title,
-      summary: post.summary,
-      lang: post.lang,
-      path: `/posts/${post.slug}`,
-      publishedAt: post.publishedAt,
-    })),
-    ...notes.notes.map((note) => ({
-      kind: 'note' as const,
-      key: `note-${note.id}`,
-      title: note.title,
-      summary: plainText(note.excerpt, 80),
-      lang: note.lang,
-      path: `/notes/${note.id}`,
-      publishedAt: note.publishedAt,
-    })),
-  ]
-    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-    .slice(0, 6)
-  return { recent, thinking: thinking.thinking[0] ?? null, tags, site }
+  const [firstPage, tags, site] = await Promise.all([fetchPostList(valid), fetchTags(valid), fetchSiteCached(valid)])
+  const recent: Recent[] = firstPage.posts.slice(0, 6).map((post) => ({
+    key: `post-${post.id}`,
+    title: post.title,
+    summary: post.summary,
+    lang: post.lang,
+    path: `/posts/${post.slug}`,
+    publishedAt: post.publishedAt,
+  }))
+  return { recent, tags, site }
 }
 
 interface Recent {
-  kind: 'post' | 'note'
   key: string
   title: string
   summary: string
@@ -112,7 +88,6 @@ function Hero({ site }: { site: Site }) {
   const number = new Intl.NumberFormat(i18n.language)
   const stats = [
     { label: t('home.statPosts'), value: number.format(site.stats.posts) },
-    { label: t('home.statNotes'), value: number.format(site.stats.notes) },
     {
       label: t('home.statWords'),
       value: site.stats.words >= 1000 ? `${number.format(Math.round(site.stats.words / 1000))}k` : number.format(site.stats.words),
@@ -154,7 +129,7 @@ function Hero({ site }: { site: Site }) {
 
 function RecentWriting({ loaderData, lang }: { loaderData: Route.ComponentProps['loaderData']; lang: Lang }) {
   const { t } = useTranslation()
-  const { recent, thinking } = loaderData
+  const { recent } = loaderData
   return (
     <section className="grid gap-10 md:grid-cols-[1fr_17rem]">
       {/* min-w-0: or the titles' one line would widen it past the screen instead of truncating */}
@@ -173,9 +148,6 @@ function RecentWriting({ loaderData, lang }: { loaderData: Route.ComponentProps[
                   <span className="font-mono text-sm text-muted-foreground tabular-nums">{String(i + 1).padStart(2, '0')}</span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <Badge variant="outline" className="shrink-0">
-                        {t(`admin.on.${item.kind}`)}
-                      </Badge>
                       <span className="truncate font-medium group-hover:text-primary" lang={item.lang}>
                         {item.title}
                       </span>
@@ -199,24 +171,9 @@ function RecentWriting({ loaderData, lang }: { loaderData: Route.ComponentProps[
             {t('home.allPosts')}
             <ArrowRightIcon className="size-4" />
           </Link>
-          <Link to={localePath(lang, '/notes')} className="inline-flex items-center gap-1 text-primary hover:underline">
-            {t('home.allNotes')}
-            <ArrowRightIcon className="size-4" />
-          </Link>
         </div>
       </div>
       <aside className="space-y-8">
-        {thinking && (
-          <Link
-            to={localePath(lang, `/thinking#thinking-${thinking.id}`)}
-            className="block rounded-2xl rounded-tl-sm border bg-card/60 p-5 backdrop-blur-md transition hover:border-primary/40"
-          >
-            <span className="mb-2 block text-xs text-muted-foreground">{t('home.lastThinking')}</span>
-            <span className="line-clamp-4 font-heading text-lg" lang={thinking.lang}>
-              {plainText(thinking.body, 140)}
-            </span>
-          </Link>
-        )}
         <div className="rounded-3xl glass p-6">
           <h2 className="mb-4 font-heading text-lg font-bold">{t('nav.tags')}</h2>
           <TagList tags={loaderData.tags} />

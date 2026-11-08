@@ -8,8 +8,6 @@ const langs = ['zh', 'en']
 const staticPages = [
   '',
   '/posts',
-  '/notes',
-  '/thinking',
   '/timeline',
   '/guestbook',
   '/friends',
@@ -34,7 +32,6 @@ interface Slugs {
   posts: { slug: string; translations: string[] }[]
   redirects: { from: string; to: string }[]
   tags: { slug: string; translations: string[] }[]
-  notes: { id: number; translations: string[] }[]
 }
 
 async function fetchSlugs(): Promise<Slugs> {
@@ -47,7 +44,7 @@ async function fetchSlugs(): Promise<Slugs> {
     // The dev server asks for the paths too, where they don't matter (pages render on request)
     if (process.env.NODE_ENV !== 'production' || process.env.BLOG_PRERENDER_WITHOUT_API === '1') {
       console.warn(`No posts prerendered, ${api} is not reachable: ${String(error)}`)
-      return { posts: [], redirects: [], tags: [], notes: [] }
+      return { posts: [], redirects: [], tags: [] }
     }
     throw new Error(`Prerendering needs the API at ${api} (BLOG_API_URL): ${String(error)}`, { cause: error })
   }
@@ -69,12 +66,10 @@ export default {
           .filter((redirect) => postLangs.get(redirect.to)?.includes(lang))
           .map((redirect) => `/${lang}/posts/${redirect.from}`),
         ...slugs.tags.filter((tag) => tag.translations.includes(lang)).map((tag) => `/${lang}/tags/${tag.slug}`),
-        ...slugs.notes.filter((note) => note.translations.includes(lang)).map((note) => `/${lang}/notes/${note.id}`),
         // React Router refuses a route with a loader that no prerendered path matches, which a blog
         // without posts or tags would have. "-" is never a slug (lib/route.ts); the server answers it 404
         `/${lang}/posts/-`,
         `/${lang}/tags/-`,
-        `/${lang}/notes/-`,
       ]),
     ]
   },

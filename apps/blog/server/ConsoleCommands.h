@@ -19,7 +19,7 @@
  *   site review on|off                             writers' publishing asks the admin first
  *   server info, server reload (SIGHUP)
  *   server shutdown|restart <time>|cancel          exit code 0, restart 2: the supervisor decides
- *   post, tag, note, thinking, comment, friend, project, upload, online, stats, status, and more of
+ *   post, tag, comment, friend, project, upload, online, stats, status, and more of
  *   account (show, create, role, deny, drive, kick...)   the admin's pages (ConsoleAdmin.h)
  *   api routes, api get|post|put|patch|delete <path> ...
  *                                                  any route of the API, for what a reader does (ConsoleApi.h)

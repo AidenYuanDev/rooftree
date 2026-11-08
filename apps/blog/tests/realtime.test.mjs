@@ -68,7 +68,7 @@ describe('websocket', () => {
     a.send({ type: 'page', path: '/zh/posts/hello' })
     b.send({ type: 'page', path: '/zh/posts/hello?from=rss#comments' })
     author.send({ type: 'page', path: '/zh/posts/hello' })
-    authorAgain.send({ type: 'page', path: '/en/notes' })
+    authorAgain.send({ type: 'page', path: '/en/posts' })
 
     // Four pages, two readers
     assert.ok(await a.next((m) => m.type === 'presence' && m.page === 2 && m.site === 2))
@@ -94,14 +94,14 @@ describe('websocket', () => {
     reader.send({ type: 'page', path: '/zh' })
     await reader.next((m) => m.type === 'presence')
 
-    const note = await admin.post('/api/admin/notes', { status: 'published', originalLang: 'zh', translations: { zh: { title: '刚写的', body: '新的' } } })
-    assert.deepEqual(await reader.next((m) => m.type === 'published'), { type: 'published', kind: 'note', path: `/notes/${note.json.id}`, title: '刚写的' })
+    await admin.post('/api/admin/posts', { slug: 'just-written', status: 'published', originalLang: 'zh', translations: { zh: { title: '刚写的', summary: '', body: '新的' } } })
+    assert.deepEqual(await reader.next((m) => m.type === 'published'), { type: 'published', kind: 'post', path: '/posts/just-written', title: '刚写的' })
 
     // A draft isn't
     await admin.post('/api/admin/posts', { slug: 'secret', status: 'draft', originalLang: 'en', translations: { en: { title: 'Secret', body: 'x' } } })
     const post = await admin.post('/api/admin/posts', { slug: 'public', status: 'published', originalLang: 'en', translations: { en: { title: 'Public', body: 'x' } } })
     assert.equal(post.status, 201)
-    const announced = await reader.next((m) => m.type === 'published' && m.kind === 'post')
+    const announced = await reader.next((m) => m.type === 'published' && m.path !== '/posts/just-written')
     assert.equal(announced.path, '/posts/public')
     reader.socket.close()
   })
@@ -265,14 +265,6 @@ describe('subscriptions', () => {
     assert.match(newsletter.mail, /List-Unsubscribe: <http:\/\/localhost:5173\/api\/unsubscribe\?token=[\w-]{43}>/)
     assert.match(newsletter.mail, /List-Unsubscribe-Post: List-Unsubscribe=One-Click/)
     assert.ok(!mailsTo('fan@example.com').some((m) => m.text.includes('Early')))
-
-    // Notes only when asked, and only to the readers of its languages
-    const both = (title) => ({ zh: { title, body: 'x' }, en: { title, body: 'x' } })
-    await admin.post('/api/admin/notes', { status: 'published', originalLang: 'zh', translations: both('A quiet note') })
-    await admin.post('/api/admin/notes', { status: 'published', originalLang: 'zh', notify: true, translations: { zh: { title: '只有中文的日记', body: 'x' } } })
-    await admin.post('/api/admin/notes', { status: 'published', originalLang: 'zh', notify: true, translations: both('A note to mail') })
-    await waitFor(() => mailsTo('fan@example.com').some((m) => m.text.includes('A note to mail')))
-    assert.ok(!mailsTo('fan@example.com').some((m) => m.text.includes('A quiet note') || m.text.includes('只有中文的日记')))
 
     // The mail client's one-click unsubscribe: a POST with the token, no Origin of ours
     const token = newsletter.mail.match(/unsubscribe\?token=([\w-]{43})/)[1]

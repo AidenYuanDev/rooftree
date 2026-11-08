@@ -12,7 +12,7 @@
  * Tags are few and read by every list, so BlogWorld keeps them in memory; they are reloaded after
  * every change that may change them (their post counts included).
  *
- * Also here: search of posts and notes (in memory, SearchIndex.h), in the page's language unless asked
+ * Also here: search of posts (in memory, SearchIndex.h), in the page's language unless asked
  * for all, and built from the same rows, the RSS feed of each language (posts and notes) and the
  * sitemap.
  */
@@ -821,21 +821,11 @@ Rooftree::Task<void> ListSlugs(Session& session, ApiRequest request)
     {
         std::vector<Slug> Posts;
         std::vector<std::pair<std::string, std::string>> Redirects;
-        std::vector<std::pair<uint32, std::vector<std::string>>> Notes;
     };
 
     Result result = co_await session.OnWorker([]
     {
         Result result;
-        if (PreparedQueryResult rows = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(BLOG_SEL_PUBLISHED_NOTES)))
-        {
-            do
-            {
-                Field* fields = rows->Fetch();
-                result.Notes.emplace_back(fields[0].GetUInt32(), SplitList(fields[2].GetStringOrNull().value_or("")));
-            } while (rows->NextRow());
-        }
-
         if (PreparedQueryResult rows = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(BLOG_SEL_PUBLISHED_SLUGS)))
         {
             do
@@ -869,12 +859,8 @@ Rooftree::Task<void> ListSlugs(Session& session, ApiRequest request)
     for (auto const& [slug, tag] : sWorld->GetTags())
         if (tag.PostCount)
             tags.push_back(Reader::CreateTagLangs(builder, builder.CreateString(slug), StringList(builder, TagLangs(tag))));
-    std::vector<flatbuffers::Offset<Reader::NoteLangs>> notes;
-    for (auto const& [id, langs] : result.Notes)
-        notes.push_back(Reader::CreateNoteLangs(builder, id, StringList(builder, langs)));
 
-    builder.Finish(Reader::CreatePostsSlugs(builder, builder.CreateVector(posts), builder.CreateVector(redirects), builder.CreateVector(tags),
-        builder.CreateVector(notes)));
+    builder.Finish(Reader::CreatePostsSlugs(builder, builder.CreateVector(posts), builder.CreateVector(redirects), builder.CreateVector(tags)));
     request->Respond(builder);
 }
 
@@ -2270,11 +2256,11 @@ Rooftree::Task<void> SearchPosts(Session& /*session*/, ApiRequest request)
     // In memory, here on the main thread: no database (BlogWorld.h, SearchIndex.h)
     sWorld->WithSearchIndex([request, lang, all, query](SearchIndex const& index)
     {
-        SearchIndex::Results found = index.Search(query, all ? std::string_view() : std::string_view(lang), SearchResults, SearchResults / 2);
+        std::vector<SearchIndex::Hit> found = index.Search(query, all ? std::string_view() : std::string_view(lang), SearchResults);
 
         flatbuffers::FlatBufferBuilder builder;
         std::vector<flatbuffers::Offset<Reader::PostSummary>> posts;
-        for (SearchIndex::Hit const& hit : found.Posts)
+        for (SearchIndex::Hit const& hit : found)
         {
             SearchPost const& post = *index.FindPost(hit.Id);
             SearchText const& text = hit.Text ? *hit.Text : post.GetText(lang);
@@ -2285,21 +2271,12 @@ Rooftree::Task<void> SearchPosts(Session& /*session*/, ApiRequest request)
             posts.push_back(PostSummaryTable(builder, summary, lang));
         }
 
-        std::vector<flatbuffers::Offset<Reader::SearchNote>> notes;
-        for (SearchIndex::Hit const& hit : found.Notes)
-        {
-            SearchNote const& note = *index.FindNote(hit.Id);
-            SearchText const& text = hit.Text ? *hit.Text : note.GetText(lang);
-            notes.push_back(Reader::CreateSearchNote(builder, note.Id, builder.CreateString(text.Lang), builder.CreateString(text.Title),
-                builder.CreateString(text.Summary), TimeString(builder, note.PublishedAt)));
-        }
-
-        builder.Finish(Reader::CreatePostsSearch(builder, builder.CreateVector(posts), builder.CreateVector(notes)));
+        builder.Finish(Reader::CreatePostsSearch(builder, builder.CreateVector(posts)));
         request->Respond(builder);
     });
 }
 
-// Posts and notes, newest first
+// Posts, newest first
 Rooftree::Task<void> BlogSession::HandleFeed(Request request)
 {
     // /zh/feed.xml, or /api/feed.xml?lang=zh
@@ -2338,25 +2315,6 @@ Rooftree::Task<void> BlogSession::HandleFeed(Request request)
         std::vector<FeedItem> items;
         for (PostSummary& post : posts)
             items.push_back({ "/posts/" + post.Slug, std::move(post.Title), std::move(post.Summary), post.PublishedAt, std::move(post.Tags) });
-
-        stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_NOTES);
-        stmt->setString(0, lang);
-        stmt->setDate(1, PermanentBanTime());
-        stmt->setDate(2, PermanentBanTime());
-        stmt->setUInt32(3, std::numeric_limits<uint32>::max());
-        stmt->setUInt32(4, FeedItems);
-        if (PreparedQueryResult result = BlogDatabase.Query(stmt))
-        {
-            do
-            {
-                Field* fields = result->Fetch();
-                items.push_back({ Rooftree::StringFormat("/notes/{}", fields[0].GetUInt32()), fields[8].GetString(), {}, fields[4].GetDate(), {} });
-            } while (result->NextRow());
-        }
-
-        std::ranges::sort(items, std::greater<>(), &FeedItem::PublishedAt);
-        if (items.size() > FeedItems)
-            items.resize(FeedItems);
         return items;
     });
     BlogSettings const& settings = sWorld->GetSettings();
@@ -2398,7 +2356,6 @@ Rooftree::Task<void> BlogSession::HandleSitemap(Request request)
     struct Result
     {
         std::vector<Entry> Posts;
-        std::vector<Entry> Notes;
     };
 
     Result result = co_await OnWorker([]
@@ -2410,14 +2367,6 @@ Rooftree::Task<void> BlogSession::HandleSitemap(Request request)
             {
                 Field* fields = rows->Fetch();
                 result.Posts.push_back({ fields[0].GetString(), fields[1].GetDate(), SplitList(fields[2].GetStringOrNull().value_or("")) });
-            } while (rows->NextRow());
-        }
-        if (PreparedQueryResult rows = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(BLOG_SEL_PUBLISHED_NOTES)))
-        {
-            do
-            {
-                Field* fields = rows->Fetch();
-                result.Notes.push_back({ std::to_string(fields[0].GetUInt32()), fields[1].GetDate(), SplitList(fields[2].GetStringOrNull().value_or("")) });
             } while (rows->NextRow());
         }
         return result;
@@ -2445,12 +2394,10 @@ Rooftree::Task<void> BlogSession::HandleSitemap(Request request)
     add("", bothLangs, entries.empty() ? Optional<SystemTimePoint>() : entries.front().UpdatedAt);
     for (Entry const& entry : entries)
         add("/posts/" + entry.Slug, entry.Langs, entry.UpdatedAt);
-    for (Entry const& entry : result.Notes)
-        add("/notes/" + entry.Slug, entry.Langs, entry.UpdatedAt);
     for (auto const& [slug, tag] : sWorld->GetTags())
         if (tag.PostCount)
             add("/tags/" + slug, TagLangs(tag), {});
-    for (std::string_view page : { "/posts", "/notes", "/thinking", "/timeline", "/friends", "/projects", "/about", "/guestbook", "/rss", "/sitemap" })
+    for (std::string_view page : { "/posts", "/timeline", "/friends", "/projects", "/about", "/guestbook", "/rss", "/sitemap" })
         add(std::string(page), bothLangs, {});
 
     xml += "</urlset>\n";
@@ -2476,21 +2423,18 @@ std::vector<TagInfo> LoadTagsDirect()
 // Rows from before word_count: counted once, at startup
 void CountMissingWordsDirect()
 {
-    for (auto [select, update] : { std::pair(BLOG_SEL_POSTS_WITHOUT_WORDS, BLOG_UPD_POST_WORDS), std::pair(BLOG_SEL_NOTES_WITHOUT_WORDS, BLOG_UPD_NOTE_WORDS) })
-    {
-        PreparedQueryResult rows = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(select));
-        if (!rows)
-            continue;
+    PreparedQueryResult rows = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(BLOG_SEL_POSTS_WITHOUT_WORDS));
+    if (!rows)
+        return;
 
-        do
-        {
-            Field* fields = rows->Fetch();
-            BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(update);
-            stmt->setUInt32(0, uint32(CountWords(fields[1].GetString()) + CountWords(fields[2].GetString())));
-            stmt->setUInt32(1, fields[0].GetUInt32());
-            BlogDatabase.DirectExecute(stmt);
-        } while (rows->NextRow());
-    }
+    do
+    {
+        Field* fields = rows->Fetch();
+        BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(BLOG_UPD_POST_WORDS);
+        stmt->setUInt32(0, uint32(CountWords(fields[1].GetString()) + CountWords(fields[2].GetString())));
+        stmt->setUInt32(1, fields[0].GetUInt32());
+        BlogDatabase.DirectExecute(stmt);
+    } while (rows->NextRow());
 }
 
 std::vector<ScheduledPost> PublishDuePostsDirect()

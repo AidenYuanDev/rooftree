@@ -20,9 +20,6 @@ enum Opcode : ushort {
   PostsSearch = 0x0203,
   PersonGet = 0x0205,
   TagsList = 0x0204,
-  NotesList = 0x0210,
-  NotesGet = 0x0211,
-  ThinkingList = 0x0212,
   SiteGet = 0x0220,
   SiteAbout = 0x0221,
   Timeline = 0x0222,
@@ -209,17 +206,11 @@ table TagLangs {
   translations:[string];    // the languages it has posts in
 }
 
-table NoteLangs {
-  id:uint;
-  translations:[string];
-}
-
 // What the prerender build makes pages of
 table PostsSlugs {
   posts:[SlugItem];
   redirects:[SlugRedirect];
   tags:[TagLangs];
-  notes:[NoteLangs];
 }
 
 table PostsSearchRequest {
@@ -228,17 +219,8 @@ table PostsSearchRequest {
   q:string;
 }
 
-table SearchNote {
-  id:uint;
-  lang:string;
-  title:string;
-  excerpt:string;
-  publishedAt:string;
-}
-
 table PostsSearch {
   posts:[PostSummary];
-  notes:[SearchNote];
 }
 
 table TagsListRequest {
@@ -256,83 +238,6 @@ table TagsList {
   tags:[Tag];
 }
 
-// Notes and thinking
-
-// A page of a list, newest first
-table PageRequest {
-  lang:string;
-  limit:uint = null;    // 10, at most 50
-  cursor:string;        // a page's nextCursor
-}
-
-table NoteSummary {
-  id:uint;
-  mood:string;
-  weather:string;
-  cover:string;
-  publishedAt:string;
-  updatedAt:string;
-  originalLang:string;
-  lang:string;
-  fallback:bool;
-  title:string;
-  excerpt:string;       // the start of the text, still markdown
-  translations:[string];
-  commentCount:long;
-}
-
-table NotesList {
-  notes:[NoteSummary];
-  nextCursor:string (json_null);
-}
-
-table NotesGetRequest {
-  id:uint = null;
-  lang:string;
-}
-
-table NoteNeighbour {
-  id:uint;
-  title:string;
-}
-
-table Note {
-  id:uint;
-  mood:string;
-  weather:string;
-  cover:string;
-  commentsEnabled:bool;
-  publishedAt:string;
-  updatedAt:string;
-  originalLang:string;
-  wordCount:uint;
-  translations:[string];
-  commentCount:long;
-  lang:string;
-  fallback:bool;
-  title:string;
-  body:string;
-  previous:NoteNeighbour (json_null);   // older
-  next:NoteNeighbour (json_null);       // newer
-}
-
-table ThinkingItem {
-  id:uint;
-  publishedAt:string;
-  originalLang:string;
-  lang:string;
-  fallback:bool;
-  body:string;
-  translations:[string];
-  commentCount:long;
-  commentsEnabled:bool;
-}
-
-table ThinkingList {
-  thinking:[ThinkingItem];
-  nextCursor:string (json_null);
-}
-
 // The site
 
 table LangRequest {
@@ -346,8 +251,6 @@ table Social {
 
 table SiteStats {
   posts:long;
-  notes:long;
-  thinking:long;
   words:long;
   days:long;
 }
@@ -371,7 +274,7 @@ table About {
 }
 
 table TimelineItem {
-  kind:string;          // post, note, thinking
+  kind:string;          // post
   id:uint;
   slug:string;
   title:string;
@@ -437,7 +340,7 @@ table UploadsMeta {
 
 // Comments, reactions, views
 
-// Of a post, a note, a thinking ("post:7", "note:3", "thinking:5") or the guestbook
+// Of a post ("post:7") or the guestbook
 table CommentsListRequest {
   target:string;
   postId:uint = null;   // the older post:<postId>

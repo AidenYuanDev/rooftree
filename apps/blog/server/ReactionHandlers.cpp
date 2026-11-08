@@ -1,7 +1,7 @@
 /*
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
- * Reactions: a logged in reader with a confirmed address gives a post, note, thinking or comment one
+ * Reactions: a logged in reader with a confirmed address gives a post or comment one
  * of a few kinds (like, heart, ...), each kind once, and may take it back. Pages ask for the counts of
  * many targets at once (a post and all its comments), with the reader's own reactions marked.
  */
@@ -29,7 +29,7 @@ namespace
 {
 constexpr std::size_t MaxTargetsPerRead = 100;
 constexpr std::string_view ReactionKinds[] = { "like", "heart", "laugh", "party", "cat", "star", "eyes", "thinking", "thanks" };
-constexpr std::string_view TargetKinds[] = { "post", "note", "thinking", "comment" };
+constexpr std::string_view TargetKinds[] = { "post", "comment" };
 
 struct ReactionTarget
 {
@@ -54,12 +54,10 @@ Optional<ReactionTarget> ParseReactionTarget(std::string_view text)
     return ReactionTarget{ std::string(kind), *id };
 }
 
-// Worker: a published post, note or thinking, a visible comment
+// Worker: a published post, a visible comment
 bool WorkerTargetExists(ReactionTarget const& target)
 {
-    BlogDatabaseStatements statement = target.Kind == "post" ? BLOG_SEL_POST_FOR_COMMENT
-        : target.Kind == "note" ? BLOG_SEL_NOTE_FOR_COMMENT
-        : target.Kind == "thinking" ? BLOG_SEL_THINKING_FOR_COMMENT : BLOG_SEL_COMMENT_FOR_REACTION;
+    BlogDatabaseStatements statement = target.Kind == "post" ? BLOG_SEL_POST_FOR_COMMENT : BLOG_SEL_COMMENT_FOR_REACTION;
     BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(statement);
     stmt->setUInt32(0, target.Id);
     PreparedQueryResult row = BlogDatabase.Query(stmt);
@@ -178,7 +176,7 @@ Rooftree::Task<void> React(Session& session, ApiRequest request)
     struct Result
     {
         Optional<TargetReactions> State;
-        std::string Page;           // what shows it: the target, a comment's post, note, thinking or guestbook
+        std::string Page;           // what shows it: the target, a comment's post or guestbook
     };
     Result result = co_await session.OnWorker([target = *target, kind, on = *in.on(), userId]() -> Result
     {
@@ -229,11 +227,7 @@ Rooftree::Task<void> React(Session& session, ApiRequest request)
         co_return RespondNotFound(request);
 
     if (!result.Page.empty())
-    {
-        if (result.Page.starts_with("thinking:"))
-            sWorld->AnnounceChanged("thinking", "reactions");
         sWorld->AnnounceChanged(std::move(result.Page), "reactions");
-    }
     flatbuffers::FlatBufferBuilder builder;
     builder.Finish(Reader::CreateReactions(builder, result.State->CountsTable(builder), StringList(builder, result.State->Mine)));
     request->Respond(builder);

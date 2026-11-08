@@ -1,7 +1,7 @@
 /*
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
- * The search, in memory: an inverted index of everything published, posts and notes, every language
+ * The search, in memory: an inverted index of every published post, every language
  * version of each (a document per version). Built once from the database (Load, a worker or startup),
  * then only read, from any thread; BlogWorld swaps in a new one after a change (BlogWorld.h).
  *
@@ -19,7 +19,7 @@
  * scored lower still.
  * Scores are BM25 with the title weighing three times the body; a search equal to a tag's name or
  * slug finds that tag's posts first.
- * A search is in one language, its versions only (a post or note without one is not found), or in
+ * A search is in one language, its versions only (a post without one is not found), or in
  * all: each found in the version that matched best.
  */
 
@@ -42,7 +42,7 @@ struct SearchText
 {
     std::string Lang;
     std::string Title;
-    std::string Summary;            // posts: their summary; notes: the start of the body
+    std::string Summary;            // their summary
     std::string Body;               // markdown, cleared once indexed
 };
 
@@ -58,16 +58,6 @@ struct SearchPost
     std::vector<SearchText> Texts;  // by lang
 
     // The version in lang, else the original
-    SearchText const& GetText(std::string_view lang) const;
-};
-
-struct SearchNote
-{
-    uint32 Id = 0;
-    std::string OriginalLang;
-    SystemTimePoint PublishedAt;
-    std::vector<SearchText> Texts;
-
     SearchText const& GetText(std::string_view lang) const;
 };
 
@@ -88,13 +78,7 @@ public:
         SearchText const* Text = nullptr;   // the version found
     };
 
-    struct Results
-    {
-        std::vector<Hit> Posts;
-        std::vector<Hit> Notes;
-    };
-
-    SearchIndex(std::vector<SearchPost> posts, std::vector<SearchNote> notes, std::vector<SearchTag> const& tags);
+    SearchIndex(std::vector<SearchPost> posts, std::vector<SearchTag> const& tags);
 
     // Everything published, with blocking queries: a worker, or startup
     static std::unique_ptr<SearchIndex> Load();
@@ -102,18 +86,16 @@ public:
     // Something to look for: a CJK character, or two characters of words
     static bool IsSearchable(std::string_view query);
 
-    // Best first, at most maxPosts and maxNotes; in the versions in lang, or with no lang in all
-    Results Search(std::string_view query, std::string_view lang, std::size_t maxPosts, std::size_t maxNotes) const;
+    // Best first, at most maxPosts; in the versions in lang, or with no lang in all
+    std::vector<Hit> Search(std::string_view query, std::string_view lang, std::size_t maxPosts) const;
 
     SearchPost const* FindPost(uint32 id) const;
-    SearchNote const* FindNote(uint32 id) const;
     std::size_t GetDocumentCount() const { return _documents.size(); }
 
 private:
     struct Document
     {
-        bool IsNote = false;
-        uint32 Owner = 0;           // index into _posts or _notes
+        uint32 Owner = 0;           // index into _posts
         uint32 Version = 0;         // index into its Texts
         uint32 BodyStart = 0;       // positions from here on are the body's
         float Length = 0;           // three times the title's tokens plus the body's
@@ -147,9 +129,7 @@ private:
     std::vector<uint32> FindWordsContaining(std::string_view fragment) const;
 
     std::vector<SearchPost> _posts;
-    std::vector<SearchNote> _notes;
     std::unordered_map<uint32, uint32> _postById;
-    std::unordered_map<uint32, uint32> _noteById;
 
     std::vector<Document> _documents;
     std::unordered_map<std::string, Postings> _terms;

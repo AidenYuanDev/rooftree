@@ -561,7 +561,7 @@ void RespondSite(ApiRequest const& request, std::string const& lang, SiteCounts 
         builder.CreateString(GetString(profile, "avatar")), builder.CreateString(Localized(profile, "tagline", lang)),
         builder.CreateString(Localized(profile, "bio", lang)), builder.CreateString(Localized(profile, "quote", lang)),
         builder.CreateString(CreatedDate(since)), builder.CreateVector(socials),
-        Reader::CreateSiteStats(builder, counts.Posts, counts.Notes, counts.Thinking, counts.Words, DaysSince(since))));
+        Reader::CreateSiteStats(builder, counts.Posts, counts.Words, DaysSince(since))));
     request->Respond(builder);
 }
 }
@@ -580,7 +580,7 @@ Rooftree::Task<void> GetSite(Session& session, ApiRequest request)
         if (PreparedQueryResult row = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(BLOG_SEL_SITE_STATS)))
         {
             Field* fields = row->Fetch();
-            counts = { fields[0].GetInt64(), fields[1].GetInt64(), fields[2].GetInt64(), fields[3].GetInt64() };
+            counts = { fields[0].GetInt64(), fields[1].GetInt64() };
         }
         return counts;
     });
@@ -625,9 +625,7 @@ Rooftree::Task<void> ListTimeline(Session& session, ApiRequest request)
         std::vector<Item> items;
         BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_TIMELINE);
         stmt->setString(0, lang);
-        stmt->setString(1, lang);
-        stmt->setString(2, lang);
-        stmt->setUInt32(3, TimelineItems);
+        stmt->setUInt32(1, TimelineItems);
         if (PreparedQueryResult rows = BlogDatabase.Query(stmt))
         {
             do

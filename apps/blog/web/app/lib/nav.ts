@@ -11,9 +11,7 @@ export interface NavItem {
 export const mainNav: NavItem[] = [
   { key: 'home', path: '' },
   { key: 'posts', path: '/posts' },
-  { key: 'notes', path: '/notes' },
   { key: 'timeline', path: '/timeline' },
-  { key: 'thinking', path: '/thinking' },
 ]
 
 // Under "More"

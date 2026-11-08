@@ -54,9 +54,9 @@ void NotFound(RequestContext& context, Rooftree::Server::StaticSite const* site)
 
 bool IsPlaceholder(std::string_view path)
 {
-    // /(zh|en)/(posts|tags|notes)/-, with / or .data after it
+    // /(zh|en)/(posts|tags)/-, with / or .data after it
     for (std::string_view lang : { "/zh/", "/en/" })
-        for (std::string_view kind : { "posts/-", "tags/-", "notes/-" })
+        for (std::string_view kind : { "posts/-", "tags/-" })
         {
             std::string prefix = std::string(lang) + std::string(kind);
             if (path == prefix || path == prefix + "/" || path == prefix + ".data")

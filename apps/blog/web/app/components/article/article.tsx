@@ -35,7 +35,7 @@ export interface Neighbour {
   to: string
 }
 
-// A post or a note to read: on paper over the painting, its table of contents and reading progress beside
+// A post to read: on paper over the painting, its table of contents and reading progress beside
 // it, older and newer below, then the comments. html is the build's (highlighted, image placeholders);
 // without it the markdown is rendered here
 export function Article({

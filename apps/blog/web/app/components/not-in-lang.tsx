@@ -5,7 +5,7 @@ import { Button } from '~/components/ui/button'
 import { localePath, useLang } from '~/lib/lang'
 import type { Lang } from '~/lib/schemas'
 
-// A post or note in other languages only: each language's site has only what is written in it, so
+// A post in other languages only: each language's site has only what is written in it, so
 // not shown here, only where it is
 export function NotInLang({ message, path, translations }: { message: string; path: string; translations: Lang[] }) {
   const { t } = useTranslation()

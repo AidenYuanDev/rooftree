@@ -79,15 +79,6 @@ await get('post list published', '/api/admin/posts?status=published&page=1')
 await get('post list bad status', '/api/admin/posts?status=nope')
 await get('post list bad page', '/api/admin/posts?page=abc')
 
-const note = await post('note create', '/api/admin/notes', { status: 'draft', originalLang: 'zh', mood: '好', weather: '晴', translations: { zh: { title: '今天', body: '星' } } })
-await patch('note update', `/api/admin/notes/${note.id}`, { mood: '累', notify: false, translations: { en: { title: 'Today', body: 'Stars' } } })
-await get('note get', `/api/admin/notes/${note.id}`)
-await get('note list', '/api/admin/notes')
-await post('note create invalid', '/api/admin/notes', { originalLang: 'zh', translations: {} })
-const thinking = await post('thinking create', '/api/admin/thinking', { originalLang: 'zh', translations: { zh: { body: '清欢' } } })
-await patch('thinking update', `/api/admin/thinking/${thinking.id}`, { status: 'draft', commentsEnabled: false })
-await get('thinking get', `/api/admin/thinking/${thinking.id}`)
-await get('thinking list', '/api/admin/thinking?page=1')
 
 const published = await post('post for comments', '/api/admin/posts', { slug: 'commented', status: 'published', originalLang: 'zh', translations: { zh: { title: 't', body: 'b' } } })
 const madeUser = await post('user create', '/api/admin/users', { username: 'gwen', displayName: '格温', email: 'gwen@example.com', password: 'password gwen', emailVerified: true })
@@ -167,9 +158,6 @@ await get('drives', '/api/admin/drives')
 await get('status', '/api/status?since=99999999999')
 await del('tag delete', '/api/admin/tags/golden')
 await del('post delete', `/api/admin/posts/${id}`)
-await del('note delete', `/api/admin/notes/${note.id}`)
-await del('thinking delete', `/api/admin/thinking/${thinking.id}`)
-await get('note get missing', `/api/admin/notes/${note.id}`)
 await record('not logged in', new Client().get('/api/admin/posts'))
 
 // The readers' routes: anonymous, and an account of their own
@@ -219,26 +207,7 @@ await a.get('search en', '/api/posts/search?q=Second&lang=en')
 await a.get('search short', '/api/posts/search?q=')
 await a.get('search long', `/api/posts/search?q=${'x'.repeat(101)}`)
 
-// Notes, thinking, the site
-const readerNote = (await admin.post('/api/admin/notes', { status: 'published', originalLang: 'zh', mood: '好', weather: '晴',
-  translations: { zh: { title: '一天', body: '看云' }, en: { title: 'A day', body: 'Clouds' } } })).json
-await admin.post('/api/admin/notes', { status: 'published', originalLang: 'en', translations: { en: { title: 'Only English', body: 'x' } } })
-await admin.post('/api/admin/thinking', { originalLang: 'zh', translations: { zh: { body: '想' }, en: { body: 'Thought' } } })
-await admin.post('/api/admin/thinking', { originalLang: 'zh', translations: { zh: { body: '再想' } } })
-await a.get('notes', '/api/notes')
-await a.get('notes en', '/api/notes?lang=en&limit=1')
-const notesPage = (await anon.get('/api/notes?limit=1')).json
-await a.get('notes next', `/api/notes?limit=1&cursor=${notesPage.nextCursor}`)
-await a.get('notes bad cursor', '/api/notes?cursor=nope!')
-await a.get('note', `/api/notes/${readerNote.id}`)
-await a.get('note en', `/api/notes/${readerNote.id}?lang=en`)
-await a.get('note not in lang', `/api/notes/${readerNote.id + 1}`)
-await a.get('note missing', '/api/notes/999999')
-await a.get('note bad id', '/api/notes/abc')
-await a.get('note zero', '/api/notes/0')
-await a.get('thinking', '/api/thinking')
-await a.get('thinking en', '/api/thinking?lang=en')
-await a.get('thinking page', '/api/thinking?limit=1')
+// The site
 await a.get('site', '/api/site')
 await a.get('site en', '/api/site?lang=en')
 await a.get('about', '/api/site/about?lang=en')
@@ -319,7 +288,7 @@ await r.post('react missing', '/api/reactions', { target: 'post:999999', kind: '
 await r.post('react invalid', '/api/reactions', { target: 'x', kind: 'shrug', on: 'yes' })
 await r.post('react no on', '/api/reactions', { target: `post:${talked.id}`, kind: 'like' })
 await a.post('react anonymous', '/api/reactions', { target: `post:${talked.id}`, kind: 'like', on: true })
-await a.get('reactions', `/api/reactions?targets=post:${talked.id},note:${readerNote.id},post:${first.id}`)
+await a.get('reactions', `/api/reactions?targets=post:${talked.id},post:${first.id}`)
 await r.get('reactions mine', `/api/reactions?targets=post:${talked.id}`)
 
 await record('view', anon.post('/api/views', { path: '/zh/posts/talked', referrer: 'https://elsewhere.example.com/x' }, { 'User-Agent': 'Mozilla/5.0' }))

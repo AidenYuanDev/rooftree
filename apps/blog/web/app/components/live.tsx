@@ -130,7 +130,7 @@ export function Live() {
           void queryClient.invalidateQueries({ queryKey: ['chat', 'channels'] })
         } else if (message.type === 'published' && message.path) {
           const { t: translate, lang: current } = latest.current
-          toast(translate(`live.published.${message.kind === 'note' ? 'note' : message.kind === 'thinking' ? 'thinking' : 'post'}`), {
+          toast(translate('live.published'), {
             description: message.title,
             action: <Link to={localePath(current, message.path)}>{translate('live.read')}</Link>,
             duration: 10_000,

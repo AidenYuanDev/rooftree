@@ -1,5 +1,5 @@
-// Notes, thinking, the site's profile, the timeline, friends' links and projects, and comments on
-// all of them, against a real server (pnpm test:api).
+// The site's profile, the timeline, friends' links and projects, comments on a post and the guestbook,
+// against a real server (pnpm test:api).
 
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
@@ -30,109 +30,19 @@ async function user(name) {
   return client
 }
 
-const note = (extra = {}) => ({
-  status: 'published',
-  originalLang: 'zh',
-  mood: '开心',
-  weather: '晴',
-  translations: { zh: { title: '今天', body: '和猫一起看星星。' } },
-  ...extra,
-})
-
-describe('notes', () => {
-  let first
-  let second
-
-  test('create, validate, read by number', async () => {
-    const invalid = await admin.post('/api/admin/notes', { originalLang: 'en', mood: 'x'.repeat(21), translations: { zh: { title: '' } } })
-    assert.equal(invalid.status, 400)
-    assert.deepEqual(invalid.json.error.fields, {
-      mood: 'too_long', 'translations.zh.title': 'required', 'translations.zh.body': 'required', 'translations.en': 'required',
-    })
-    assert.equal((await new Client().post('/api/admin/notes', note())).status, 401)
-
-    first = (await admin.post('/api/admin/notes', note())).json
-    assert.equal(first.status, 'published')
-    assert.ok(first.publishedAt)
-    second = (await admin.post('/api/admin/notes', note({
-      translations: { zh: { title: '第二篇', body: '星空' }, en: { title: 'Second', body: 'Stars' } },
-    }))).json
-    assert.ok(second.id > first.id)
-
-    const zh = (await new Client().get(`/api/notes/${first.id}?lang=zh`)).json
-    assert.equal(zh.title, '今天')
-    assert.equal(zh.mood, '开心')
-    assert.equal(zh.weather, '晴')
-    // 今天 and 和猫一起看星星, the full stop isn't a word
-    assert.equal(zh.wordCount, 9)
-    assert.equal(zh.previous, null)
-    assert.deepEqual(zh.next, { id: second.id, title: '第二篇' })
-
-    // No English version: not on the English site, neither itself nor as a neighbour
-    const en = await new Client().get(`/api/notes/${first.id}?lang=en`)
-    assert.equal(en.status, 404)
-    assert.deepEqual(en.json.error, { code: 'not_in_lang', translations: ['zh'] })
-    assert.equal((await new Client().get(`/api/notes/${second.id}?lang=en`)).json.previous, null)
-  })
-
-  test('drafts stay private, lists page by cursor', async () => {
-    const draft = (await admin.post('/api/admin/notes', note({ status: 'draft' }))).json
-    assert.equal((await new Client().get(`/api/notes/${draft.id}`)).status, 404)
-    assert.equal((await admin.get(`/api/admin/notes/${draft.id}`)).json.status, 'draft')
-    assert.ok((await admin.get('/api/admin/notes?status=draft')).json.notes.some((n) => n.id === draft.id))
-
-    const page = (await new Client().get('/api/notes?lang=zh&limit=1')).json
-    assert.equal(page.notes.length, 1)
-    assert.equal(page.notes[0].id, second.id)
-    assert.equal(page.notes[0].title, '第二篇')
-    assert.equal(page.notes[0].excerpt, '星空')
-    const next = (await new Client().get(`/api/notes?lang=zh&limit=1&cursor=${page.nextCursor}`)).json
-    assert.deepEqual(next.notes.map((n) => n.id), [first.id])
-    assert.equal(next.nextCursor, null)
-    // In English only the one written in it
-    assert.deepEqual((await new Client().get('/api/notes?lang=en')).json.notes.map((n) => [n.id, n.title]), [[second.id, 'Second']])
-
-    assert.deepEqual((await new Client().get('/api/posts/slugs')).json.notes.find((n) => n.id === first.id), { id: first.id, translations: ['zh'] })
-  })
-
-  test('update keeps the original language, delete', async () => {
-    const missing = await admin.patch(`/api/admin/notes/${second.id}`, { translations: { zh: null } })
-    assert.deepEqual(missing.json.error.fields, { 'translations.zh': 'required' })
-    const updated = await admin.patch(`/api/admin/notes/${second.id}`, { weather: '雨', translations: { en: null } })
-    assert.equal(updated.json.weather, '雨')
-    assert.deepEqual(Object.keys(updated.json.translations), ['zh'])
-
-    const temporary = (await admin.post('/api/admin/notes', note())).json
-    assert.equal((await admin.delete(`/api/admin/notes/${temporary.id}`)).status, 200)
-    assert.equal((await admin.get(`/api/admin/notes/${temporary.id}`)).status, 404)
-  })
-})
-
-describe('thinking', () => {
-  test('a one-liner list in the reader language', async () => {
-    const created = await admin.post('/api/admin/thinking', { originalLang: 'en', translations: { en: { body: 'Cats know.' }, zh: { body: '猫知道。' } } })
-    assert.equal(created.status, 201)
-    assert.equal(created.json.status, 'published')
-    await admin.post('/api/admin/thinking', { originalLang: 'zh', status: 'draft', translations: { zh: { body: '还没想好' } } })
-
-    const list = (await new Client().get('/api/thinking?lang=zh')).json
-    assert.deepEqual(list.thinking.map((t) => t.body), ['猫知道。'])
-    assert.equal(list.thinking[0].fallback, false)
-    assert.equal((await admin.get('/api/admin/thinking')).json.thinking.length, 2)
-
-    assert.equal((await admin.patch(`/api/admin/thinking/${created.json.id}`, { translations: { zh: { body: '猫什么都知道。' } } })).status, 200)
-    assert.equal((await new Client().get('/api/thinking?lang=zh')).json.thinking[0].body, '猫什么都知道。')
-    assert.equal((await admin.post('/api/admin/thinking', { originalLang: 'zh', translations: { zh: { body: 'x'.repeat(2001) } } })).json.error.fields['translations.zh.body'], 'too_long')
-  })
-})
+let posts = 0
+const newPost = async () => {
+  const created = await admin.post('/api/admin/posts', { slug: `talked-about-${++posts}`, status: 'published', originalLang: 'zh', translations: { zh: { title: '今天', summary: '', body: '和猫一起看星星。' } } })
+  assert.equal(created.status, 201, JSON.stringify(created.json))
+  return created.json.id
+}
 
 describe('comments everywhere', () => {
-  test('on a note, a thinking and the guestbook', async () => {
+  test('on a post and the guestbook', async () => {
     const reader = await user('stargazer')
-    const noteId = (await admin.post('/api/admin/notes', note())).json.id
-    const thinkingId = (await admin.post('/api/admin/thinking', { originalLang: 'zh', translations: { zh: { body: '喵' } } })).json.id
+    const postId = await newPost()
 
-    for (const target of [`note:${noteId}`, `thinking:${thinkingId}`, 'guestbook']) {
+    for (const target of [`post:${postId}`, 'guestbook']) {
       const comment = await reader.post('/api/comments', { target, body: `on ${target}` })
       assert.equal(comment.status, 201, JSON.stringify(comment.json))
       assert.equal(comment.json.target, target)
@@ -147,16 +57,16 @@ describe('comments everywhere', () => {
 
     // A reply has to stay on its target
     const guestbook = (await new Client().get('/api/comments?target=guestbook')).json.threads[0]
-    const crossed = await reader.post('/api/comments', { target: `note:${noteId}`, body: 'x', replyTo: guestbook.id })
+    const crossed = await reader.post('/api/comments', { target: `post:${postId}`, body: 'x', replyTo: guestbook.id })
     assert.deepEqual(crossed.json.error.fields, { replyTo: 'invalid' })
 
-    assert.equal((await reader.post('/api/comments', { target: 'note:999999', body: 'x' })).status, 404)
+    assert.equal((await reader.post('/api/comments', { target: 'post:999999', body: 'x' })).status, 404)
     assert.equal((await reader.post('/api/comments', { target: 'nothing:1', body: 'x' })).json.error.fields.target, 'required')
     assert.equal((await new Client().get('/api/comments?target=bad')).status, 400)
 
-    // Deleting the note deletes its comments
-    assert.equal((await admin.delete(`/api/admin/notes/${noteId}`)).status, 200)
-    assert.ok(!(await admin.get('/api/admin/comments')).json.comments.some((c) => c.target === `note:${noteId}`))
+    // Deleting the post deletes its comments
+    assert.equal((await admin.delete(`/api/admin/posts/${postId}`)).status, 200)
+    assert.ok(!(await admin.get('/api/admin/comments')).json.comments.some((c) => c.target === `post:${postId}`))
     assert.ok((await admin.get('/api/admin/comments')).json.comments.some((c) => c.target === 'guestbook'))
   })
 })
@@ -181,6 +91,7 @@ describe('the site', () => {
   })
 
   test('profile in both languages, stats', async () => {
+    await newPost()
     const invalid = await admin.put('/api/admin/site', { since: '2026-13-01', avatar: 'javascript:x', socials: [{ kind: 'myspace', url: 'x' }] })
     assert.equal(invalid.status, 400)
     assert.deepEqual(invalid.json.error.fields, { since: 'invalid', avatar: 'invalid', 'socials.0.kind': 'invalid', 'socials.0.url': 'invalid' })
@@ -206,7 +117,6 @@ describe('the site', () => {
     assert.equal(en.socials.length, 2)
     // Days in UTC, counting today
     assert.equal(en.stats.days, Math.floor((Date.now() - Date.UTC(2026, 9, 1)) / 86400000) + 1)
-    assert.ok(en.stats.notes >= 2)
     assert.ok(en.stats.words > 0)
     assert.equal((await new Client().get('/api/site/about?lang=en')).json.about, '# About me')
 
@@ -214,20 +124,15 @@ describe('the site', () => {
     const feed = await fetch(`${new URL('/api/feed.xml?lang=zh', (await import('./server.mjs')).baseUrl)}`)
     const xml = await feed.text()
     assert.match(xml, /<title>黑猫与星空<\/title>/)
-    // Notes are in it too
-    assert.match(xml, /<link>http:\/\/localhost:5173\/zh\/notes\/\d+<\/link>/)
   })
 
-  test('timeline of everything published', async () => {
+  test('timeline of the posts published', async () => {
     await admin.post('/api/admin/posts', { slug: 'timeline-post', status: 'published', originalLang: 'en', translations: { en: { title: 'A post', body: 'Text' } } })
-    await admin.post('/api/admin/notes', note({ originalLang: 'en', translations: { en: { title: 'A note', body: 'Text' } } }))
     // On the English site: not on the Chinese one
     assert.ok(!(await new Client().get('/api/timeline?lang=zh')).json.items.some((i) => i.slug === 'timeline-post'))
     const items = (await new Client().get('/api/timeline?lang=en')).json.items
     // Times have a second's resolution: what was made in the same second comes in any order
     assert.ok(items.some((i) => i.kind === 'post' && i.slug === 'timeline-post' && i.title === 'A post'))
-    assert.ok(items.some((i) => i.kind === 'note'))
-    assert.ok(items.some((i) => i.kind === 'thinking'))
     for (let i = 1; i < items.length; ++i)
       assert.ok(items[i - 1].publishedAt >= items[i].publishedAt)
   })
@@ -300,13 +205,6 @@ describe('the site', () => {
 })
 
 describe('search', () => {
-  test('finds notes too', async () => {
-    await admin.post('/api/admin/notes', note({ translations: { zh: { title: '流星雨之夜', body: '看到了很多流星。' } } }))
-    const found = (await new Client().get(`/api/posts/search?lang=zh&q=${encodeURIComponent('流星')}`)).json
-    assert.deepEqual(found.notes.map((n) => n.title), ['流星雨之夜'])
-    assert.equal(found.posts.length, 0)
-  })
-
   test('finds what was published as soon as it answered, never what was deleted', async () => {
     const search = async (q) => (await new Client().get(`/api/posts/search?lang=en&q=${encodeURIComponent(q)}`)).json.posts.map((p) => p.slug)
     const created = await admin.post('/api/admin/posts', {
@@ -453,35 +351,35 @@ describe('reactions', () => {
   test('toggle, counts for many targets, mine', async () => {
     const reader = await user('reactor')
     const other = await user('reactor2')
-    const noteId = (await admin.post('/api/admin/notes', note())).json.id
-    const comment = (await reader.post('/api/comments', { target: `note:${noteId}`, body: 'nice' })).json
+    const postId = await newPost()
+    const comment = (await reader.post('/api/comments', { target: `post:${postId}`, body: 'nice' })).json
 
-    assert.equal((await new Client().post('/api/reactions', { target: `note:${noteId}`, kind: 'like', on: true })).status, 401)
+    assert.equal((await new Client().post('/api/reactions', { target: `post:${postId}`, kind: 'like', on: true })).status, 401)
     const invalid = await reader.post('/api/reactions', { target: 'guestbook', kind: 'meh', on: 'yes' })
     assert.deepEqual(Object.keys(invalid.json.error.fields).sort(), ['kind', 'on', 'target'])
 
-    assert.deepEqual((await reader.post('/api/reactions', { target: `note:${noteId}`, kind: 'heart', on: true })).json, { counts: { heart: 1 }, mine: ['heart'] })
+    assert.deepEqual((await reader.post('/api/reactions', { target: `post:${postId}`, kind: 'heart', on: true })).json, { counts: { heart: 1 }, mine: ['heart'] })
     // Twice is still once
-    assert.deepEqual((await reader.post('/api/reactions', { target: `note:${noteId}`, kind: 'heart', on: true })).json.counts, { heart: 1 })
-    await other.post('/api/reactions', { target: `note:${noteId}`, kind: 'heart', on: true })
+    assert.deepEqual((await reader.post('/api/reactions', { target: `post:${postId}`, kind: 'heart', on: true })).json.counts, { heart: 1 })
+    await other.post('/api/reactions', { target: `post:${postId}`, kind: 'heart', on: true })
     await other.post('/api/reactions', { target: `comment:${comment.id}`, kind: 'cat', on: true })
     await other.post('/api/reactions', { target: `comment:${comment.id}`, kind: 'thanks', on: true })
     // One's own comment too, like on GitHub
     await reader.post('/api/reactions', { target: `comment:${comment.id}`, kind: 'eyes', on: true })
 
-    const targets = `note:${noteId},comment:${comment.id},post:999999`
+    const targets = `post:${postId},comment:${comment.id},post:999999`
     const seen = (await reader.get(`/api/reactions?targets=${targets}`)).json.reactions
-    assert.deepEqual(seen[`note:${noteId}`], { counts: { heart: 2 }, mine: ['heart'] })
+    assert.deepEqual(seen[`post:${postId}`], { counts: { heart: 2 }, mine: ['heart'] })
     assert.deepEqual(seen[`comment:${comment.id}`], { counts: { cat: 1, eyes: 1, thanks: 1 }, mine: ['eyes'] })
     assert.deepEqual(seen['post:999999'], { counts: {}, mine: [] })
-    assert.deepEqual((await new Client().get(`/api/reactions?targets=note:${noteId}`)).json.reactions[`note:${noteId}`].mine, [])
+    assert.deepEqual((await new Client().get(`/api/reactions?targets=post:${postId}`)).json.reactions[`post:${postId}`].mine, [])
 
-    assert.deepEqual((await reader.post('/api/reactions', { target: `note:${noteId}`, kind: 'heart', on: false })).json, { counts: { heart: 1 }, mine: [] })
-    assert.equal((await reader.post('/api/reactions', { target: 'note:999999', kind: 'like', on: true })).status, 404)
+    assert.deepEqual((await reader.post('/api/reactions', { target: `post:${postId}`, kind: 'heart', on: false })).json, { counts: { heart: 1 }, mine: [] })
+    assert.equal((await reader.post('/api/reactions', { target: 'post:999999', kind: 'like', on: true })).status, 404)
     assert.equal((await new Client().get('/api/reactions?targets=bad')).status, 400)
 
-    // Deleting the note takes its reactions (and its comments' ones) along
-    await admin.delete(`/api/admin/notes/${noteId}`)
+    // Deleting the post takes its reactions (and its comments' ones) along
+    await admin.delete(`/api/admin/posts/${postId}`)
     assert.deepEqual((await reader.get(`/api/reactions?targets=${targets}`)).json.reactions[`comment:${comment.id}`].counts, {})
   })
 })

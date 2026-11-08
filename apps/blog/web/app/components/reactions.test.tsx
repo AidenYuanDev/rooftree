@@ -12,11 +12,11 @@ const reader = { id: 3, username: 'bob', displayName: 'bob', role: 'user', email
 function render() {
   const Page = () => (
     <>
-      <Reactions target="note:7" />
+      <Reactions target="post:7" />
       <Toaster />
     </>
   )
-  return renderPage('/en/notes/7', [{ path: '/:lang/notes/:id', Component: Page }])
+  return renderPage('/en/posts/7', [{ path: '/:lang/posts/:id', Component: Page }])
 }
 
 test('counts, and a click takes the own one back', async () => {
@@ -24,8 +24,8 @@ test('counts, and a click takes the own one back', async () => {
   server.use(
     me(reader),
     http.get('*/api/reactions', ({ request }) => {
-      expect(new URL(request.url).searchParams.get('targets')).toBe('note:7')
-      return HttpResponse.json({ reactions: { 'note:7': { counts: { heart: 2, cat: 1 }, mine: ['heart'] } } })
+      expect(new URL(request.url).searchParams.get('targets')).toBe('post:7')
+      return HttpResponse.json({ reactions: { 'post:7': { counts: { heart: 2, cat: 1 }, mine: ['heart'] } } })
     }),
     http.post('*/api/reactions', async ({ request }) => {
       posted.push(await request.json())
@@ -41,7 +41,7 @@ test('counts, and a click takes the own one back', async () => {
   expect(screen.getByRole('button', { name: 'Meow' })).toHaveAttribute('aria-pressed', 'false')
 
   await user.click(heart)
-  await vi.waitFor(() => expect(posted).toEqual([{ target: 'note:7', kind: 'heart', on: false }]))
+  await vi.waitFor(() => expect(posted).toEqual([{ target: 'post:7', kind: 'heart', on: false }]))
   expect(await screen.findByRole('button', { name: 'Love' })).toHaveTextContent('1')
 })
 
@@ -49,7 +49,7 @@ test('without a login nothing is sent', async () => {
   const posted: unknown[] = []
   server.use(
     me(null),
-    http.get('*/api/reactions', () => HttpResponse.json({ reactions: { 'note:7': { counts: { like: 1 }, mine: [] } } })),
+    http.get('*/api/reactions', () => HttpResponse.json({ reactions: { 'post:7': { counts: { like: 1 }, mine: [] } } })),
     http.post('*/api/reactions', () => {
       posted.push(1)
       return HttpResponse.json({})

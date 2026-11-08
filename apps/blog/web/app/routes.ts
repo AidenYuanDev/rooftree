@@ -1,7 +1,7 @@
 import { type RouteConfig, index, route } from '@react-router/dev/routes'
 
 // Every page lives under its language, /zh/... and /en/...; "/" sends readers to theirs.
-// Prerendered (react-router.config.ts): the home page, posts, notes, tags, the other public pages and
+// Prerendered (react-router.config.ts): the home page, posts, tags, the other public pages and
 // the account pages', the status page's and the drive's shells.
 // Everything else (admin, links to what is in a drive) is served by the SPA fallback.
 export default [
@@ -11,9 +11,6 @@ export default [
     route('posts', 'routes/posts.tsx'),
     route('posts/:slug', 'routes/post.tsx'),
     route('tags/:tag', 'routes/tag.tsx'),
-    route('notes', 'routes/notes.tsx'),
-    route('notes/:id', 'routes/note.tsx'),
-    route('thinking', 'routes/thinking.tsx'),
     route('timeline', 'routes/timeline.tsx'),
     route('guestbook', 'routes/guestbook.tsx'),
     route('friends', 'routes/friends.tsx'),
@@ -43,10 +40,6 @@ export default [
       index('routes/admin/posts.tsx'),
       route('posts/new', 'routes/admin/post-edit.tsx', { id: 'admin-post-new' }),
       route('posts/:id', 'routes/admin/post-edit.tsx', { id: 'admin-post-edit' }),
-      route('notes', 'routes/admin/notes.tsx'),
-      route('notes/new', 'routes/admin/note-edit.tsx', { id: 'admin-note-new' }),
-      route('notes/:id', 'routes/admin/note-edit.tsx', { id: 'admin-note-edit' }),
-      route('thinking', 'routes/admin/thinking.tsx'),
       route('tags', 'routes/admin/tags.tsx'),
       route('friends', 'routes/admin/friends.tsx'),
       route('projects', 'routes/admin/projects.tsx'),

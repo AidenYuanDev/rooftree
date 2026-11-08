@@ -141,7 +141,6 @@ export const Slugs = z.object({
   posts: z.array(z.object({ slug: z.string(), updatedAt: z.string(), translations: z.array(Lang) })),
   redirects: z.array(z.object({ from: z.string(), to: z.string() })),
   tags: z.array(z.object({ slug: z.string(), translations: z.array(Lang) })),
-  notes: z.array(z.object({ id: z.number(), translations: z.array(Lang) })),
 })
 export type Slugs = z.infer<typeof Slugs>
 
@@ -215,11 +214,9 @@ export const CommentAuthor = z.object({ id: z.number(), username: z.string(), di
 // deleted: the account is gone, its comments kept, with no name
 export const CommentUser = CommentAuthor.extend({ role: Role, deleted: z.boolean().optional() })
 
-// What a comment is on: "post:7", "note:3", "thinking:5", "guestbook"
-export type CommentTarget = `post:${number}` | `note:${number}` | `thinking:${number}` | 'guestbook'
-export const CommentTarget = z.custom<CommentTarget>(
-  (value) => typeof value === 'string' && /^((post|note|thinking):\d+|guestbook)$/.test(value),
-)
+// What a comment is on: "post:7", "guestbook"
+export type CommentTarget = `post:${number}` | 'guestbook'
+export const CommentTarget = z.custom<CommentTarget>((value) => typeof value === 'string' && /^(post:\d+|guestbook)$/.test(value))
 
 // The passage of a post a comment is on (lib/passage.ts): its text, the text around it, its block as it
 // was (only once the post lost it: orphaned; kept, the admin left it so)
@@ -407,7 +404,6 @@ export const Upload = z.object({ url: z.string(), mime: z.string(), size: z.numb
 
 export const SearchResults = z.object({
   posts: z.array(PostSummary),
-  notes: z.array(z.object({ id: z.number(), lang: Lang, title: z.string(), excerpt: z.string(), publishedAt: z.string() })).default([]),
 })
 
 // The site's profile (admin "Site settings"), in the page's language: the home page's introduction
@@ -434,8 +430,6 @@ export const Social = z.object({ kind: SocialKind, url: z.string() })
 
 export const SiteStats = z.object({
   posts: z.number(),
-  notes: z.number(),
-  thinking: z.number(),
   words: z.number(),
   // Since Site.since, counting the first day
   days: z.number(),
@@ -479,56 +473,8 @@ export const AdminSite = z.object({
 })
 export type AdminSite = z.infer<typeof AdminSite>
 
-export const NoteSummary = z.object({
-  id: z.number(),
-  lang: Lang,
-  fallback: z.boolean(),
-  originalLang: Lang,
-  title: z.string(),
-  // The start of the text, markdown
-  excerpt: z.string(),
-  mood: z.string(),
-  weather: z.string(),
-  cover: z.string(),
-  translations: z.array(Lang),
-  commentCount: z.number(),
-  publishedAt: z.string(),
-  updatedAt: z.string(),
-})
-export type NoteSummary = z.infer<typeof NoteSummary>
-
-export const NoteList = z.object({ notes: z.array(NoteSummary), nextCursor: z.string().nullable() })
-export type NoteList = z.infer<typeof NoteList>
-
-const NoteRef = z.object({ id: z.number(), title: z.string() })
-
-export const Note = NoteSummary.omit({ excerpt: true }).extend({
-  body: z.string(),
-  wordCount: z.number(),
-  commentsEnabled: z.boolean(),
-  previous: NoteRef.nullable(),
-  next: NoteRef.nullable(),
-})
-export type Note = z.infer<typeof Note>
-
-export const Thinking = z.object({
-  id: z.number(),
-  lang: Lang,
-  fallback: z.boolean(),
-  originalLang: Lang,
-  body: z.string(),
-  translations: z.array(Lang),
-  commentCount: z.number(),
-  commentsEnabled: z.boolean(),
-  publishedAt: z.string(),
-})
-export type Thinking = z.infer<typeof Thinking>
-
-export const ThinkingList = z.object({ thinking: z.array(Thinking), nextCursor: z.string().nullable() })
-export type ThinkingList = z.infer<typeof ThinkingList>
-
 export const TimelineItem = z.object({
-  kind: z.enum(['post', 'note', 'thinking']),
+  kind: z.literal('post'),
   id: z.number(),
   slug: z.string(),
   title: z.string(),
@@ -570,72 +516,13 @@ export type Project = z.infer<typeof Project>
 
 export const ProjectList = z.object({ projects: z.array(Project) })
 
-export const NoteTranslation = z.object({ title: z.string(), body: z.string() })
-
-export const AdminNote = z.object({
-  id: z.number(),
-  status: z.enum(['draft', 'published']),
-  originalLang: Lang,
-  mood: z.string(),
-  weather: z.string(),
-  cover: z.string(),
-  commentsEnabled: z.boolean(),
-  translations: z.partialRecord(Lang, NoteTranslation),
-  publishedAt: z.string().nullable(),
-  updatedAt: z.string(),
-  createdAt: z.string().nullable(),
-})
-export type AdminNote = z.infer<typeof AdminNote>
-
-export const AdminNoteList = z.object({
-  notes: z.array(
-    z.object({
-      id: z.number(),
-      status: z.enum(['draft', 'published']),
-      originalLang: Lang,
-      title: z.string(),
-      translations: z.array(Lang),
-      updatedAt: z.string(),
-      publishedAt: z.string().nullable(),
-    }),
-  ),
-  hasMore: z.boolean(),
-})
-
-export const AdminThinking = z.object({
-  id: z.number(),
-  status: z.enum(['draft', 'published']),
-  originalLang: Lang,
-  commentsEnabled: z.boolean(),
-  translations: z.partialRecord(Lang, z.object({ body: z.string() })),
-  publishedAt: z.string().nullable(),
-  updatedAt: z.string(),
-  createdAt: z.string(),
-})
-export type AdminThinking = z.infer<typeof AdminThinking>
-
-export const AdminThinkingList = z.object({
-  thinking: z.array(
-    z.object({
-      id: z.number(),
-      status: z.enum(['draft', 'published']),
-      originalLang: Lang,
-      body: z.string(),
-      translations: z.array(Lang),
-      updatedAt: z.string(),
-      publishedAt: z.string().nullable(),
-    }),
-  ),
-  hasMore: z.boolean(),
-})
-
 // Uploaded images by file name: the blurred placeholder and size the build puts into posts
 export const UploadMeta = z.object({
   images: z.record(z.string(), z.object({ thumbhash: z.string(), width: z.number(), height: z.number() })),
 })
 export type UploadMeta = z.infer<typeof UploadMeta>
 
-// Readers' reactions to a post, note, thinking or comment ("comment:12"): counts per kind, and the
+// Readers' reactions to a post or comment ("comment:12"): counts per kind, and the
 // reader's own
 export const reactionKinds = ['like', 'heart', 'laugh', 'party', 'cat', 'star', 'eyes', 'thinking', 'thanks'] as const
 export const ReactionKind = z.enum(reactionKinds)

@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Lang } from '~/lib/schemas'
 
 // The editors' unsaved changes, kept in localStorage until saved: per post ("new" for one not created
-// yet), per note ("note:new", "note:12")
+// yet)
 export interface PostDraft {
   slug: string
   status: 'draft' | 'published'
@@ -16,7 +16,7 @@ export interface PostDraft {
 }
 
 interface DraftState {
-  // PostDraft, or the note editor's form
+  // PostDraft
   drafts: Record<string, { draft: object; savedAt: number }>
   saveDraft: (key: string, draft: object) => void
   discardDraft: (key: string) => void

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Form, Link, useSearchParams } from 'react-router'
+import { Form, useSearchParams } from 'react-router'
 import type { Route } from './+types/search'
 import { FormError } from '~/components/form'
 import { PostCard } from '~/components/post-card'
@@ -7,11 +7,11 @@ import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Skeleton } from '~/components/ui/skeleton'
 import { Switch } from '~/components/ui/switch'
-import { localePath, useLang } from '~/lib/lang'
+import { useLang } from '~/lib/lang'
 import { privateMeta } from '~/lib/page'
 import { useSearch } from '~/lib/queries'
 import type { Lang } from '~/lib/schemas'
-import { isSearchable, plainText } from '~/lib/text'
+import { isSearchable } from '~/lib/text'
 
 export const meta = ({ params }: Route.MetaArgs) => privateMeta(params.lang, 'search.title')
 
@@ -26,7 +26,6 @@ export default function Search() {
   const search = useSearch(lang, query, allLangs)
   const resultLang = (found: Lang) => (allLangs ? found : lang)
   const posts = search.data?.posts ?? []
-  const notes = search.data?.notes ?? []
   const long = isSearchable(query)
 
   return (
@@ -64,32 +63,13 @@ export default function Search() {
       {long && search.isSuccess && (
         <>
           <p className="text-sm text-muted-foreground">
-            {posts.length + notes.length ? t('search.results', { count: posts.length + notes.length }) : t('search.empty', { query })}
+            {posts.length ? t('search.results', { count: posts.length }) : t('search.empty', { query })}
           </p>
           <div className="space-y-4">
             {posts.map((post) => (
               <PostCard key={post.id} post={post} linkLang={resultLang(post.lang)} />
             ))}
           </div>
-          {notes.length > 0 && (
-            <section className="grid gap-2">
-              <h2 className="font-heading text-lg font-bold">{t('nav.notes')}</h2>
-              {notes.map((note) => (
-                <Link
-                  key={note.id}
-                  to={localePath(resultLang(note.lang), `/notes/${note.id}`)}
-                  className="rounded-2xl border bg-card/60 p-4 backdrop-blur-md transition hover:border-primary/40"
-                >
-                  <span className="block font-heading font-bold" lang={note.lang}>
-                    {note.title}
-                  </span>
-                  <span className="mt-1 line-clamp-2 block text-sm text-muted-foreground" lang={note.lang}>
-                    {plainText(note.excerpt)}
-                  </span>
-                </Link>
-              ))}
-            </section>
-          )}
         </>
       )}
     </div>

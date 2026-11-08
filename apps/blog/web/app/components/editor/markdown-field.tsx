@@ -7,7 +7,7 @@ import { editorTheme, liveMarkdown, markdownShortcuts } from '~/lib/live-markdow
 import { cn } from '~/lib/utils'
 
 // A standalone Markdown editor with Typora-style live preview (for new posts before they have a
-// collaborative id, and for notes)
+// collaborative id)
 export function MarkdownField({
   id,
   value,

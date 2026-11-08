@@ -489,7 +489,7 @@ Blog:
 # LIMITS
 #
 #    Blog.Comments.MaxPerUserPerPost
-#        Description: Comments one account may write under one post (note, thinking, the guestbook), in all.
+#        Description: Comments one account may write under one post (or the guestbook), in all.
 #        Default:     1024
 #
 #    Blog.Comments.EditWindow
@@ -542,7 +542,7 @@ Blog:
 #        Default:     1
 #
 #    Blog.Newsletter.MailsPerMinute
-#        Description: Newsletters (new posts, notes when asked) go out one after another at this pace,
+#        Description: Newsletters (new posts) go out one after another at this pace,
 #                     on a thread of their own, so the SMTP server doesn't take them for spam.
 #        Default:     60
 #
@@ -555,8 +555,7 @@ Blog:
 #        Example:     "/srv/blog/site/current"
 #
 #    Blog.Rebuild.Command
-#        Description: Run after something on the prerendered pages changed (a published post, note or
-#                     thinking, a tag, the profile, friends, projects): rebuilds them (deploy/rebuild.sh).
+#        Description: Run after something on the prerendered pages changed (a published post, a tag, the profile, friends, projects): rebuilds them (deploy/rebuild.sh).
 #                     Empty: never, rebuild by hand.
 #        Default:     ""
 #        Example:     "/opt/blog/rebuild.sh"

@@ -229,17 +229,12 @@ SearchText const& SearchPost::GetText(std::string_view lang) const
     return FindText(*this, lang);
 }
 
-SearchText const& SearchNote::GetText(std::string_view lang) const
-{
-    return FindText(*this, lang);
-}
-
-SearchIndex::SearchIndex(std::vector<SearchPost> posts, std::vector<SearchNote> notes, std::vector<SearchTag> const& tags)
-    : _posts(std::move(posts)), _notes(std::move(notes))
+SearchIndex::SearchIndex(std::vector<SearchPost> posts, std::vector<SearchTag> const& tags)
+    : _posts(std::move(posts))
 {
     // Every version a document, in order: the postings come out ascending by document
     float totalLength = 0;
-    auto addTexts = [&](bool isNote, uint32 owner, std::vector<SearchText>& texts)
+    auto addTexts = [&](uint32 owner, std::vector<SearchText>& texts)
     {
         for (uint32 version = 0; version < texts.size(); ++version)
         {
@@ -248,13 +243,12 @@ SearchIndex::SearchIndex(std::vector<SearchPost> posts, std::vector<SearchNote> 
             uint32 position = 0;
             Add(document, text.Title, position);
             uint32 bodyStart = position;
-            // A post's summary is searched as its body; a note's is the body's start
-            if (!isNote)
-                Add(document, text.Summary, position);
+            // The summary is searched as the body
+            Add(document, text.Summary, position);
             Add(document, StripLinkTargets(text.Body), position);
 
             float length = TitleWeight * float(bodyStart) + float(position - bodyStart);
-            _documents.push_back({ isNote, owner, version, bodyStart, length });
+            _documents.push_back({ owner, version, bodyStart, length });
             totalLength += length;
             text.Body = {};
         }
@@ -263,12 +257,7 @@ SearchIndex::SearchIndex(std::vector<SearchPost> posts, std::vector<SearchNote> 
     for (uint32 i = 0; i < _posts.size(); ++i)
     {
         _postById[_posts[i].Id] = i;
-        addTexts(false, i, _posts[i].Texts);
-    }
-    for (uint32 i = 0; i < _notes.size(); ++i)
-    {
-        _noteById[_notes[i].Id] = i;
-        addTexts(true, i, _notes[i].Texts);
+        addTexts(i, _posts[i].Texts);
     }
     if (!_documents.empty())
         _averageLength = std::max(1.0f, totalLength / float(_documents.size()));
@@ -558,11 +547,11 @@ std::vector<std::pair<std::string_view, uint32>> SearchIndex::FindTypos(std::str
     return found;
 }
 
-SearchIndex::Results SearchIndex::Search(std::string_view query, std::string_view lang, std::size_t maxPosts, std::size_t maxNotes) const
+std::vector<SearchIndex::Hit> SearchIndex::Search(std::string_view query, std::string_view lang, std::size_t maxPosts) const
 {
     auto textOf = [&](Document const& document) -> SearchText const&
     {
-        return document.IsNote ? _notes[document.Owner].Texts[document.Version] : _posts[document.Owner].Texts[document.Version];
+        return _posts[document.Owner].Texts[document.Version];
     };
 
     // The documents with each word of the search
@@ -572,9 +561,8 @@ SearchIndex::Results SearchIndex::Search(std::string_view query, std::string_vie
         words.push_back(kind == CharKind::Word ? MatchWord(Join(characters)) : MatchCjk(characters));
     });
 
-    // The best version of each post and note
+    // The best version of each post
     std::unordered_map<uint32, Hit> postScores;
-    std::unordered_map<uint32, Hit> noteScores;
     bool everyWord = !words.empty() && std::ranges::none_of(words, [](Matches const& matches) { return matches.Documents.empty(); });
     if (everyWord)
     {
@@ -612,7 +600,7 @@ SearchIndex::Results SearchIndex::Search(std::string_view query, std::string_vie
             if (!inAll)
                 continue;
 
-            Hit& best = (found.IsNote ? noteScores : postScores)[found.Owner];
+            Hit& best = postScores[found.Owner];
             if (!best.Text || score > best.Score)
                 best = { 0, score, &textOf(found) };
         }
@@ -639,30 +627,20 @@ SearchIndex::Results SearchIndex::Search(std::string_view query, std::string_vie
         }
     }
 
-    auto best = [](std::unordered_map<uint32, Hit> const& scores, auto const& owners, std::size_t max)
-    {
-        std::vector<Hit> hits;
-        for (auto const& [owner, hit] : scores)
-            hits.push_back({ owners[owner].Id, hit.Score, hit.Text });
-        // Ties: the newer (the higher id) first
-        std::ranges::sort(hits, [](Hit const& a, Hit const& b) { return std::tuple(a.Score, a.Id) > std::tuple(b.Score, b.Id); });
-        if (hits.size() > max)
-            hits.resize(max);
-        return hits;
-    };
-    return { best(postScores, _posts, maxPosts), best(noteScores, _notes, maxNotes) };
+    std::vector<Hit> hits;
+    for (auto const& [owner, hit] : postScores)
+        hits.push_back({ _posts[owner].Id, hit.Score, hit.Text });
+    // Ties: the newer (the higher id) first
+    std::ranges::sort(hits, [](Hit const& a, Hit const& b) { return std::tuple(a.Score, a.Id) > std::tuple(b.Score, b.Id); });
+    if (hits.size() > maxPosts)
+        hits.resize(maxPosts);
+    return hits;
 }
 
 SearchPost const* SearchIndex::FindPost(uint32 id) const
 {
     auto it = _postById.find(id);
     return it == _postById.end() ? nullptr : &_posts[it->second];
-}
-
-SearchNote const* SearchIndex::FindNote(uint32 id) const
-{
-    auto it = _noteById.find(id);
-    return it == _noteById.end() ? nullptr : &_notes[it->second];
 }
 
 std::unique_ptr<SearchIndex> SearchIndex::Load()
@@ -690,24 +668,6 @@ std::unique_ptr<SearchIndex> SearchIndex::Load()
         } while (result->NextRow());
     }
 
-    std::vector<SearchNote> notes;
-    if (PreparedQueryResult result = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(BLOG_SEL_SEARCH_NOTES)))
-    {
-        do
-        {
-            Field* fields = result->Fetch();
-            uint32 id = fields[0].GetUInt32();
-            if (notes.empty() || notes.back().Id != id)
-            {
-                SearchNote& note = notes.emplace_back();
-                note.Id = id;
-                note.OriginalLang = fields[1].GetString();
-                note.PublishedAt = fields[2].GetDate();
-            }
-            notes.back().Texts.push_back({ fields[3].GetString(), fields[4].GetString(), fields[5].GetString(), fields[6].GetString() });
-        } while (result->NextRow());
-    }
-
     std::vector<SearchTag> tags;
     if (PreparedQueryResult result = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(BLOG_SEL_SEARCH_TAGS)))
     {
@@ -718,6 +678,6 @@ std::unique_ptr<SearchIndex> SearchIndex::Load()
         } while (result->NextRow());
     }
 
-    return std::make_unique<SearchIndex>(std::move(posts), std::move(notes), tags);
+    return std::make_unique<SearchIndex>(std::move(posts), tags);
 }
 }

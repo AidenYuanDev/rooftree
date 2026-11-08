@@ -460,26 +460,8 @@ test("the status page is the admin's", async ({ page }) => {
   await expect(page.getByText(/^Updated \d\d:\d\d, every 10 seconds$/)).toBeVisible()
 })
 
-test('notes, thinking and the site settings', async ({ page }) => {
+test('the site settings', async ({ page }) => {
   await loginAsAdmin(page)
-
-  await page.goto('/en/admin/notes')
-  await page.getByRole('link', { name: 'New note' }).click()
-  await page.getByLabel('Mood').fill('happy')
-  await page.getByLabel('Weather').fill('clear')
-  await page.getByLabel('Status').click()
-  await page.getByRole('option', { name: 'Published' }).click()
-  await page.getByLabel('Title').fill('Night on the roof')
-  await replaceText(page, 'Text (Markdown)', 'Stars **everywhere**.')
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page.getByText('Saved.')).toBeVisible()
-  await expect(page).toHaveURL(/\/en\/admin\/notes\/\d+$/)
-
-  await page.goto('/en/admin/thinking')
-  await page.getByPlaceholder("What's on your mind? (Markdown)").fill('Cats know everything.')
-  await page.getByRole('button', { name: 'Publish' }).click()
-  await expect(page.getByPlaceholder("What's on your mind? (Markdown)")).toHaveValue('')
-  await expect(page.getByRole('main').getByText('Cats know everything.')).toBeVisible()
 
   await page.goto('/en/admin/site')
   await page.getByLabel('Site name · English').fill('Starry Cat')
@@ -487,17 +469,8 @@ test('notes, thinking and the site settings', async ({ page }) => {
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByText('Saved, the pages rebuild by themselves.')).toBeVisible()
 
-  await page.goto('/en/notes')
+  await page.goto('/en/posts')
   await expect(page.getByRole('banner').getByText('Starry Cat')).toBeVisible()
-  await page.getByRole('link', { name: /Night on the roof/ }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Night on the roof' })).toBeVisible()
-  await expect(page.getByText('Mood · happy')).toBeVisible()
-  await expect(page.locator('article strong')).toHaveText('everywhere')
-
-  await page.goto('/en/thinking')
-  await expect(page.getByText('Cats know everything.')).toBeVisible()
-  await page.goto('/en/timeline')
-  await expect(page.getByRole('link', { name: /Night on the roof/ })).toBeVisible()
 })
 
 test('a reader signs the guestbook and applies for a link', async ({ page, browser }) => {

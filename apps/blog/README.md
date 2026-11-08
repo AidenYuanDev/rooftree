@@ -13,12 +13,12 @@
 
 前面没有 nginx：TLS、静态文件、gzip、超时和连接数限制都由服务器自己做，见 [docs/30](../../docs/30-static-files-and-tls.md)。
 
-内容有文章、日记、一句话（思考）、时间线、留言板、友链、项目和关于页，管理员还能「看云」，看服务器此刻怎么样；管理员开通了网盘的账号可以存文件，分享链接给登录的读者（可设密码、有效期，能看到谁打开过），管理员可以查看和管理每个账号的网盘和分享；读者可以注册、评论（有人回复会收到邮件）、点表情、申请友链、订阅邮件，互加好友，在浮动聊天窗里聊天（广场、私聊、群聊）；开通了写作权限的账号可以写自己的文章，和受邀的协作者一起实时编辑。作者在后台写作、审核和改站点设置（名称、头像、简介、社交链接、关于页），还能管理用户：新建、改资料、改角色（普通用户或版主）、单独收回评论/表情/换头像/申请友链的权限、改密码或发重置邮件、关两步验证、让某台设备退出登录、注销或彻底删除，并看到谁在线、在线多久、正在看哪个页面。版主只能隐藏评论、封禁普通用户、管理广场和群聊的消息（后台没有查看私聊的入口）。
+内容有文章、时间线、留言板、友链、项目和关于页，管理员还能「看云」，看服务器此刻怎么样；管理员开通了网盘的账号可以存文件，分享链接给登录的读者（可设密码、有效期，能看到谁打开过），管理员可以查看和管理每个账号的网盘和分享；读者可以注册、评论（有人回复会收到邮件）、点表情、申请友链、订阅邮件，互加好友，在浮动聊天窗里聊天（广场、私聊、群聊）；开通了写作权限的账号可以写自己的文章，和受邀的协作者一起实时编辑。作者在后台写作、审核和改站点设置（名称、头像、简介、社交链接、关于页），还能管理用户：新建、改资料、改角色（普通用户或版主）、单独收回评论/表情/换头像/申请友链的权限、改密码或发重置邮件、关两步验证、让某台设备退出登录、注销或彻底删除，并看到谁在线、在线多久、正在看哪个页面。版主只能隐藏评论、封禁普通用户、管理广场和群聊的消息（后台没有查看私聊的入口）。
 
 | 功能 | 在哪里 |
 |---|---|
-| 文章、日记、一句话，都可以有中英两个版本；文章可以定时发布 | `server/PostHandlers.cpp`、`ContentHandlers.cpp` |
-| 评论（文章、日记、一句话、留言板）、表情回应、有人回复时发邮件提醒（默认关，读者在账号页打开） | `CommentHandlers.cpp`、`ReactionHandlers.cpp` |
+| 文章，可以有中英两个版本，可以定时发布 | `server/PostHandlers.cpp` |
+| 评论（文章、留言板）、表情回应、有人回复时发邮件提醒（默认关，读者在账号页打开） | `CommentHandlers.cpp`、`ReactionHandlers.cpp` |
 | 段落评论：选中文章的一段来评论，楼主选中处显示 💬 和回复数，讨论在旁边（手机上从底部弹出），点中哪条评论就高亮它的段落；回复默认沿用所回复评论的段落，也可以另选。文章的每个已发布版本都留着，改了以后找不到原文的评论交给作者处理（保留，或在文章里重选），读者在「原文已修改」里看到当时的原文 | `CommentHandlers.cpp`、`PostHandlers.cpp`（`WorkerSyncPostRevisions`）、`web/app/lib/passage.ts`、`components/passages.tsx` |
 | 写作者和协作：管理员给账号开通写作权限后，它拥有自己的文章（`/zh/write`），可以邀请协作者，按人给发布、改设置、管理协作者的权限；多人实时编辑工作副本（`post_draft`），发布后读者才看到；在文章页上直接编辑，Markdown 所见即所得；站点可以要求写作者的发布先审核（`site review`）；公开主页 `/zh/u/<用户名>` | `PostHandlers.cpp`、`PostAccess.h`、`Collab.cpp`、`web/app/components/editor/`、`web/app/routes/write/`、`routes/person.tsx` |
 | 版本历史：每次发布和手动保存都留一个版本，可以对比、还原 | `PostHandlers.cpp`（`post_revision`） |
@@ -192,7 +192,7 @@ systemctl reload blog                       # 读入刚生成的页面
 systemctl enable --now blog-backup.timer
 ```
 
-控制台（`help` 列出命令：改密码、重设 TOTP、改名、封禁、站点资料 `site show|set|import`、`server info`、`server restart`；后台能做的都有命令（`post`、`tag`、`note`、`thinking`、`comment`、`chat`、`friend`、`project`、`upload`、`account show|role|write|drive|kick…`、`stats`、`status`），读者那一侧的用 `api` 调接口，见 [docs/31](../../docs/31-console.md)。自己的客户端用 `/ws` 上的二进制包调读者和后台的操作（登录、文件下载这类只走 HTTP），见 [docs/32](../../docs/32-packets.md)）：`sudo -u blog /opt/blog/bin/blog --config /etc/blog/blog.yaml --console --socket /var/lib/blog/console.sock`。它连到正在运行的服务器，Tab 补全命令，密码不回显，Ctrl+C 或 Ctrl+D 只退出控制台。
+控制台（`help` 列出命令：改密码、重设 TOTP、改名、封禁、站点资料 `site show|set|import`、`server info`、`server restart`；后台能做的都有命令（`post`、`tag`、`comment`、`chat`、`friend`、`project`、`upload`、`account show|role|write|drive|kick…`、`stats`、`status`），读者那一侧的用 `api` 调接口，见 [docs/31](../../docs/31-console.md)。自己的客户端用 `/ws` 上的二进制包调读者和后台的操作（登录、文件下载这类只走 HTTP），见 [docs/32](../../docs/32-packets.md)）：`sudo -u blog /opt/blog/bin/blog --config /etc/blog/blog.yaml --console --socket /var/lib/blog/console.sock`。它连到正在运行的服务器，Tab 补全命令，密码不回显，Ctrl+C 或 Ctrl+D 只退出控制台。
 
 `blog.service` 只给了程序绑定 80、443 端口的权限（`CAP_NET_BIND_SERVICE`），程序以 `blog` 用户运行，不需要 root。
 
@@ -200,7 +200,7 @@ systemctl enable --now blog-backup.timer
 
 - **发布文章**：服务器在最后一次修改 10 秒后（`Blog.Rebuild.Debounce`）自动运行 `rebuild.sh`。它构建到新目录、检查结果（必须有的页面、代码块都已高亮）、压缩文本文件，再原子地切换 `current`；成功后服务器把新版本读进内存，失败就保留旧版本，原因写在服务器日志里。最近 5 个版本保留在 `releases/`，回滚就是把 `current` 指回去再 `systemctl reload blog`。
 - **评论、表情、在线人数**由浏览器直接请求 API 和 WebSocket，不需要重新构建。
-- **订阅邮件**：文章第一次发布时自动群发；日记在编辑页勾选"发布时邮件通知订阅者"才发。每篇只发一次（`mailed_at`），在单独的线程上按 `MailsPerMinute` 一封一封发，服务器重启时没发完的不会补发。每封邮件带退订链接和 `List-Unsubscribe` 头，邮箱客户端的"退订"按钮可以直接用。
+- **订阅邮件**：文章第一次发布时自动群发。每篇只发一次（`mailed_at`），在单独的线程上按 `MailsPerMinute` 一封一封发，服务器重启时没发完的不会补发。每封邮件带退订链接和 `List-Unsubscribe` 头，邮箱客户端的"退订"按钮可以直接用。
 - **网盘**：管理员在后台的用户页给账号开通网盘、设空间大小和回收站保留天数（管理员自己一直有）；删除的文件默认在回收站留 1 天；`drive list` 控制台命令列出各账号用了多少。上传的分片在 `drive/parts/`，一天没传完的自动清掉。
 - **聊天**：每个频道有消息上限（广场和群聊 5000 条，私聊 3000 条），超过时删掉最旧的；`Server.AntiDos.Limits` 的 `chat`、`chat.write` 限制频率；`chat` 控制台命令管理广场和群聊。
 - **站点设置**在后台"站点设置"里改，保存后自动重新构建。

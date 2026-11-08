@@ -39,8 +39,6 @@ export function meta({ params, loaderData }: Route.MetaArgs) {
 const pages = [
   ['', 'nav.home'],
   ['/posts', 'nav.posts'],
-  ['/notes', 'nav.notes'],
-  ['/thinking', 'nav.thinking'],
   ['/timeline', 'nav.timeline'],
   ['/guestbook', 'nav.guestbook'],
   ['/friends', 'nav.friends'],
@@ -78,7 +76,6 @@ export default function Sitemap({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation()
   const lang = useLang()
   const posts = loaderData.items.filter((item) => item.kind === 'post')
-  const notes = loaderData.items.filter((item) => item.kind === 'note')
   const tags = loaderData.tags.filter((tag) => tag.postCount > 0)
 
   return (
@@ -91,13 +88,6 @@ export default function Sitemap({ loaderData }: Route.ComponentProps) {
         <Section title={`${t('nav.posts')} · ${posts.length}`}>
           {posts.length ? (
             <Links links={posts.map((post) => ({ to: localePath(lang, `/posts/${post.slug}`), label: post.title }))} />
-          ) : (
-            <p className="text-sm text-muted-foreground">{t('sitemap.none')}</p>
-          )}
-        </Section>
-        <Section title={`${t('nav.notes')} · ${notes.length}`}>
-          {notes.length ? (
-            <Links links={notes.map((note) => ({ to: localePath(lang, `/notes/${note.id}`), label: note.title }))} />
           ) : (
             <p className="text-sm text-muted-foreground">{t('sitemap.none')}</p>
           )}

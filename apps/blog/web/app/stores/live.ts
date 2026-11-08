@@ -5,7 +5,7 @@ import { create } from 'zustand'
 // null until it's connected; pages show nothing then.
 // And what the page shows that others may change while it's open ("post:12", "guestbook"): each
 // part of the page watching one says so (useWatch), the socket tells the server, and when the
-// server says a post's or note's text changed its version here goes up (useContentVersion)
+// server says a post's text changed its version here goes up (useContentVersion)
 interface LiveState {
   page: number | null
   site: number | null

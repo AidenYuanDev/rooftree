@@ -32,8 +32,8 @@ test('the routes are listed, a filter narrows them', () => {
   const all = server.console('api routes')
   assert.match(all, /POST +\/api\/admin\/posts +admin/)
   assert.match(all, /GET +\/api\/drive +drive/)
-  const posts = server.console('api routes /api/admin/notes')
-  assert.match(posts, /PATCH +\/api\/admin\/notes\/\{id\}/)
+  const posts = server.console('api routes /api/admin/tags')
+  assert.match(posts, /PATCH +\/api\/admin\/tags\/\{slug\}/)
   assert.doesNotMatch(posts, /\/api\/drive/)
 })
 
@@ -55,13 +55,13 @@ test('a post from items and a markdown file, as the admin', () => {
 })
 
 test('JSON as it is, validation errors printed, unknown accounts and paths', () => {
-  const invalid = server.console('api post /api/admin/notes {"originalLang": "zh", "translations": {"zh": {"title": ""}}}')
+  const invalid = server.console('api post /api/admin/posts {"originalLang": "zh", "translations": {"zh": {"title": ""}}}')
   assert.match(invalid, /: 400/)
   assert.match(invalid, /"translations\.zh\.title": "required"/)
   assert.match(server.console('api get /api/nothing'), /: 404/)
   assert.match(server.console('api get /api/admin/posts --as nobody'), /There is no account nobody/)
-  assert.match(server.console('api post /api/admin/notes {not json'), /The body isn't JSON/)
-  assert.match(server.console('api post /api/admin/notes title'), /an item is key=text/)
+  assert.match(server.console('api post /api/admin/posts {not json'), /The body isn't JSON/)
+  assert.match(server.console('api post /api/admin/posts title'), /an item is key=text/)
   assert.match(server.console('api get admin/posts'), /Syntax: api get/)
 })
 

@@ -34,16 +34,6 @@ enum Opcode : ushort {
   TagsCreate = 0x0110,
   TagsUpdate = 0x0111,
   TagsDelete = 0x0112,
-  NotesList = 0x0120,
-  NotesGet = 0x0121,
-  NotesCreate = 0x0122,
-  NotesUpdate = 0x0123,
-  NotesDelete = 0x0124,
-  ThinkingList = 0x0130,
-  ThinkingGet = 0x0131,
-  ThinkingCreate = 0x0132,
-  ThinkingUpdate = 0x0133,
-  ThinkingDelete = 0x0134,
   CommentsList = 0x0140,
   CommentsModerate = 0x0141,
   FriendsList = 0x0150,
@@ -91,10 +81,6 @@ table Ok {
 // The operations with an id in their path and nothing else
 table IdRequest {
   id:uint = null;
-}
-
-table PageRequest {
-  page:uint = null;
 }
 
 table EmptyRequest {
@@ -221,109 +207,6 @@ table TagInput {
 
 table SlugRequest {
   slug:string;
-}
-
-// Notes
-
-table NoteText {
-  title:string;
-  body:string;
-}
-
-table NoteTranslations {
-  zh:NoteText (json_null, json_omit);
-  en:NoteText (json_null, json_omit);
-}
-
-table Note {
-  id:uint;
-  status:string;
-  originalLang:string;
-  mood:string;
-  weather:string;
-  cover:string;
-  commentsEnabled:bool;
-  translations:NoteTranslations;
-  publishedAt:string (json_null);
-  updatedAt:string;
-  createdAt:string;
-}
-
-table NoteInput {
-  id:uint = null;
-  status:string;
-  originalLang:string;
-  mood:string;
-  weather:string;
-  cover:string;
-  commentsEnabled:bool = null;
-  notify:bool = null;           // mail the subscribers once it is published
-  translations:NoteTranslations (json_closed);
-}
-
-table NotesListRequest {
-  status:string;
-  page:uint = null;
-}
-
-table NotesListItem {
-  id:uint;
-  status:string;
-  originalLang:string;
-  updatedAt:string;
-  publishedAt:string (json_null);
-  title:string;
-  translations:[string];
-}
-
-table NotesList {
-  notes:[NotesListItem];
-  hasMore:bool;
-}
-
-// Thinking
-
-table ThinkingText {
-  body:string;
-}
-
-table ThinkingTranslations {
-  zh:ThinkingText (json_null, json_omit);
-  en:ThinkingText (json_null, json_omit);
-}
-
-table Thinking {
-  id:uint;
-  status:string;
-  originalLang:string;
-  commentsEnabled:bool;
-  translations:ThinkingTranslations;
-  publishedAt:string (json_null);
-  updatedAt:string;
-  createdAt:string;
-}
-
-table ThinkingInput {
-  id:uint = null;
-  status:string;
-  originalLang:string;
-  commentsEnabled:bool = null;
-  translations:ThinkingTranslations (json_closed);
-}
-
-table ThinkingListItem {
-  id:uint;
-  status:string;
-  originalLang:string;
-  updatedAt:string;
-  publishedAt:string (json_null);
-  body:string;
-  translations:[string];
-}
-
-table ThinkingList {
-  thinking:[ThinkingListItem];
-  hasMore:bool;
 }
 
 // Comments

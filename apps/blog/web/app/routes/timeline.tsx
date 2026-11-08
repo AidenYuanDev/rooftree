@@ -1,4 +1,4 @@
-import { FileTextIcon, MessageSquareQuoteIcon, NotebookPenIcon } from 'lucide-react'
+import { FileTextIcon } from 'lucide-react'
 import { useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -10,7 +10,6 @@ import { localePath, useLang } from '~/lib/lang'
 import { pageMeta } from '~/lib/meta'
 import { requireLang } from '~/lib/route'
 import type { Lang, TimelineItem } from '~/lib/schemas'
-import { plainText } from '~/lib/text'
 
 async function load(lang: string | undefined) {
   const valid = requireLang(lang)
@@ -37,12 +36,8 @@ export function meta({ params, loaderData }: Route.MetaArgs) {
   return pageMeta({ lang, title: `${getI18n(lang).t('nav.timeline')} · ${loaderData?.siteName ?? ''}`, path: '/timeline' })
 }
 
-const icons = { post: FileTextIcon, note: NotebookPenIcon, thinking: MessageSquareQuoteIcon }
-
 function itemPath(lang: Lang, item: TimelineItem) {
-  if (item.kind === 'post') return localePath(lang, `/posts/${item.slug}`)
-  if (item.kind === 'note') return localePath(lang, `/notes/${item.id}`)
-  return localePath(lang, `/thinking#thinking-${item.id}`)
+  return localePath(lang, `/posts/${item.slug}`)
 }
 
 const subscribe = () => () => {}
@@ -83,7 +78,6 @@ export default function Timeline({ loaderData }: Route.ComponentProps) {
           </h2>
           <ol className="relative ml-2 space-y-1 border-l pl-6">
             {items.map((item) => {
-              const Icon = icons[item.kind]
               return (
                 <li key={`${item.kind}-${item.id}`} className="relative">
                   <span className="absolute top-3 -left-[1.95rem] size-2.5 rounded-full border-2 border-background bg-primary" />
@@ -94,10 +88,8 @@ export default function Timeline({ loaderData }: Route.ComponentProps) {
                     <time dateTime={item.publishedAt} className="w-12 shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
                       {parts(item.publishedAt).day}
                     </time>
-                    <Icon className="size-4 shrink-0 text-muted-foreground" aria-label={t(`admin.on.${item.kind}`)} />
-                    <span className="truncate group-hover:text-primary">
-                      {item.kind === 'thinking' ? plainText(item.title, 60) : item.title}
-                    </span>
+                    <FileTextIcon className="size-4 shrink-0 text-muted-foreground" aria-label={t(`admin.on.${item.kind}`)} />
+                    <span className="truncate group-hover:text-primary">{item.title}</span>
                   </Link>
                 </li>
               )

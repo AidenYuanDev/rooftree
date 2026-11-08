@@ -1,8 +1,7 @@
 /*
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
- * Comments on a post, a note, a thinking or the guestbook (the target, "post:7", "note:3",
- * "thinking:5", "guestbook"). Two levels like most Chinese sites: top-level comments start threads, every reply sits
+ * Comments on a post or the guestbook (the target, "post:7", "guestbook"). Two levels like most Chinese sites: top-level comments start threads, every reply sits
  * in its thread and may name whom it answers ("reply @someone"), so a conversation can go on as long
  * as it likes without the page indenting deeper and deeper. Replying to a reply files the new one in
  * the same thread with reply_to_user_id set.
@@ -69,7 +68,7 @@ Optional<CommentTarget> ParseTarget(std::string_view text)
 
     std::string_view kind = text.substr(0, colon);
     Optional<uint32> id = Rooftree::StringTo<uint32>(text.substr(colon + 1));
-    if (!id || !*id || (kind != "post" && kind != "note" && kind != "thinking"))
+    if (!id || !*id || kind != "post")
         return {};
 
     return CommentTarget{ std::string(kind), *id };
@@ -179,7 +178,7 @@ struct ReplyNotice
 {
     UserRow Recipient;
     std::string Lang;       // of the page linked: the recipient's when the page has it
-    std::string Title;      // of the post or note, empty for a thinking or the guestbook
+    std::string Title;      // of the post, empty for the guestbook
     std::string Path;       // "/zh/posts/hello", without the comment's anchor
 };
 
@@ -188,9 +187,9 @@ Optional<ReplyNotice> WorkerReplyPage(CommentTarget const& target, std::string c
 {
     ReplyNotice notice;
     notice.Lang = lang;
-    if (target.Kind == "post" || target.Kind == "note")
+    if (target.Kind == "post")
     {
-        BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(target.Kind == "post" ? BLOG_SEL_POST_TITLES : BLOG_SEL_NOTE_TITLES);
+        BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_POST_TITLES);
         stmt->setUInt32(0, target.Id);
         PreparedQueryResult rows = BlogDatabase.Query(stmt);
         if (!rows)
@@ -207,10 +206,8 @@ Optional<ReplyNotice> WorkerReplyPage(CommentTarget const& target, std::string c
         if (!titles.contains(lang))
             notice.Lang = titles.begin()->first;
         notice.Title = titles[notice.Lang];
-        notice.Path = target.Kind == "post" ? "/" + notice.Lang + "/posts/" + slug : Rooftree::StringFormat("/{}/notes/{}", notice.Lang, target.Id);
+        notice.Path = "/" + notice.Lang + "/posts/" + slug;
     }
-    else if (target.Kind == "thinking")
-        notice.Path = "/" + lang + "/thinking";
     else
         notice.Path = "/" + lang + "/guestbook";
     return notice;
@@ -243,13 +240,13 @@ Rooftree::Server::MailMessage ReplyMail(ReplyNotice const& notice, CommentRow co
     UserRow const& to = notice.Recipient;
     if (notice.Lang == "en")
     {
-        std::string where = !notice.Title.empty() ? "under “" + notice.Title + "”" : reply.Target.Kind == "thinking" ? "under a thought" : "in the guestbook";
+        std::string where = !notice.Title.empty() ? "under “" + notice.Title + "”" : "in the guestbook";
         return { .To = to.Email, .Subject = reply.DisplayName + " replied to you on " + site,
             .TextBody = Rooftree::StringFormat("Hi {},\n\n{} replied to your comment {}:\n\n{}\nRead it and answer:\n{}\n\n--\n"
                 "You get these as {} on {}. Turn them off in your account: {}\n", to.DisplayName, reply.DisplayName, where, quoted, link,
                 to.Username, site, account) };
     }
-    std::string where = !notice.Title.empty() ? "在《" + notice.Title + "》下" : reply.Target.Kind == "thinking" ? "在一句话下" : "在留言板";
+    std::string where = !notice.Title.empty() ? "在《" + notice.Title + "》下" : "在留言板";
     return { .To = to.Email, .Subject = reply.DisplayName + " 在" + site + "回复了你",
         .TextBody = Rooftree::StringFormat("{}，你好：\n\n{} {}回复了你的评论：\n\n{}\n去看看，或者回复 TA：\n{}\n\n——\n"
             "你在{}的账号是 {}。不想收到这类邮件，可以在账号设置里关掉：{}\n", to.DisplayName, reply.DisplayName, where, quoted, link,
@@ -374,7 +371,7 @@ bool IsWithinEditWindow(std::string const& createdAt, Seconds window)
     return !in.fail() && SystemTimePoint::clock::now() < created + window;
 }
 
-// target=note:3, or the older postId=7
+// target=post:7, or the older postId=7
 Optional<CommentTarget> GetTarget(Reader::CommentsListRequest const& in)
 {
     if (in.target())
@@ -384,7 +381,7 @@ Optional<CommentTarget> GetTarget(Reader::CommentsListRequest const& in)
     return {};
 }
 
-// Worker: whether target takes comments; for posts, notes and thinking, a published one with comments on
+// Worker: whether target takes comments; for posts, a published one with comments on
 enum class TargetState
 {
     Open,
@@ -397,9 +394,7 @@ TargetState WorkerCheckTarget(CommentTarget const& target)
     if (target.Kind == "guestbook")
         return TargetState::Open;
 
-    BlogDatabaseStatements statement = target.Kind == "post" ? BLOG_SEL_POST_FOR_COMMENT
-        : target.Kind == "note" ? BLOG_SEL_NOTE_FOR_COMMENT : BLOG_SEL_THINKING_FOR_COMMENT;
-    BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(statement);
+    BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_POST_FOR_COMMENT);
     stmt->setUInt32(0, target.Id);
     PreparedQueryResult row = BlogDatabase.Query(stmt);
     if (!row || row->Fetch()[0].GetString() != "published")
@@ -588,7 +583,7 @@ Rooftree::Task<void> CreateComment(Session& session, ApiRequest request)
 
     Reader::CommentInput const& in = request->Get<Reader::CommentInput>();
     TableFields fields(request->GetErrors());
-    // "target": "note:3", or the older "postId": 7
+    // "target": "post:7", or the older "postId": 7
     Optional<CommentTarget> commentTarget;
     if (in.target())
         commentTarget = ParseTarget(fields.Text("target", in.target(), 1, 30));
@@ -700,46 +695,42 @@ Rooftree::Task<void> CreateComment(Session& session, ApiRequest request)
         }
 
         stmt = BlogDatabase.GetPreparedStatement(BLOG_INS_COMMENT);
-        for (uint8 column = 0; std::string_view kind : { "post", "note", "thinking" })
-        {
-            if (on.Kind == kind)
-                stmt->setUInt32(column, on.Id);
-            else
-                stmt->setNull(column);
-            ++column;
-        }
-        stmt->setString(3, on.Kind);
-        stmt->setUInt32(4, on.Id);
-        stmt->setUInt32(5, userId);
+        if (on.Kind == "post")
+            stmt->setUInt32(0, on.Id);
+        else
+            stmt->setNull(0);
+        stmt->setString(1, on.Kind);
+        stmt->setUInt32(2, on.Id);
+        stmt->setUInt32(3, userId);
         if (parentId)
-            stmt->setUInt32(6, *parentId);
+            stmt->setUInt32(4, *parentId);
         else
-            stmt->setNull(6);
+            stmt->setNull(4);
         if (replyToUserId)
-            stmt->setUInt32(7, *replyToUserId);
+            stmt->setUInt32(5, *replyToUserId);
         else
-            stmt->setNull(7);
-        stmt->setString(8, text);
-        stmt->setString(9, ip);
+            stmt->setNull(5);
+        stmt->setString(6, text);
+        stmt->setString(7, ip);
         if (target)
-            stmt->setUInt32(10, *target);
+            stmt->setUInt32(8, *target);
         else
-            stmt->setNull(10);
+            stmt->setNull(8);
         if (anchor)
         {
-            stmt->setString(11, anchor->Lang);
-            stmt->setUInt32(12, anchor->Block);
-            stmt->setString(13, anchor->Quote);
-            stmt->setString(14, anchor->Prefix);
-            stmt->setString(15, anchor->Suffix);
-            stmt->setString(16, anchor->Text);
+            stmt->setString(9, anchor->Lang);
+            stmt->setUInt32(10, anchor->Block);
+            stmt->setString(11, anchor->Quote);
+            stmt->setString(12, anchor->Prefix);
+            stmt->setString(13, anchor->Suffix);
+            stmt->setString(14, anchor->Text);
             if (revision)
-                stmt->setUInt32(17, *revision);
+                stmt->setUInt32(15, *revision);
             else
-                stmt->setNull(17);
+                stmt->setNull(15);
         }
         else
-            for (uint8 column = 11; column <= 17; ++column)
+            for (uint8 column = 9; column <= 15; ++column)
                 stmt->setNull(column);
         BlogDatabase.DirectExecute(stmt);
 
@@ -773,8 +764,6 @@ Rooftree::Task<void> CreateComment(Session& session, ApiRequest request)
     RT_LOG_INFO("blog.comments", "{} commented on {} ({})", result.Comment->Username, result.Comment->Target.ToString(), result.Comment->Id);
     sWorld->RequestCommentCounts();
     sWorld->AnnounceChanged(result.Comment->Target.ToString(), "comments");
-    if (result.Comment->Target.Kind == "thinking")
-        sWorld->AnnounceChanged("thinking", "content");
     if (result.Notice)
     {
         if (sWorld->GetReplyMailLimiter().Allow(result.Notice->Recipient.Id))
@@ -935,8 +924,6 @@ Rooftree::Task<void> DeleteComment(Session& session, ApiRequest request)
         co_return request->RespondError(http::status::forbidden, result.Error);
 
     sWorld->RequestCommentCounts();
-    if (result.Target.starts_with("thinking:"))
-        sWorld->AnnounceChanged("thinking", "content");
     sWorld->AnnounceChanged(std::move(result.Target), "comments");
     RespondOk(request);
 }
@@ -1050,8 +1037,6 @@ Rooftree::Task<void> AdminModerateComment(Session& session, ApiRequest request)
         comment->Anchor ? Rooftree::StringFormat(", its passage {}", comment->Anchor->Status) : std::string());
     sWorld->RequestCommentCounts();
     sWorld->AnnounceChanged(comment->Target.ToString(), "comments");
-    if (comment->Target.Kind == "thinking")
-        sWorld->AnnounceChanged("thinking", "content");
     flatbuffers::FlatBufferBuilder builder;
     builder.Finish(CommentTable(builder, *comment));
     request->Respond(builder);

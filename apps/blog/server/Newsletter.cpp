@@ -87,8 +87,7 @@ void Newsletter::Run()
 
 void Newsletter::Send(NewsletterIssue const& issue)
 {
-    bool post = issue.Kind == "post";
-    BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(post ? BLOG_SEL_POST_TO_MAIL : BLOG_SEL_NOTE_TO_MAIL);
+    BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_POST_TO_MAIL);
     stmt->setUInt32(0, issue.Id);
     PreparedQueryResult rows = BlogDatabase.Query(stmt);
     if (!rows)
@@ -108,11 +107,11 @@ void Newsletter::Send(NewsletterIssue const& issue)
         texts[fields[1].GetString()] = { fields[2].GetString(), fields[3].GetString() };
     } while (rows->NextRow());
 
-    stmt = BlogDatabase.GetPreparedStatement(post ? BLOG_UPD_POST_MAILED : BLOG_UPD_NOTE_MAILED);
+    stmt = BlogDatabase.GetPreparedStatement(BLOG_UPD_POST_MAILED);
     stmt->setUInt32(0, issue.Id);
     BlogDatabase.DirectExecute(stmt);
 
-    std::string path = post ? "/posts/" + slug : Rooftree::StringFormat("/notes/{}", issue.Id);
+    std::string path = "/posts/" + slug;
     Milliseconds pause = Milliseconds(60000 / std::max(issue.MailsPerMinute, 1u));
     uint32 sent = 0;
     PreparedQueryResult subscribers = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(BLOG_SEL_ACTIVE_SUBSCRIBERS));
@@ -152,7 +151,7 @@ void Newsletter::Send(NewsletterIssue const& issue)
             }
             else
             {
-                message.Subject = Rooftree::StringFormat("「{}」{}{}", site, post ? "新文章：" : "新日记：", text.Title);
+                message.Subject = Rooftree::StringFormat("「{}」{}{}", site, "新文章：", text.Title);
                 message.TextBody = Rooftree::StringFormat("{}\n\n{}阅读全文：\n{}\n\n——\n你订阅了{}的更新。退订：{}\n", text.Title, summary, link, site, unsubscribe);
             }
             // One-click unsubscribing from the mail client (RFC 8058): a POST to the API with the token

@@ -208,7 +208,7 @@ describe('admin packets', () => {
 
     const missing = await ws.call('PostsGet', { id: 999999 }, 'IdRequest', 'Post')
     assert.deepEqual([missing.error.status, missing.error.code], [404, 'not_found'])
-    const noId = await ws.call('NotesGet', {}, 'IdRequest', 'Note')
+    const noId = await ws.call('PostsGet', {}, 'IdRequest', 'Post')
     assert.equal(noId.error.status, 404)
 
     assert.equal((await ws.call('TagsCreate', { slug: 'twice', nameZh: '两', nameEn: 'Two' }, 'TagInput', 'Tag')).json.postCount, undefined)
@@ -223,30 +223,6 @@ describe('admin packets', () => {
     assert.deepEqual(updated.json, { slug: 'net', nameZh: '网', nameEn: 'Network' })
     assert.ok((await new Client().get('/api/tags')).json.tags.some((tag) => tag.slug === 'net'))
     assert.deepEqual((await ws.call('TagsDelete', { slug: 'net' }, 'SlugRequest', 'Ok')).json, { ok: true })
-  })
-
-  test('notes and thinking', async () => {
-    const note = await ws.call('NotesCreate', {
-      status: 'draft', originalLang: 'zh', mood: '好', weather: '晴', translations: { zh: { title: '今天', body: '看星星' } },
-    }, 'NoteInput', 'Note')
-    assert.ok(note.ok, JSON.stringify(note.error))
-    const id = note.json.id
-    assertSame((await admin.get(`/api/admin/notes/${id}`)).json, note.json)
-    const edited = await ws.call('NotesUpdate', { id, mood: '累', translations: { en: { title: 'Today', body: 'Stars' } } }, 'NoteInput', 'Note')
-    assertSame((await admin.get(`/api/admin/notes/${id}`)).json, edited.json)
-    assertSame((await admin.get(`/api/admin/notes/${id}`)).json, (await ws.call('NotesGet', { id }, 'IdRequest', 'Note')).json)
-    assertSame((await admin.get('/api/admin/notes?page=1')).json, (await ws.call('NotesList', { page: 1 }, 'NotesListRequest', 'NotesList')).json)
-    assert.deepEqual((await ws.call('NotesDelete', { id }, 'IdRequest', 'Ok')).json, { ok: true })
-
-    const thinking = await ws.call('ThinkingCreate', { originalLang: 'zh', translations: { zh: { body: '人间有味是清欢' } } }, 'ThinkingInput', 'Thinking')
-    const thinkingId = thinking.json.id
-    assert.equal(thinking.json.status, 'published')
-    const unpublished = await ws.call('ThinkingUpdate', { id: thinkingId, status: 'draft' }, 'ThinkingInput', 'Thinking')
-    assertSame((await admin.get(`/api/admin/thinking/${thinkingId}`)).json, unpublished.json)
-    assertSame((await admin.get(`/api/admin/thinking/${thinkingId}`)).json,
-      (await ws.call('ThinkingGet', { id: thinkingId }, 'IdRequest', 'Thinking')).json)
-    assertSame((await admin.get('/api/admin/thinking')).json, (await ws.call('ThinkingList', {}, 'PageRequest', 'ThinkingList')).json)
-    assert.deepEqual((await ws.call('ThinkingDelete', { id: thinkingId }, 'IdRequest', 'Ok')).json, { ok: true })
   })
 
   test('comments', async () => {
@@ -440,17 +416,8 @@ describe('reader packets', () => {
     assert.deepEqual([empty.error.code, empty.error.fields], ['validation_failed', [{ name: 'q', code: 'too_short' }]])
   })
 
-  test('notes, thinking and the site, by anyone', async () => {
-    const note = (await admin.post('/api/admin/notes', { status: 'published', originalLang: 'zh', mood: '好',
-      translations: { zh: { title: '包', body: '读' }, en: { title: 'Packet', body: 'Read' } } })).json
-    await admin.post('/api/admin/thinking', { originalLang: 'zh', translations: { zh: { body: '包里的想法' } } })
+  test('the site, by anyone', async () => {
     const anon = new Client()
-    assertSame((await anon.get('/api/notes?lang=en')).json, (await anonymous.read('NotesList', { lang: 'en' }, 'PageRequest', 'NotesList')).json)
-    assertSame((await anon.get(`/api/notes/${note.id}?lang=en`)).json,
-      (await anonymous.read('NotesGet', { id: note.id, lang: 'en' }, 'NotesGetRequest', 'Note')).json)
-    assert.equal((await anonymous.read('NotesGet', {}, 'NotesGetRequest', 'Note')).error.status, 404)
-    assertSame((await anon.get('/api/thinking?limit=2')).json, (await anonymous.read('ThinkingList', { limit: 2 }, 'PageRequest', 'ThinkingList')).json)
-
     assertSame((await anon.get('/api/site?lang=en')).json, (await anonymous.read('SiteGet', { lang: 'en' }, 'LangRequest', 'Site')).json)
     assertSame((await anon.get('/api/site/about')).json, (await anonymous.read('SiteAbout', {}, 'LangRequest', 'About')).json)
     assertSame((await anon.get('/api/timeline')).json, (await anonymous.read('Timeline', {}, 'LangRequest', 'Timeline')).json)

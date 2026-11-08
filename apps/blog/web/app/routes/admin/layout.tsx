@@ -11,8 +11,6 @@ export const meta = ({ params }: Route.MetaArgs) => privateMeta(params.lang, 'ad
 // moderator: the sections moderators have too, the rest is the admin's
 const sections = [
   ['', 'admin.posts', false],
-  ['/notes', 'admin.notes', false],
-  ['/thinking', 'admin.thinking', false],
   ['/comments', 'admin.comments', true],
   ['/users', 'admin.users', true],
   ['/drives', 'admin.drives', false],

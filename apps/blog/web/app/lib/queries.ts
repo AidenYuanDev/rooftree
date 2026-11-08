@@ -23,11 +23,7 @@ import {
   AdminCommentList,
   AdminFriend,
   AdminFriendList,
-  AdminNote,
-  AdminNoteList,
   AdminSite,
-  AdminThinking,
-  AdminThinkingList,
   AdminPost,
   PostEditors,
   Person,
@@ -735,87 +731,7 @@ export function useUpload(postId?: number) {
   return useMutation({ mutationFn: (file: File) => uploadFile(file, postId) })
 }
 
-// Notes, thinking, the site's profile, friends and projects
-
-export function useAdminNotes(status: string, page: number) {
-  return useQuery({
-    queryKey: ['admin', 'notes', status, page],
-    queryFn: () => api(`/api/admin/notes?status=${encodeURIComponent(status)}&page=${page}`, AdminNoteList),
-  })
-}
-
-export function useAdminNote(id: number | null) {
-  return useQuery({
-    queryKey: ['admin', 'note', id ?? 0],
-    queryFn: () => api(`/api/admin/notes/${id}`, AdminNote),
-    enabled: id !== null,
-  })
-}
-
-export interface NoteInput {
-  status: 'draft' | 'published'
-  originalLang: Lang
-  mood: string
-  weather: string
-  cover: string
-  commentsEnabled: boolean
-  // Mail it to the subscribers once published (once only)
-  notify?: boolean
-  // null removes a translation (updates only)
-  translations: Partial<Record<Lang, { title: string; body: string } | null>>
-}
-
-export function useSaveNote() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, input }: { id: number | null; input: NoteInput }) =>
-      id === null
-        ? api('/api/admin/notes', AdminNote, { method: 'POST', body: input })
-        : api(`/api/admin/notes/${id}`, AdminNote, { method: 'PATCH', body: input }),
-    onSuccess: (note) => {
-      queryClient.setQueryData(['admin', 'note', note.id], note)
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'notes'] })
-    },
-  })
-}
-
-export function useDeleteNote() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => api(`/api/admin/notes/${id}`, Ok, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'notes'] }),
-  })
-}
-
-export function useAdminThinking(page: number) {
-  return useQuery({ queryKey: ['admin', 'thinking', page], queryFn: () => api(`/api/admin/thinking?page=${page}`, AdminThinkingList) })
-}
-
-export interface ThinkingInput {
-  status: 'draft' | 'published'
-  originalLang: Lang
-  commentsEnabled?: boolean
-  translations: Partial<Record<Lang, { body: string } | null>>
-}
-
-export function useSaveThinking() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, input }: { id: number | null; input: ThinkingInput }) =>
-      id === null
-        ? api('/api/admin/thinking', AdminThinking, { method: 'POST', body: input })
-        : api(`/api/admin/thinking/${id}`, AdminThinking, { method: 'PATCH', body: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'thinking'] }),
-  })
-}
-
-export function useDeleteThinking() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => api(`/api/admin/thinking/${id}`, Ok, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'thinking'] }),
-  })
-}
+// The site's profile, friends and projects
 
 export function usePerson(username: string, lang: Lang) {
   return useQuery({

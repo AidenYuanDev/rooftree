@@ -14,9 +14,6 @@
  *   post editors <post>, post editor add <post> <account> [publish,settings,editors|none],
  *   post editor remove <post> <account>, post owner <post> <account>
  *   tag list, tag add|edit <slug> <name zh> <name en>, tag delete <slug>
- *   note list|show|create|edit|publish|unpublish|delete, note translation set|delete   like post's, by id
- *   thinking list [page], thinking add <zh|en> <text>, thinking edit <id> <zh|en> <text>,
- *   thinking publish|unpublish|delete <id>
  *   comment list [visible|hidden|deleted] [before <id>], comment hide|show <id>
  *   friend list [pending|approved|rejected], friend approve <id>, friend reject <id> [reason],
  *   friend add <name> <url> [description], friend edit <id> name|url|avatar|description|sort <value>,

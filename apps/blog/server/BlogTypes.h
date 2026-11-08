@@ -57,8 +57,6 @@ SystemTimePoint PermanentBanTime();
 struct SiteCounts
 {
     int64 Posts = 0;
-    int64 Notes = 0;
-    int64 Thinking = 0;
     int64 Words = 0;
 };
 

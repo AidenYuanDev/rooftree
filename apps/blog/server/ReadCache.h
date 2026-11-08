@@ -2,13 +2,13 @@
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Readers' answers that are the same for everyone, kept in memory until what they show changes: the
- * published posts' lists and pages, the comments of a post, note, thinking or the guestbook as readers
+ * published posts' lists and pages, the comments of a post or the guestbook as readers
  * see them (their FlatBuffers answers, by key) and the site's counts. A query that took a few hundred
  * microseconds of PostgreSQL each time is then a lookup; on two cores the database was what a load of reads ran
  * out of first.
  *
  * Invalidate() drops it all. BlogWorld calls it where the prerendered pages go stale too
- * (RequestRebuild: a post, note, thinking, tag or the site changed or was published at its time), on a
+ * (RequestRebuild: a post, tag or the site changed or was published at its time), on a
  * comment's change (the counts the posts show, the comments' lists; an edit of its text too), on an
  * account's (an author's or a commenter's name, picture, role) and every Cleanup (what a stream of
  * made up cursors filled it with goes too). Only what worked is kept: a missing post, a redirect, an

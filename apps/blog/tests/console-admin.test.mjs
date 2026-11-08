@@ -1,4 +1,4 @@
-// The admin's pages as console commands (ConsoleAdmin.h): posts, tags, notes, thinking, comments,
+// The admin's pages as console commands (ConsoleAdmin.h): posts, tags, comments,
 // chat, friends' links, projects, uploads, accounts and the numbers, checked against the API (pnpm test:api).
 
 import assert from 'node:assert/strict'
@@ -77,27 +77,6 @@ describe('posts and tags', () => {
     assert.match(server.console('post delete from-console'), /Deleted from-console/)
     assert.match(server.console('post show from-console'), /There is no post from-console/)
     assert.match(server.console('tag delete console'), /Deleted tag console/)
-  })
-})
-
-describe('notes and thinking', () => {
-  test('notes', () => {
-    const created = server.console(`note create zh 今天 ${file('n.md', '看星星')} published`)
-    const id = created.match(/Created note (\d+): published/)[1]
-    assert.match(server.console(`note edit ${id} mood 开心`), /mood: 开心, weather: -/)
-    assert.match(server.console(`note translation set ${id} en Today ${file('n-en.md', 'Stars')}`), /en: Today, 5 characters/)
-    assert.match(server.console('note list'), new RegExp(`${id} +published +(zh,en|en,zh) +今天`))
-    assert.match(server.console(`note unpublish ${id}`), /: draft/)
-    assert.match(server.console(`note delete ${id}`), new RegExp(`Deleted note ${id}`))
-    assert.match(server.console(`note show ${id}`), /Not found/)
-  })
-
-  test('thinking', () => {
-    const id = server.console('thinking add zh 人间有味是清欢').match(/Added thinking (\d+): published/)[1]
-    assert.match(server.console(`thinking edit ${id} en The taste of life is in the plain`), /en: The taste of life/)
-    assert.match(server.console('thinking list'), /人间有味是清欢/)
-    assert.match(server.console(`thinking unpublish ${id}`), /: draft/)
-    assert.match(server.console(`thinking delete ${id}`), new RegExp(`Deleted thinking ${id}`))
   })
 })
 

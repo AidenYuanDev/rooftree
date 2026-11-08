@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
 
-// What a page shows in the header once its own title has scrolled away (posts, notes)
+// What a page shows in the header once its own title has scrolled away (posts)
 interface HeaderState {
   title: string | null
   set: (title: string | null) => void

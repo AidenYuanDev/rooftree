@@ -3,21 +3,7 @@
 
 import { ApiError, api } from './api'
 import { z } from 'zod'
-import {
-  About,
-  FriendList,
-  Lang,
-  Note,
-  NoteList,
-  Post,
-  PostList,
-  ProjectList,
-  Site,
-  Slugs,
-  TagList,
-  ThinkingList,
-  Timeline,
-} from './schemas'
+import { About, FriendList, Lang, Post, PostList, ProjectList, Site, Slugs, TagList, Timeline } from './schemas'
 
 export const pageSize = 10
 
@@ -28,7 +14,7 @@ export function fetchPostList(lang: Lang, options: { tag?: string; cursor?: stri
   return api(`/api/posts?${query}`, PostList)
 }
 
-// A post or note that is there, not in the language asked for: each language's site has only what is
+// A post that is there, not in the language asked for: each language's site has only what is
 // written in it. The languages it is in
 export interface NotInLang {
   notInLang: Lang[]
@@ -65,28 +51,6 @@ export function fetchSite(lang: Lang) {
 
 export function fetchAbout(lang: Lang) {
   return api(`/api/site/about?lang=${lang}`, About)
-}
-
-export function fetchNoteList(lang: Lang, cursor?: string | null) {
-  const query = new URLSearchParams({ lang, limit: String(pageSize) })
-  if (cursor) query.set('cursor', cursor)
-  return api(`/api/notes?${query}`, NoteList)
-}
-
-// null when there is no such (published) note
-export async function fetchNote(lang: Lang, id: string) {
-  if (!/^[1-9]\d{0,9}$/.test(id)) return null
-  try {
-    return await api(`/api/notes/${id}?lang=${lang}`, Note)
-  } catch (error) {
-    return notFound(error)
-  }
-}
-
-export function fetchThinkingList(lang: Lang, cursor?: string | null) {
-  const query = new URLSearchParams({ lang, limit: '20' })
-  if (cursor) query.set('cursor', cursor)
-  return api(`/api/thinking?${query}`, ThinkingList)
 }
 
 export async function fetchTimeline(lang: Lang) {

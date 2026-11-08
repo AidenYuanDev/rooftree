@@ -21,16 +21,10 @@
 #define BLOG_POST_TAGS "(SELECT string_agg(tg.slug, ',' ORDER BY tg.slug) FROM post_tag pt JOIN tag tg ON tg.id = pt.tag_id WHERE pt.post_id = p.id)"
 #define BLOG_POST_LANGS "(SELECT string_agg(x.lang, ',' ORDER BY x.lang DESC) FROM post_translation x WHERE x.post_id = p.id)"
 #define BLOG_POST_COMMENT_COUNT "(SELECT COUNT(*) FROM comment c WHERE c.target_kind = 'post' AND c.target_id = p.id AND c.status = 'visible')"
-#define BLOG_NOTE_LANGS "(SELECT string_agg(x.lang, ',' ORDER BY x.lang DESC) FROM note_translation x WHERE x.note_id = n.id)"
-#define BLOG_NOTE_COMMENT_COUNT "(SELECT COUNT(*) FROM comment c WHERE c.target_kind = 'note' AND c.target_id = n.id AND c.status = 'visible')"
-#define BLOG_THINKING_LANGS "(SELECT string_agg(x.lang, ',' ORDER BY x.lang DESC) FROM thinking_translation x WHERE x.thinking_id = h.id)"
-#define BLOG_THINKING_COMMENT_COUNT "(SELECT COUNT(*) FROM comment c WHERE c.target_kind = 'thinking' AND c.target_id = h.id AND c.status = 'visible')"
 
 // A row's text in the requested language (t, its ? is the requested language); rows without one are
 // left out: each language's site shows only what is written in it
-#define BLOG_NOTE_TEXT_JOINS "FROM note n JOIN note_translation t ON t.note_id = n.id AND t.lang = ? "
 #define BLOG_POST_TEXT_JOINS "FROM post p JOIN post_translation t ON t.post_id = p.id AND t.lang = ? "
-#define BLOG_THINKING_TEXT_JOINS "FROM thinking h JOIN thinking_translation t ON t.thinking_id = h.id AND t.lang = ? "
 
 BlogDatabaseConnection::BlogDatabaseConnection(DatabaseConnectionInfo const& info) : DatabaseConnection(info)
 {
@@ -159,73 +153,14 @@ void BlogDatabaseConnection::DoPrepareStatements()
     PrepareStatement(BLOG_SEL_POSTS_WITHOUT_WORDS, "SELECT p.id, o.title, o.body_md FROM post p "
         "JOIN post_translation o ON o.post_id = p.id AND o.lang = p.original_lang WHERE p.word_count = 0");
 
-    // notes: like posts, with numbers instead of slugs. Lists carry the start of the text
-    PrepareStatement(BLOG_SEL_NOTES, "SELECT n.id, n.mood, n.weather, n.cover, n.published_at, n.updated_at, n.original_lang, "
-        "t.lang, t.title, LEFT(t.body_md, 300), " BLOG_NOTE_LANGS ", " BLOG_NOTE_COMMENT_COUNT " "
-        BLOG_NOTE_TEXT_JOINS "WHERE n.status = 'published' AND (n.published_at < ? OR (n.published_at = ? AND n.id < ?)) "
-        "ORDER BY n.published_at DESC, n.id DESC LIMIT ?");
-    PrepareStatement(BLOG_SEL_NOTE, "SELECT n.id, n.status, n.mood, n.weather, n.cover, n.comments_enabled, n.published_at, n.updated_at, "
-        "n.original_lang, n.word_count, " BLOG_NOTE_LANGS ", " BLOG_NOTE_COMMENT_COUNT " FROM note n WHERE n.id = ?");
-    PrepareStatement(BLOG_SEL_NOTE_TRANSLATION, "SELECT lang, title, body_md FROM note_translation WHERE note_id = ? AND lang = ?");
-    PrepareStatement(BLOG_SEL_NOTE_PREV, "SELECT n.id, t.title " BLOG_NOTE_TEXT_JOINS
-        "WHERE n.status = 'published' AND (n.published_at < ? OR (n.published_at = ? AND n.id < ?)) ORDER BY n.published_at DESC, n.id DESC LIMIT 1");
-    PrepareStatement(BLOG_SEL_NOTE_NEXT, "SELECT n.id, t.title " BLOG_NOTE_TEXT_JOINS
-        "WHERE n.status = 'published' AND (n.published_at > ? OR (n.published_at = ? AND n.id > ?)) ORDER BY n.published_at, n.id LIMIT 1");
-    PrepareStatement(BLOG_SEL_PUBLISHED_NOTES, "SELECT n.id, n.updated_at, " BLOG_NOTE_LANGS " FROM note n WHERE n.status = 'published' "
-        "ORDER BY n.published_at DESC, n.id DESC");
-    PrepareStatement(BLOG_SEL_ADMIN_NOTES, "SELECT n.id, n.status, n.original_lang, n.updated_at, n.published_at, o.title, " BLOG_NOTE_LANGS " "
-        "FROM note n JOIN note_translation o ON o.note_id = n.id AND o.lang = n.original_lang "
-        "WHERE (? = '' OR n.status = ?) ORDER BY n.updated_at DESC, n.id DESC LIMIT ? OFFSET ?");
-    PrepareStatement(BLOG_SEL_NOTE_BY_ID, "SELECT id, status, original_lang, mood, weather, cover, comments_enabled, published_at, updated_at, created_at "
-        "FROM note WHERE id = ?");
-    PrepareStatement(BLOG_SEL_NOTE_TRANSLATIONS, "SELECT lang, title, body_md FROM note_translation WHERE note_id = ? ORDER BY lang DESC");
-    PrepareStatement(BLOG_INS_NOTE, "INSERT INTO note (status, original_lang, mood, weather, cover, comments_enabled, word_count, published_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    PrepareStatement(BLOG_INS_NEW_NOTE_TRANSLATION, "INSERT INTO note_translation (note_id, lang, title, body_md) VALUES (lastval(), ?, ?, ?)");
-    // Only the admin creates notes, thinking and projects, one at a time: the newest is the one just made
-    PrepareStatement(BLOG_SEL_NEWEST_NOTE_ID, "SELECT MAX(id) FROM note");
-    PrepareStatement(BLOG_UPD_NOTE, "UPDATE note SET status = ?, original_lang = ?, mood = ?, weather = ?, cover = ?, comments_enabled = ?, "
-        "published_at = COALESCE(published_at, ?), updated_at = utc_now() WHERE id = ?");
-    PrepareStatement(BLOG_REP_NOTE_TRANSLATION, "INSERT INTO note_translation (note_id, lang, title, body_md) VALUES (?, ?, ?, ?) ON CONFLICT (note_id, lang) DO UPDATE SET title = EXCLUDED.title, body_md = EXCLUDED.body_md");
-    PrepareStatement(BLOG_DEL_NOTE_TRANSLATION, "DELETE FROM note_translation WHERE note_id = ? AND lang = ?");
-    PrepareStatement(BLOG_DEL_NOTE, "DELETE FROM note WHERE id = ?");
-    PrepareStatement(BLOG_UPD_NOTE_WORDS, "UPDATE note SET word_count = ? WHERE id = ?");
-    PrepareStatement(BLOG_SEL_NOTES_WITHOUT_WORDS, "SELECT n.id, o.title, o.body_md FROM note n "
-        "JOIN note_translation o ON o.note_id = n.id AND o.lang = n.original_lang WHERE n.word_count = 0");
-
-    // thinking: one-liners, the whole text in lists
-    PrepareStatement(BLOG_SEL_THINKING_LIST, "SELECT h.id, h.published_at, h.original_lang, t.lang, t.body_md, "
-        BLOG_THINKING_LANGS ", " BLOG_THINKING_COMMENT_COUNT ", h.comments_enabled " BLOG_THINKING_TEXT_JOINS
-        "WHERE h.status = 'published' AND (h.published_at < ? OR (h.published_at = ? AND h.id < ?)) "
-        "ORDER BY h.published_at DESC, h.id DESC LIMIT ?");
-    PrepareStatement(BLOG_SEL_ADMIN_THINKING, "SELECT h.id, h.status, h.original_lang, h.updated_at, h.published_at, o.body_md, " BLOG_THINKING_LANGS " "
-        "FROM thinking h JOIN thinking_translation o ON o.thinking_id = h.id AND o.lang = h.original_lang "
-        "ORDER BY h.created_at DESC, h.id DESC LIMIT ? OFFSET ?");
-    PrepareStatement(BLOG_SEL_THINKING_BY_ID, "SELECT id, status, original_lang, comments_enabled, published_at, updated_at, created_at "
-        "FROM thinking WHERE id = ?");
-    PrepareStatement(BLOG_SEL_THINKING_TRANSLATIONS, "SELECT lang, body_md FROM thinking_translation WHERE thinking_id = ? ORDER BY lang DESC");
-    PrepareStatement(BLOG_INS_THINKING, "INSERT INTO thinking (status, original_lang, comments_enabled, published_at) VALUES (?, ?, ?, ?)");
-    PrepareStatement(BLOG_INS_NEW_THINKING_TRANSLATION, "INSERT INTO thinking_translation (thinking_id, lang, body_md) VALUES (lastval(), ?, ?)");
-    PrepareStatement(BLOG_SEL_NEWEST_THINKING_ID, "SELECT MAX(id) FROM thinking");
-    PrepareStatement(BLOG_UPD_THINKING, "UPDATE thinking SET status = ?, original_lang = ?, comments_enabled = ?, published_at = COALESCE(published_at, ?), "
-        "updated_at = utc_now() WHERE id = ?");
-    PrepareStatement(BLOG_REP_THINKING_TRANSLATION, "INSERT INTO thinking_translation (thinking_id, lang, body_md) VALUES (?, ?, ?) ON CONFLICT (thinking_id, lang) DO UPDATE SET body_md = EXCLUDED.body_md");
-    PrepareStatement(BLOG_DEL_THINKING_TRANSLATION, "DELETE FROM thinking_translation WHERE thinking_id = ? AND lang = ?");
-    PrepareStatement(BLOG_DEL_THINKING, "DELETE FROM thinking WHERE id = ?");
-
     // site. JSON as text: the documents are parsed by Boost.JSON
     PrepareStatement(BLOG_SEL_SITE_SETTINGS, "SELECT name, value::text FROM site_setting");
     PrepareStatement(BLOG_REP_SITE_SETTING, "INSERT INTO site_setting (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value, updated_at = utc_now()");
-    PrepareStatement(BLOG_SEL_SITE_STATS, "SELECT (SELECT COUNT(*) FROM post WHERE status = 'published'), (SELECT COUNT(*) FROM note WHERE status = 'published'), "
-        "(SELECT COUNT(*) FROM thinking WHERE status = 'published'), "
-        "CAST((SELECT COALESCE(SUM(word_count), 0) FROM post WHERE status = 'published') + "
-        "(SELECT COALESCE(SUM(word_count), 0) FROM note WHERE status = 'published') AS bigint)");
-    // Everything published, newest first: what, which, its title (thinking: its start) in the language
-    PrepareStatement(BLOG_SEL_TIMELINE, "(SELECT 'post' AS kind, p.id, p.slug, t.title AS title, p.published_at "
-        BLOG_POST_TEXT_JOINS "WHERE p.status = 'published') "
-        "UNION ALL (SELECT 'note', n.id, '', t.title, n.published_at " BLOG_NOTE_TEXT_JOINS "WHERE n.status = 'published') "
-        "UNION ALL (SELECT 'thinking', h.id, '', LEFT(t.body_md, 80), h.published_at " BLOG_THINKING_TEXT_JOINS
-        "WHERE h.status = 'published') ORDER BY published_at DESC, id DESC LIMIT ?");
+    PrepareStatement(BLOG_SEL_SITE_STATS, "SELECT (SELECT COUNT(*) FROM post WHERE status = 'published'), "
+        "CAST((SELECT COALESCE(SUM(word_count), 0) FROM post WHERE status = 'published') AS bigint)");
+    // The posts published, newest first: what, which, its title in the language
+    PrepareStatement(BLOG_SEL_TIMELINE, "SELECT 'post' AS kind, p.id, p.slug, t.title AS title, p.published_at "
+        BLOG_POST_TEXT_JOINS "WHERE p.status = 'published' ORDER BY p.published_at DESC, p.id DESC LIMIT ?");
     PrepareStatement(BLOG_SEL_FRIENDS, "SELECT id, name, url, avatar, description FROM friend_link WHERE status = 'approved' ORDER BY sort, id");
 #define BLOG_FRIEND_COLUMNS "f.id, f.name, f.url, f.avatar, f.description, f.status, f.message, f.reject_reason, f.sort, f.created_at, f.reviewed_at, " \
     "u.id AS applicant_id, u.username, u.display_name, u.email, u.locale"
@@ -260,14 +195,12 @@ void BlogDatabaseConnection::DoPrepareStatements()
 
     // comments
     PrepareStatement(BLOG_SEL_POST_FOR_COMMENT, "SELECT status, comments_enabled FROM post WHERE id = ?");
-    PrepareStatement(BLOG_SEL_NOTE_FOR_COMMENT, "SELECT status, comments_enabled FROM note WHERE id = ?");
-    PrepareStatement(BLOG_SEL_THINKING_FOR_COMMENT, "SELECT status, comments_enabled FROM thinking WHERE id = ?");
     PrepareStatement(BLOG_SEL_COMMENT, "SELECT id, target_kind, target_id, user_id, parent_id, status, created_at FROM comment WHERE id = ?");
     PrepareStatement(BLOG_SEL_USER_TARGET_COMMENT_COUNT, "SELECT COUNT(*) FROM comment WHERE user_id = ? AND target_kind = ? AND target_id = ?");
     // The target twice: its kind's foreign key (for ON DELETE CASCADE) and target_kind, target_id
-    PrepareStatement(BLOG_INS_COMMENT, "INSERT INTO comment (post_id, note_id, thinking_id, target_kind, target_id, user_id, parent_id, reply_to_user_id, body, ip, "
+    PrepareStatement(BLOG_INS_COMMENT, "INSERT INTO comment (post_id, target_kind, target_id, user_id, parent_id, reply_to_user_id, body, ip, "
         "reply_to_id, anchor_lang, anchor_block, anchor_quote, anchor_prefix, anchor_suffix, anchor_text, anchor_revision) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     // A passage chosen again: found in the post as it is
     PrepareStatement(BLOG_UPD_COMMENT_ANCHOR, "UPDATE comment SET anchor_lang = ?, anchor_block = ?, anchor_quote = ?, anchor_prefix = ?, anchor_suffix = ?, "
         "anchor_text = ?, anchor_revision = ?, anchor_status = 'ok' WHERE id = ?");
@@ -327,12 +260,11 @@ void BlogDatabaseConnection::DoPrepareStatements()
 
     // A reply's mail: the page of the comment, its title in each language
     PrepareStatement(BLOG_SEL_POST_TITLES, "SELECT x.lang, x.title, p.slug FROM post p JOIN post_translation x ON x.post_id = p.id WHERE p.id = ? ORDER BY x.lang DESC");
-    PrepareStatement(BLOG_SEL_NOTE_TITLES, "SELECT lang, title, '' FROM note_translation WHERE note_id = ? ORDER BY lang DESC");
 
     // reactions. IGNORE: the same reaction twice is still one
     PrepareStatement(BLOG_SEL_COMMENT_FOR_REACTION, "SELECT status FROM comment WHERE id = ?");
-    PrepareStatement(BLOG_INS_REACTION, "INSERT INTO reaction (user_id, target_kind, target_id, kind, post_id, note_id, thinking_id, comment_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING");
+    PrepareStatement(BLOG_INS_REACTION, "INSERT INTO reaction (user_id, target_kind, target_id, kind, post_id, comment_id) "
+        "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING");
     PrepareStatement(BLOG_DEL_REACTION, "DELETE FROM reaction WHERE user_id = ? AND target_kind = ? AND target_id = ? AND kind = ?");
 
     // subscriptions
@@ -347,13 +279,10 @@ void BlogDatabaseConnection::DoPrepareStatements()
     PrepareStatement(BLOG_UPD_SUBSCRIBER_STATUS, "UPDATE subscriber SET status = ?, lang = ?, confirm_hash = NULL WHERE id = ?");
     PrepareStatement(BLOG_UPD_SUBSCRIBER_UNSUBSCRIBED, "UPDATE subscriber SET status = 'unsubscribed', confirm_hash = NULL WHERE id = ?");
     PrepareStatement(BLOG_SEL_ACTIVE_SUBSCRIBERS, "SELECT email, lang, unsubscribe_token FROM subscriber WHERE status = 'active' ORDER BY id");
-    // A post or note to mail: published, never mailed. Each translation as "lang", title, summary
+    // A post to mail: published, never mailed. Each translation as "lang", title, summary
     PrepareStatement(BLOG_SEL_POST_TO_MAIL, "SELECT p.slug, t.lang, t.title, t.summary FROM post p JOIN post_translation t ON t.post_id = p.id "
         "WHERE p.id = ? AND p.status = 'published' AND p.mailed_at IS NULL");
     PrepareStatement(BLOG_UPD_POST_MAILED, "UPDATE post SET mailed_at = utc_now() WHERE id = ?");
-    PrepareStatement(BLOG_SEL_NOTE_TO_MAIL, "SELECT '', t.lang, t.title, LEFT(t.body_md, 200) FROM note n JOIN note_translation t ON t.note_id = n.id "
-        "WHERE n.id = ? AND n.status = 'published' AND n.mailed_at IS NULL");
-    PrepareStatement(BLOG_UPD_NOTE_MAILED, "UPDATE note SET mailed_at = utc_now() WHERE id = ?");
 
     // users and bans, admin
     // Filters, each off with '' (or 0): the search (by address only when the 1st ? is 1, the admin), the
@@ -398,8 +327,6 @@ void BlogDatabaseConnection::DoPrepareStatements()
     PrepareStatement(BLOG_SEL_SEARCH_POSTS, "SELECT p.id, p.slug, p.cover, p.published_at, p.updated_at, p.original_lang, "
         "t.lang, t.title, t.summary, t.body_md, " BLOG_POST_TAGS " "
         "FROM post p JOIN post_translation t ON t.post_id = p.id WHERE p.status = 'published' ORDER BY p.id, t.lang DESC");
-    PrepareStatement(BLOG_SEL_SEARCH_NOTES, "SELECT n.id, n.original_lang, n.published_at, t.lang, t.title, LEFT(t.body_md, 300), t.body_md "
-        "FROM note n JOIN note_translation t ON t.note_id = n.id WHERE n.status = 'published' ORDER BY n.id, t.lang DESC");
     PrepareStatement(BLOG_SEL_SEARCH_TAGS, "SELECT slug, name_zh, name_en FROM tag");
     // Visible comments per post, for the search's results (BlogWorld keeps them)
     PrepareStatement(BLOG_SEL_POST_COMMENT_COUNTS, "SELECT target_id, COUNT(*) FROM comment WHERE target_kind = 'post' AND status = 'visible' "
