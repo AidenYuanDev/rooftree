@@ -30,21 +30,6 @@ services:
       timeout: 5s
       retries: 30
 
-  # The old database, only while a deployment moves (README.md): docker compose --profile migrate up -d mysql
-  mysql:
-    image: mysql:8.4
-    profiles: [migrate]
-    network_mode: host
-    command:
-      - --bind-address=127.0.0.1
-      - --mysqlx=OFF
-      - --performance-schema=OFF
-      - --innodb-buffer-pool-size=128M
-      - --max-connections=50
-    env_file: /etc/blog/mysql.env
-    volumes:
-      - /srv/blog/mysql:/var/lib/mysql
-
   blog:
     image: blog:latest
     restart: unless-stopped

@@ -289,28 +289,3 @@ apps/blog/deploy/docker/ship.sh user@host   # 构建、传镜像、重启、重�
 | 备份 | `deploy/docker/blog-backup.service` 和 `deploy/blog-backup.timer` 复制到 `/etc/systemd/system/`，`systemctl enable --now blog-backup.timer` |
 
 证书和上面第 4 步一样在主机上用 certbot 申请（`/srv/blog/acme` 挂进了容器），`certbot-deploy-hook.sh` 发现 `/srv/blog/compose.yaml` 时用 HUP 通知容器里的服务器。
-
-## 从 MySQL 迁移
-
-2026-11 之前的部署用的是 MySQL。升级到 PostgreSQL 的版本时要迁移一次数据。先备份，这个过程只读 MySQL，旧数据不会被改动，出问题时用上一个版本的镜像就能回去。
-
-线上要先升级到 MySQL 的最后一个版本，这样它的表结构才和脚本一致；迁移前再做一次备份（`deploy/backup.sh`，用旧版本的镜像）。
-
-Docker 部署，在主机上：
-
-```sh
-docker compose -f /srv/blog/compose.yaml stop blog
-mkdir -p /srv/blog/postgres
-# 把新的 compose.yaml、镜像和 /etc/blog/postgres.env 放好（ship.sh 会传前两个），blog.env 的 DATABASE_URL 改成
-# postgres://blog:密码@127.0.0.1:5433/rooftree_blog?sslmode=disable，blog.yaml 的 Database.Blog.Port 改成 5433
-# （容器的 PostgreSQL 在 5433：主机自己可能已经有一个在 5432）
-docker compose -f /srv/blog/compose.yaml --profile migrate up -d mysql postgres
-docker compose -f /srv/blog/compose.yaml run --rm --entrypoint sh blog -c '
-  cd /opt/blog/src/apps/blog
-  node_modules/.bin/dbmate --migrations-dir db/migrations --no-dump-schema --wait up
-  MYSQL_URL=mysql://blog:旧密码@127.0.0.1:3306/旧库名 node deploy/migrate-from-mysql.mjs'
-docker compose -f /srv/blog/compose.yaml stop mysql
-docker compose -f /srv/blog/compose.yaml up -d --wait
-```
-
-`migrate-from-mysql.mjs` 在一个事务里复制所有表，重置序列，核对每张表的行数和每个外键，有一处不对就全部回滚；目标库已经有数据时拒绝执行。它需要 PostgreSQL 的超级用户（容器的 `POSTGRES_USER` 就是）。确认网站正常后，`/srv/blog/mysql` 和 `/etc/blog/mysql.env` 可以留一段时间再删。

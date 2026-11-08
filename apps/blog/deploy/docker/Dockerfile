@@ -30,7 +30,6 @@ RUN tar -xzf /tmp/flatbuffers.tar.gz -C /tmp \
 COPY . /src
 WORKDIR /src
 # The tests run against this image's libraries; the database ones are skipped (no database here).
-# mysql-client below is for migrate-from-mysql.mjs, while a deployment moves
 RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DEXAMPLES=0 \
     && cmake --build build \
     && ctest --test-dir build --output-on-failure
@@ -39,7 +38,7 @@ FROM ubuntu:26.04
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       libboost-filesystem1.90.0 libboost-json1.90.0 libboost-url1.90.0 libssl3t64 libpq5 \
       libyaml-cpp0.8 libargon2-1 libqrencode4 libreadline8t64 libcurl4t64 libjemalloc2 ca-certificates libcap2-bin \
-      nodejs npm postgresql-client mysql-client \
+      nodejs npm postgresql-client \
     && npm install -g pnpm@12.14.0 \
     && apt-get purge -y --auto-remove npm \
     && rm -rf /var/lib/apt/lists/* /root/.npm

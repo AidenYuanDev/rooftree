@@ -79,7 +79,7 @@
 - [x] 注册（邮箱验证）、登录（管理员 TOTP）、登出、`/api/auth/me`、找回密码
 - [x] 文章：列表（游标分页、标签、语言）、详情（按 slug，旧 slug 301）、增删改、译文、草稿
 - [x] `/api/posts/slugs`（预渲染用）
-- [x] 集成测试（本机 MySQL）：`pnpm test:api`（`apps/blog/tests/`，每次重建 `rooftree_blog_test`）
+- [x] 集成测试（本机 PostgreSQL）：`pnpm test:api`（`apps/blog/tests/`，每次重建 `rooftree_blog_test`）
 - [x] 提前做了：标签的增删改（M4 原计划）、普通用户可选的 TOTP
 
 ### M3 前端（`apps/blog/web`）
