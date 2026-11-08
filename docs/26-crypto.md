@@ -13,7 +13,7 @@
 
 KCP 的数据报加密（AES-128-GCM）直接调用 OpenSSL 的 EVP 接口，写在 [KcpProtocol.cpp](../src/common/network/kcp/KcpProtocol.cpp) 里（[33](33-kcp.md)），不经过这里。
 
-模块里只有用到的东西：没有 `AES`、`HMAC`、`Ed25519`、`RSA`、大整数，也没有只为兼容某个现成客户端才需要的 SRP6、ARC4。
+模块里只有用到的东西：没有 `AES`、`HMAC`、`Ed25519`、`RSA`、大整数。
 
 ## 2. 核心接口
 

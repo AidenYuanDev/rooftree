@@ -428,7 +428,7 @@ public:
         RegisterHandler(boost::beast::http::verb::get, "/upgrade", &Upgrade);
     }
 
-    // Sessions reach their service through a static, like bnetserver's sLoginService
+    // Sessions reach their service through a static
     static TestHttpService* Current;
     // SetTimeouts of the sessions started from now on
     static Milliseconds RequestTimeout;

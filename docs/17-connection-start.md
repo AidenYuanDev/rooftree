@@ -77,7 +77,7 @@ void WorldHttpSocket::Start()
 
 | 没有采用的做法 | Rooftree | 原因 |
 |---|---|---|
-| `SocketConnectionInitializer` 链：`ReadConnectionInitializer`、`SslHandshakeConnectionInitializer`、`HttpConnectionInitializer`、bnetserver 的 `IpBanCheckConnectionInitializer` | `Start()` 里按顺序写，握手是协程 `AcceptTls` | 协程把"做完这一步再做下一步"直接写出来，不需要为每一步定义一个类 |
+| `SocketConnectionInitializer` 链：`ReadConnectionInitializer`、`SslHandshakeConnectionInitializer`、`HttpConnectionInitializer`、`IpBanCheckConnectionInitializer` | `Start()` 里按顺序写，握手是协程 `AcceptTls` | 协程把"做完这一步再做下一步"直接写出来，不需要为每一步定义一个类 |
 | 握手失败记 error 日志（`session` logger） | debug（`network` logger） | 见 3.1 |
 | 封 IP 的检查在初始化链里，要查数据库 | 在 `SocketMgr::OnSocketOpen` 里，构造 socket 之前（`AddressBlocklist`，[18](18-network-thread-and-socket-mgr.md)） | 被封的连接什么都不分配 |
 

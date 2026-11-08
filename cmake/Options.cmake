@@ -1,6 +1,6 @@
 # This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
 #
-# The build's switches: cmake -DASAN=ON ..., see the README's table
+# The build's switches: cmake -DASAN=ON ..., see the table in docs/34-layout-and-build.md
 
 option(EXAMPLES                "Build the examples"                                         ON)
 option(APPS                    "Build the applications in apps/"                            ON)

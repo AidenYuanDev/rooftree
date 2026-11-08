@@ -1,7 +1,7 @@
 /*
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
- * arena's HTTP side, modeled after bnetserver's LoginRESTService:
+ * arena's HTTP side:
  *
  *   GET  /                  the browser client (Arena.WebRoot/index.html)
  *   POST /api/register      {"username", "password"} -> {"ok": true} or {"error"}

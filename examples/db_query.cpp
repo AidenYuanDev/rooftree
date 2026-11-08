@@ -145,7 +145,7 @@ int main(int argc, char** argv)
     RT_LOG_INFO("demo", "main thread is {}", std::this_thread::get_id());
     for (int tick = 0; !done && tick < 100; ++tick)
     {
-        queryProcessor.ProcessReadyCallbacks(); // what WorldSession::Update / Session::Update do every tick
+        queryProcessor.ProcessReadyCallbacks(); // what a Session::Update does every tick
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 

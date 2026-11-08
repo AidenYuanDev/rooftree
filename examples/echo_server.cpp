@@ -1,7 +1,7 @@
 /*
  * echo_server: the smallest possible user of the net module.
  *
- * Shows the same structure WorldSocketMgr / bnetserver's SessionManager use:
+ * Shows how a server takes connections:
  *   Socket<>         - one connection, ReadHandler() is called with new bytes
  *   NetworkThread    - owns an io_context + the sockets assigned to it, calls Socket::Update()
  *   SocketMgr        - acceptor + N NetworkThreads, picks the thread with fewest connections

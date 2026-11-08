@@ -1,8 +1,6 @@
 /*
  * http_server: the net/http module (Boost.Beast on top of Rooftree::Net::Socket).
  *
- * Modeled after bnetserver's LoginRESTService / LoginHttpSession, minus SRP6 login and TLS.
- *
  * Try:  ./http_server  then
  *       curl -i http://127.0.0.1:8080/hello
  *       curl -i -X POST -d 'ping' http://127.0.0.1:8080/echo

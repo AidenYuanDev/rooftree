@@ -1,7 +1,7 @@
 /*
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
- * Login tickets, the bnetserver way: the HTTP login checks the password and hands out a random ticket,
+ * Login tickets: the HTTP login checks the password and hands out a random ticket,
  * the client presents it once when it opens the WebSocket (ws://host/arena?ticket=...). Browsers can't
  * set headers on a WebSocket handshake, so the query string is where it goes.
  *
