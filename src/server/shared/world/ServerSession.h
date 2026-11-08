@@ -48,7 +48,6 @@
 #include <memory>
 #include <optional>
 #include <type_traits>
-#include <unordered_set>
 #include <variant>
 
 namespace Rooftree::Server
@@ -106,6 +105,13 @@ protected:
 private:
     friend class SessionMgr;
 
+    // What Spawn() runs is linked into the session through its promise, from its start to its end
+    struct SpawnedLink
+    {
+        SpawnedLink* Prev = this;
+        SpawnedLink* Next = this;
+    };
+
     class SpawnedCoroutine;
     static SpawnedCoroutine RunSpawned(Session& session, Rooftree::Task<void> task);
     void DestroyCoroutines();
@@ -127,7 +133,7 @@ private:
     uint32 _rejectionsInWindow = 0;
     QueryCallbackProcessor _queryProcessor;
     uint32 _pendingWork = 0;
-    std::unordered_set<void*> _coroutines;  // what Spawn() runs, by its handle's address, until it ends
+    SpawnedLink _coroutines;        // what Spawn() runs, until it ends: no hashing nor a node to allocate
     TimePoint _lastActivity;
     bool _closed = false;
 };

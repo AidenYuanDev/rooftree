@@ -17,9 +17,23 @@ Session::Session(SessionMgr& sessionMgr, std::string key, boost::asio::ip::addre
 class Session::SpawnedCoroutine
 {
 public:
-    struct promise_type
+    struct promise_type : SpawnedLink
     {
-        promise_type(Session& session, Rooftree::Task<void> const&) : Owner(session) { }
+        promise_type(Session& session, Rooftree::Task<void> const&) : Owner(session)
+        {
+            SpawnedLink& head = session._coroutines;
+            Prev = head.Prev;
+            Next = &head;
+            head.Prev->Next = this;
+            head.Prev = this;
+        }
+
+        // At its end or destroyed while it waits
+        ~promise_type()
+        {
+            Prev->Next = Next;
+            Next->Prev = Prev;
+        }
 
         SpawnedCoroutine get_return_object() { return { std::coroutine_handle<promise_type>::from_promise(*this) }; }
         std::suspend_always initial_suspend() noexcept { return {}; }
@@ -31,11 +45,7 @@ public:
                 bool await_ready() noexcept { return false; }
                 void await_resume() noexcept { }
 
-                void await_suspend(std::coroutine_handle<promise_type> self) noexcept
-                {
-                    self.promise().Owner._coroutines.erase(self.address());
-                    self.destroy();
-                }
+                void await_suspend(std::coroutine_handle<promise_type> self) noexcept { self.destroy(); }
             };
             return Finish{};
         }
@@ -60,17 +70,16 @@ Session::SpawnedCoroutine Session::RunSpawned(Session& /*session*/, Rooftree::Ta
 
 void Session::Spawn(Rooftree::Task<void> task)
 {
-    std::coroutine_handle<SpawnedCoroutine::promise_type> handle = RunSpawned(*this, std::move(task)).Handle;
-    _coroutines.insert(handle.address());
-    handle.resume();
+    RunSpawned(*this, std::move(task)).Handle.resume();
 }
 
 void Session::DestroyCoroutines()
 {
-    // Destroying one may release what another waits for, but nothing resumes on this thread now
-    std::unordered_set<void*> coroutines = std::exchange(_coroutines, {});
-    for (void* coroutine : coroutines)
-        std::coroutine_handle<>::from_address(coroutine).destroy();
+    // One at a time from the head: destroying one may let another one go on (a WhenCalled whose
+    // callback it held) and end, which takes that one out of the list
+    using Promise = SpawnedCoroutine::promise_type;
+    while (_coroutines.Next != &_coroutines)
+        std::coroutine_handle<Promise>::from_promise(*static_cast<Promise*>(_coroutines.Next)).destroy();
 }
 
 Session::~Session()

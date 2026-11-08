@@ -1043,6 +1043,33 @@ TEST_CASE("Session::OnWorker works on a worker and goes on on the main thread", 
         CHECK(destroyed);
         CHECK_FALSE(wentOn);
     }
+
+    SECTION("destroying one may let another one go on and end: each goes once")
+    {
+        // One's frame holds the other one's callback: destroyed first (the older goes first), it lets
+        // the other one go on and end, which must not be destroyed again
+        bool const holderFirst = GENERATE(true, false);
+        std::function<void()> parked;
+        auto box = std::make_shared<std::function<void()>>();
+        auto holder = [&](std::shared_ptr<std::function<void()>> /*holds*/) -> Rooftree::Task<void>
+        {
+            co_await Rooftree::WhenCalled<>([&](auto callback) { parked = callback; });
+        };
+        bool gotNothing = false;
+        auto waiter = [&](std::function<void()>& slot) -> Rooftree::Task<void>
+        {
+            gotNothing = !co_await Rooftree::WhenCalled<>([&](auto callback) { slot = callback; });
+        };
+        if (holderFirst)
+            session.Spawn(holder(box));
+        session.Spawn(waiter(*box));
+        if (!holderFirst)
+            session.Spawn(holder(box));
+        box = nullptr;
+
+        mgr.Stop();
+        CHECK(gotNothing == holderFirst);
+    }
 }
 
 TEST_CASE("Session classes are served by priority, each within its own settings", "[server]")
