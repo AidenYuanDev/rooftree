@@ -19,7 +19,7 @@ npm install -g pnpm@12.14.0
 # Ubuntu has fmt 10 and FlatBuffers 23.5: static ones in /usr/local, found before the system's
 build() {
   local name=$1 url=$2; shift 2
-  curl -fsSL "$url" | tar -xz -C /tmp
+  curl --retry 5 --retry-all-errors --retry-delay 5 -fsSL "$url" | tar -xz -C /tmp
   cmake -S "/tmp/$name" -B "/tmp/$name-build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON "$@"
   cmake --build "/tmp/$name-build" --target install
   rm -rf "/tmp/$name" "/tmp/$name-build"
