@@ -59,12 +59,12 @@ jobs:
       CCACHE_MAXSIZE: 1G
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Dependencies
         run: .github/scripts/install-deps.sh
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-${{ matrix.id }}-${{ github.sha }}
