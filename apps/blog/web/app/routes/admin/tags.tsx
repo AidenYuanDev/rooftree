@@ -3,7 +3,7 @@ import { Trash2Icon } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import type { z } from 'zod'
 import { FormError, FormField } from '~/components/form'
 import { useHydrated } from '~/lib/hydrated'
 import { applyFieldErrors } from '~/lib/form-errors'
@@ -11,15 +11,9 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Skeleton } from '~/components/ui/skeleton'
 import { errorMessage } from '~/i18n'
-import { slug } from '~/lib/forms'
+import { tagForm } from '~/lib/forms'
 import { useDeleteTag, useSaveTag, useTags } from '~/lib/queries'
 import type { Tag } from '~/lib/schemas'
-
-const tagForm = z.object({
-  slug: slug(50),
-  nameZh: z.string().trim().min(1, 'required').max(50, 'too_long'),
-  nameEn: z.string().trim().min(1, 'required').max(50, 'too_long'),
-})
 
 function TagRow({ tag }: { tag: Tag }) {
   const hydrated = useHydrated()

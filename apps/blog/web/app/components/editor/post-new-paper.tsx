@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { UploadButton } from '~/components/admin/upload-button'
 import { MarkdownField } from '~/components/editor/markdown-field'
+import { TagPicker } from '~/components/editor/tag-picker'
 import { FormError, FormField } from '~/components/form'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
@@ -16,7 +17,7 @@ import { applyFieldErrors } from '~/lib/form-errors'
 import { slug } from '~/lib/forms'
 import { useHydrated } from '~/lib/hydrated'
 import { localePath } from '~/lib/lang'
-import { useMe, useSavePost, useTags } from '~/lib/queries'
+import { useMe, useSavePost } from '~/lib/queries'
 import type { Lang } from '~/lib/schemas'
 
 const newPostForm = z.object({
@@ -46,7 +47,6 @@ export function PostNewPaper({
   const navigate = useNavigate()
   const admin = useMe().data?.user?.role === 'admin'
   const save = useSavePost()
-  const tags = useTags()
   const [sourceMode, setSourceMode] = useState(false)
   const bodyHost = useRef<HTMLDivElement>(null)
 
@@ -141,29 +141,7 @@ export function PostNewPaper({
             <Input id={id} className="font-mono" placeholder="hello-world" aria-describedby={describedBy} {...form.register('slug')} />
           )}
         </FormField>
-        {tags.data && tags.data.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {tags.data.map((tag) => {
-              const selected = selectedTags.includes(tag.slug)
-              return (
-                <Button
-                  key={tag.slug}
-                  type="button"
-                  size="xs"
-                  variant={selected ? 'default' : 'outline'}
-                  aria-pressed={selected}
-                  onClick={() =>
-                    form.setValue('tags', selected ? selectedTags.filter((s) => s !== tag.slug) : [...selectedTags, tag.slug], {
-                      shouldDirty: true,
-                    })
-                  }
-                >
-                  {lang === 'en' ? tag.nameEn : tag.nameZh}
-                </Button>
-              )
-            })}
-          </div>
-        )}
+        <TagPicker value={selectedTags} onChange={(slugs) => form.setValue('tags', slugs, { shouldDirty: true })} />
       </div>
 
       <div className="grid gap-1.5">

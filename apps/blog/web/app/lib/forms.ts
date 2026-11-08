@@ -28,6 +28,12 @@ export const slug = (max: number) =>
     .max(max, 'too_long')
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'invalid')
 
+export const tagForm = z.object({
+  slug: slug(50),
+  nameZh: z.string().trim().min(1, 'required').max(50, 'too_long'),
+  nameEn: z.string().trim().min(1, 'required').max(50, 'too_long'),
+})
+
 // The characters of the picture; the server says when they are missing (it may have the captcha off)
 export const captcha = z.string().trim().max(16, 'too_long')
 

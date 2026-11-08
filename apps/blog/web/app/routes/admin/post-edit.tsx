@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
+import { TagPicker } from '~/components/editor/tag-picker'
 import { FormError, FormField } from '~/components/form'
 import { UploadButton } from '~/components/admin/upload-button'
 import { MarkdownField } from '~/components/editor/markdown-field'
@@ -24,7 +25,7 @@ import { Textarea } from '~/components/ui/textarea'
 import { slug } from '~/lib/forms'
 import { useHydrated } from '~/lib/hydrated'
 import { localePath, useLang, usePostsBase } from '~/lib/lang'
-import { type PostInput, useAdminPost, useMe, useSavePost, useTags } from '~/lib/queries'
+import { type PostInput, useAdminPost, useMe, useSavePost } from '~/lib/queries'
 import { type AdminPost, AdminCommentList, Lang, langs } from '~/lib/schemas'
 import { type PostDraft, useDraftStore } from '~/stores/drafts'
 
@@ -161,7 +162,6 @@ function Editor({ id, post }: { id: number | null; post?: AdminPost }) {
   const lang = useLang()
   const navigate = useNavigate()
   const save = useSavePost()
-  const tags = useTags()
   const base = usePostsBase()
   const admin = useMe().data?.user?.role === 'admin'
   const draftKey = id === null ? 'new' : String(id)
@@ -321,31 +321,7 @@ function Editor({ id, post }: { id: number | null; post?: AdminPost }) {
         </FormField>
         <div className="grid gap-2 md:col-span-2">
           <Label>{t('admin.tags')}</Label>
-          <div className="flex flex-wrap gap-2">
-            {tags.data?.map((tag) => {
-              const selected = (values.tags ?? []).includes(tag.slug)
-              return (
-                <Button
-                  key={tag.slug}
-                  type="button"
-                  size="xs"
-                  variant={selected ? 'default' : 'outline'}
-                  aria-pressed={selected}
-                  onClick={() => {
-                    const current = form.getValues('tags')
-                    form.setValue('tags', selected ? current.filter((s) => s !== tag.slug) : [...current, tag.slug], { shouldDirty: true })
-                  }}
-                >
-                  {lang === 'en' ? tag.nameEn : tag.nameZh}
-                </Button>
-              )
-            })}
-            {tags.data?.length === 0 && (
-              <Link to={localePath(lang, '/admin/tags')} className="text-sm text-muted-foreground underline">
-                {t('admin.addTag')}
-              </Link>
-            )}
-          </div>
+          <TagPicker value={values.tags ?? []} onChange={(slugs) => form.setValue('tags', slugs, { shouldDirty: true })} />
           {errors.tags?.message && <p className="text-xs text-destructive">{t(`fieldErrors.${errors.tags.message as 'unknown_tag'}`)}</p>}
         </div>
         <div className="flex items-center gap-2 md:col-span-2">

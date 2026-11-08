@@ -7,6 +7,7 @@ import { PostEditorsDialog } from '~/components/admin/post-editors'
 import { PostRevisionsDialog } from '~/components/admin/post-revisions'
 import { UploadButton } from '~/components/admin/upload-button'
 import { CollabField } from '~/components/editor/collab-field'
+import { TagPicker } from '~/components/editor/tag-picker'
 import { FormError } from '~/components/form'
 import { Badge } from '~/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '~/components/ui/dialog'
@@ -21,15 +22,7 @@ import { errorMessage } from '~/i18n'
 import { api } from '~/lib/api'
 import { CollabConnection, insertAtCursor, type Peer, type PeerUser, peerColor } from '~/lib/collab'
 import { localePath, useLang } from '~/lib/lang'
-import {
-  type PostSettings,
-  useMe,
-  usePublishPost,
-  useSavePostSettings,
-  useSavePostVersion,
-  useTags,
-  useWithdrawReview,
-} from '~/lib/queries'
+import { type PostSettings, useMe, usePublishPost, useSavePostSettings, useSavePostVersion, useWithdrawReview } from '~/lib/queries'
 import { type AdminPost, AdminCommentList, canModerate, type Lang, langs } from '~/lib/schemas'
 
 // A post as its editors see it: its text written together, live (lib/collab.ts), as a working copy
@@ -348,8 +341,6 @@ function RemoveLanguage({ post, lang, onRemoved }: { post: AdminPost; lang: Lang
 // What isn't text: by who may change it (the settings right, the publish right for its state)
 function Settings({ post }: { post: AdminPost }) {
   const { t, i18n } = useTranslation()
-  const lang = useLang()
-  const tags = useTags()
   const save = useSavePostSettings(post.id)
   const [values, setValues] = useState({
     slug: post.slug,
@@ -444,24 +435,7 @@ function Settings({ post }: { post: AdminPost }) {
       </div>
       <div className="grid gap-2 md:col-span-2">
         <Label>{t('admin.tags')}</Label>
-        <div className="flex flex-wrap gap-2">
-          {tags.data?.map((tag) => {
-            const selected = values.tags.includes(tag.slug)
-            return (
-              <Button
-                key={tag.slug}
-                type="button"
-                size="xs"
-                variant={selected ? 'default' : 'outline'}
-                aria-pressed={selected}
-                disabled={!canSettings}
-                onClick={() => set('tags', selected ? values.tags.filter((s) => s !== tag.slug) : [...values.tags, tag.slug])}
-              >
-                {lang === 'en' ? tag.nameEn : tag.nameZh}
-              </Button>
-            )
-          })}
-        </div>
+        <TagPicker value={values.tags} onChange={(slugs) => set('tags', slugs)} disabled={!canSettings} />
       </div>
       <div className="flex items-center gap-2">
         <Switch
