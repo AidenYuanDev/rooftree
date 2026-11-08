@@ -43,8 +43,8 @@ public:
 
     void DoPrepareStatements() override
     {
-
-        PrepareStatement(BENCH_INS_ROW, "REPLACE INTO rooftree_bench (id, name, score) VALUES (?, ?, ?)");
+        PrepareStatement(BENCH_INS_ROW, "INSERT INTO rooftree_bench (id, name, score) VALUES (?, ?, ?) "
+            "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, score = EXCLUDED.score");
         PrepareStatement(BENCH_SEL_ROW, "SELECT id, name, score FROM rooftree_bench WHERE id = ?");
         PrepareStatement(BENCH_UPD_SCORE, "UPDATE rooftree_bench SET score = score + 1 WHERE id = ?");
     }
@@ -71,7 +71,6 @@ public:
         std::optional<DatabaseConfig> database = Rooftree::Test::GetTestDatabaseConfig(why);
         if (!database)
             SKIP(why);
-
 
         Database.SetConnectionInfo(database->Connection, 1, 1);
         REQUIRE(Database.Open() == 0);
@@ -171,14 +170,14 @@ TEST_CASE_METHOD(DatabaseFixture, "Database synchronous queries", "[database]")
         return sum;
     };
 
-    BENCHMARK("DirectExecute prepared REPLACE")
+    BENCHMARK("DirectExecute prepared upsert")
     {
         id = id % RowCount + 1;
         Database.DirectExecute(InsertRow(id, id));
         return id;
     };
 
-    BENCHMARK("DirectCommitTransaction of 100 REPLACEs")
+    BENCHMARK("DirectCommitTransaction of 100 upserts")
     {
         SQLTransaction<BenchDatabaseConnection> trans = Database.BeginTransaction();
         for (uint32 i = 1; i <= 100; ++i)
@@ -217,7 +216,7 @@ TEST_CASE_METHOD(DatabaseFixture, "Database asynchronous work", "[database]")
         return 100;
     };
 
-    BENCHMARK("AsyncCommitTransaction of 100 REPLACEs")
+    BENCHMARK("AsyncCommitTransaction of 100 upserts")
     {
         SQLTransaction<BenchDatabaseConnection> trans = Database.BeginTransaction();
         for (uint32 i = 1; i <= 100; ++i)
