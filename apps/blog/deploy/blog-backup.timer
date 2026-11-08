@@ -1,0 +1,11 @@
+# /etc/systemd/system/blog-backup.timer: systemctl enable --now blog-backup.timer
+[Unit]
+Description=Daily blog backup
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

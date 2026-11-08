@@ -1,0 +1,5 @@
+build
+.react-router
+pnpm-lock.yaml
+playwright-report
+test-results

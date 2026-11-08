@@ -1,0 +1,8 @@
+# /etc/systemd/system/blog-backup.service, with ../blog-backup.timer: backup.sh in the running container
+[Unit]
+Description=Back up the blog's database and uploads (docker)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker compose -f /srv/blog/compose.yaml exec -T blog /opt/blog/src/apps/blog/deploy/backup.sh

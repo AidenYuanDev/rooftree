@@ -1,0 +1,6 @@
+node_modules/
+build/
+.react-router/
+playwright-report/
+test-results/
+.state.json

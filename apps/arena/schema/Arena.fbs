@@ -1,0 +1,96 @@
+// The arena's messages, both ways. A native client (KCP, or the WebSocket with format=packets) sends
+// and gets packets: Packet.h's 8 byte header ([uint16 opcode][uint16 flags = 0][uint32 requestId = 0],
+// little-endian) and the opcode's table. The browser page speaks JSON: {"type": name, ...the table's
+// fields}, converted at the WebSocket by this schema (ArenaPackets.cpp names the types).
+//
+// Fields are only added at the end, an opcode keeps its number. Client opcodes are 0x00xx, the
+// server's 0x01xx; 0 is the framework's Error, unused here.
+
+namespace Arena;
+
+enum Opcode : ushort {
+  // Client to server
+  Ping = 0x0001,
+  Input = 0x0002,
+  Chat = 0x0003,
+
+  // Server to client
+  Welcome = 0x0101,
+  Pong = 0x0102,
+  State = 0x0103,
+  ChatMessage = 0x0104,
+  SystemMessage = 0x0105,
+}
+
+// ---- client to server ---------------------------------------------------------------------------
+
+// Any time, answered with a Pong of the same t: the client's clock, for its round trip time
+table Ping {
+  t:double;
+}
+
+// In game: where the player walks until the next one, -1, 0 or 1 each (others are clamped)
+table Input {
+  dx:byte;
+  dy:byte;
+}
+
+// In game: a line for everyone, at most Arena.Chat.MaxLength characters and one per Arena.Chat.Interval
+table Chat {
+  text:string;
+}
+
+// ---- server to client ---------------------------------------------------------------------------
+
+// Once the player is loaded: inputs and chat are accepted from now on
+table Welcome {
+  id:uint;
+  name:string;
+  width:float;
+  height:float;
+  playerRadius:float;
+  totalCoins:uint;
+  motd:string;
+}
+
+table Pong {
+  t:double;
+}
+
+table PlayerState {
+  id:uint;
+  name:string;
+  x:float;
+  y:float;
+  score:uint;   // this session's coins
+  total:uint;   // all time
+}
+
+table CoinState {
+  id:uint;
+  x:float;
+  y:float;
+  value:uint;
+}
+
+// Every world tick to everyone in game, unreliably over KCP: the next one replaces a lost one
+table State {
+  players:[PlayerState];
+  coins:[CoinState];
+  goldRush:bool;
+}
+
+table ChatMessage {
+  from:string;
+  text:string;
+}
+
+// From the server: joins, leaves, gold rush, chat refused
+table SystemMessage {
+  text:string;
+}
+
+// Any of the tables would do: flatc embeds a binary schema (Arena_bfbs_generated.h, FlatJsonSchema's)
+// only for a schema with a root type, named after it (StateBinarySchema). Packets say their table by
+// the opcode, not this
+root_type State;

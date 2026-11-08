@@ -1,0 +1,1012 @@
+// The readers' operations as packets (ApiPackets.h), the routes of /api that aren't the admin's:
+// opcodes, and per opcode the table it sends (...Request) and the one it gets back. The rules are
+// Admin.fbs's: a table mirrors the JSON of the HTTP route key for key, path and query parameters
+// among the request's fields; fields are only added at the end, an opcode keeps its number.
+//
+// Not here, they stay HTTP's: what sets the login cookie (register, log in and out, password
+// changes, OAuth), files (downloads, zips, thumbnails, upload chunks) and XML (feeds, sitemap).
+attribute "json_null";
+attribute "json_omit";
+attribute "json_closed";
+attribute "json_map";
+
+namespace Blog.Reader;
+
+enum Opcode : ushort {
+  // 0x01xx are the admin's (Admin.fbs)
+  PostsList = 0x0200,
+  PostsGet = 0x0201,
+  PostsSlugs = 0x0202,
+  PostsSearch = 0x0203,
+  PersonGet = 0x0205,
+  TagsList = 0x0204,
+  NotesList = 0x0210,
+  NotesGet = 0x0211,
+  ThinkingList = 0x0212,
+  SiteGet = 0x0220,
+  SiteAbout = 0x0221,
+  Timeline = 0x0222,
+  FriendsList = 0x0223,
+  FriendsApply = 0x0224,
+  ProjectsList = 0x0225,
+  UploadsMeta = 0x0226,
+  CommentsList = 0x0230,
+  CommentsCreate = 0x0231,
+  CommentsUpdate = 0x0232,
+  CommentsDelete = 0x0233,
+  ReactionsList = 0x0234,
+  React = 0x0235,
+  CountView = 0x0236,
+  CommentsAnchored = 0x0237,
+  Subscribe = 0x0240,
+  SubscribeConfirm = 0x0241,
+  SubscriptionGet = 0x0242,
+  SubscriptionSet = 0x0243,
+  Captcha = 0x0250,
+  OAuthProviders = 0x0251,
+  Me = 0x0252,
+  MeUpdate = 0x0253,
+  VerifyEmail = 0x0254,
+  ResendVerification = 0x0255,
+  ForgotPassword = 0x0256,
+  TotpSetup = 0x0257,
+  TotpEnable = 0x0258,
+  TotpDisable = 0x0259,
+  IdentitiesList = 0x025A,
+  IdentitiesDelete = 0x025B,
+  AvatarUpload = 0x025C,
+  AvatarUseProvider = 0x025D,
+  AvatarDelete = 0x025E,
+  Logout = 0x025F,
+  PasswordChange = 0x0260,
+  PasswordReset = 0x0261,
+  DriveList = 0x0270,
+  DriveFolders = 0x0271,
+  DriveFolderCreate = 0x0272,
+  DriveFolderUpdate = 0x0273,
+  DriveFolderDelete = 0x0274,
+  DriveFileUpdate = 0x0275,
+  DriveFileDelete = 0x0276,
+  DriveTrash = 0x0277,
+  DriveRestore = 0x0278,
+  DrivePurge = 0x0279,
+  DriveEmptyTrash = 0x027A,
+  DriveUploadCreate = 0x027B,
+  DriveUploadComplete = 0x027C,
+  DriveUploadCancel = 0x027D,
+  DriveSharesList = 0x027E,
+  DriveShareCreate = 0x027F,
+  DriveShareAccess = 0x0280,
+  DriveShareDelete = 0x0281,
+  ShareGet = 0x0290,
+  ShareUnlock = 0x0291,
+  UserFriendsList = 0x02A0,
+  UserFriendRequests = 0x02A1,
+  UserFriendRequestSend = 0x02A2,
+  UserFriendRequestAccept = 0x02A3,
+  UserFriendRequestReject = 0x02A4,
+  UserFriendRemove = 0x02A5,
+  UserFriendshipStatus = 0x02A6,
+  ChatChannelsList = 0x02B0,
+  ChatMessagesList = 0x02B1,
+  ChatMessageSend = 0x02B2,
+  ChatMarkRead = 0x02B3,
+  ChatUnreadCount = 0x02B4,
+  ChatGroupCreate = 0x02B5,
+  ChatGroupMembers = 0x02B6,
+  ChatGroupLeave = 0x02B7,
+}
+
+table EmptyRequest {
+}
+
+// What has nothing more to say than that it worked
+table Ok {
+  ok:bool;
+}
+
+// Posts and tags
+
+table PostsListRequest {
+  lang:string;          // zh unless en
+  tag:string;
+  limit:uint = null;    // 10, at most 50
+  cursor:string;        // a page's nextCursor
+}
+
+table TagName {
+  slug:string;
+  name:string;          // in the page's language
+}
+
+table PostSummary {
+  id:uint;
+  slug:string;
+  lang:string;
+  fallback:bool;
+  originalLang:string;
+  title:string;
+  summary:string;
+  cover:string;
+  tags:[TagName];
+  translations:[string];
+  commentCount:long;
+  publishedAt:string;
+  updatedAt:string;
+}
+
+table PostsList {
+  posts:[PostSummary];
+  nextCursor:string (json_null);  // none on the last page
+}
+
+// An old slug answers 301 moved, its details the new one (redirect) and its route (location)
+// Someone's page: who they are, the posts they wrote (owned or edited), in a language
+table PersonGetRequest {
+  username:string;
+  lang:string;          // zh unless en
+}
+
+table Person {
+  person:Contributor;
+  since:string;         // when the account was made
+  posts:[PostSummary];  // published, newest first, at most 100
+}
+
+table PostsGetRequest {
+  slug:string;
+  lang:string;
+}
+
+table Neighbour {
+  slug:string;
+  title:string;
+}
+
+table Post {
+  id:uint;
+  slug:string;
+  lang:string;
+  fallback:bool;
+  originalLang:string;
+  translations:[string];
+  title:string;
+  summary:string;
+  body:string;
+  cover:string;
+  author:string;
+  tags:[TagName];
+  commentsEnabled:bool;
+  commentCount:long;
+  publishedAt:string;
+  updatedAt:string;
+  previous:Neighbour (json_null);   // older
+  next:Neighbour (json_null);       // newer
+  people:[Contributor];             // who wrote it: its owner first, then its editors
+}
+
+// Someone who writes on the site, linked to their page (/u/<username>)
+table Contributor {
+  id:uint;
+  username:string;
+  displayName:string;
+  avatar:string (json_null);
+}
+
+table SlugItem {
+  slug:string;
+  updatedAt:string;
+  translations:[string];
+}
+
+table SlugRedirect {
+  from:string;
+  to:string;
+}
+
+table TagLangs {
+  slug:string;
+  translations:[string];    // the languages it has posts in
+}
+
+table NoteLangs {
+  id:uint;
+  translations:[string];
+}
+
+// What the prerender build makes pages of
+table PostsSlugs {
+  posts:[SlugItem];
+  redirects:[SlugRedirect];
+  tags:[TagLangs];
+  notes:[NoteLangs];
+}
+
+table PostsSearchRequest {
+  lang:string;
+  all:string;           // "1": in every language
+  q:string;
+}
+
+table SearchNote {
+  id:uint;
+  lang:string;
+  title:string;
+  excerpt:string;
+  publishedAt:string;
+}
+
+table PostsSearch {
+  posts:[PostSummary];
+  notes:[SearchNote];
+}
+
+table TagsListRequest {
+  lang:string;          // the counts in it, of every post without
+}
+
+table Tag {
+  slug:string;
+  nameZh:string;
+  nameEn:string;
+  postCount:uint;
+}
+
+table TagsList {
+  tags:[Tag];
+}
+
+// Notes and thinking
+
+// A page of a list, newest first
+table PageRequest {
+  lang:string;
+  limit:uint = null;    // 10, at most 50
+  cursor:string;        // a page's nextCursor
+}
+
+table NoteSummary {
+  id:uint;
+  mood:string;
+  weather:string;
+  cover:string;
+  publishedAt:string;
+  updatedAt:string;
+  originalLang:string;
+  lang:string;
+  fallback:bool;
+  title:string;
+  excerpt:string;       // the start of the text, still markdown
+  translations:[string];
+  commentCount:long;
+}
+
+table NotesList {
+  notes:[NoteSummary];
+  nextCursor:string (json_null);
+}
+
+table NotesGetRequest {
+  id:uint = null;
+  lang:string;
+}
+
+table NoteNeighbour {
+  id:uint;
+  title:string;
+}
+
+table Note {
+  id:uint;
+  mood:string;
+  weather:string;
+  cover:string;
+  commentsEnabled:bool;
+  publishedAt:string;
+  updatedAt:string;
+  originalLang:string;
+  wordCount:uint;
+  translations:[string];
+  commentCount:long;
+  lang:string;
+  fallback:bool;
+  title:string;
+  body:string;
+  previous:NoteNeighbour (json_null);   // older
+  next:NoteNeighbour (json_null);       // newer
+}
+
+table ThinkingItem {
+  id:uint;
+  publishedAt:string;
+  originalLang:string;
+  lang:string;
+  fallback:bool;
+  body:string;
+  translations:[string];
+  commentCount:long;
+  commentsEnabled:bool;
+}
+
+table ThinkingList {
+  thinking:[ThinkingItem];
+  nextCursor:string (json_null);
+}
+
+// The site
+
+table LangRequest {
+  lang:string;
+}
+
+table Social {
+  kind:string;
+  url:string;
+}
+
+table SiteStats {
+  posts:long;
+  notes:long;
+  thinking:long;
+  words:long;
+  days:long;
+}
+
+// The profile in the reader's language (the other one where it's empty), the home page's numbers
+table Site {
+  name:string;
+  author:string;
+  avatar:string;
+  tagline:string;
+  bio:string;
+  quote:string;
+  since:string;         // ISO 8601, "" when not set
+  socials:[Social];
+  stats:SiteStats;
+}
+
+table About {
+  about:string;
+  aboutSite:string;
+}
+
+table TimelineItem {
+  kind:string;          // post, note, thinking
+  id:uint;
+  slug:string;
+  title:string;
+  publishedAt:string;
+}
+
+table Timeline {
+  items:[TimelineItem];
+}
+
+table Friend {
+  id:uint;
+  name:string;
+  url:string;
+  avatar:string;
+  description:string;
+}
+
+table FriendsList {
+  friends:[Friend];
+}
+
+// A login with a confirmed address asks for a link, pending until the author looks
+table FriendApplication {
+  name:string;
+  url:string;
+  avatar:string;
+  description:string;
+  message:string;       // to the author
+}
+
+table FriendApplied {
+  id:uint;
+  status:string;        // pending
+}
+
+table Project {
+  id:uint;
+  name:string;
+  url:string;
+  repoUrl:string;
+  icon:string;
+  descriptionZh:string;
+  descriptionEn:string;
+  sort:int;
+}
+
+table ProjectsList {
+  projects:[Project];
+}
+
+// An uploaded picture's placeholder, by its address
+table ImageMeta {
+  key:string;           // /uploads/...
+  thumbhash:string;
+  width:ushort;
+  height:ushort;
+}
+
+table UploadsMeta {
+  images:[ImageMeta] (json_map);
+}
+
+// Comments, reactions, views
+
+// Of a post, a note, a thinking ("post:7", "note:3", "thinking:5") or the guestbook
+table CommentsListRequest {
+  target:string;
+  postId:uint = null;   // the older post:<postId>
+  cursor:string;        // a page's nextCursor
+}
+
+table CommentAuthor {
+  id:uint;
+  username:string;
+  displayName:string;
+  role:string;
+  avatar:string (json_null);
+  deleted:bool;         // the account is gone, its comments kept
+}
+
+table CommentReplyTo {
+  id:uint;
+  displayName:string;
+}
+
+// The passage of a post a comment is on, in one language version of it: the selected text of one
+// block (a paragraph, an item, a heading, a code block), found again by its text and the text around
+// it, the block's number a hint only. A reply without one has the passage of the comment it answers
+table CommentAnchor {
+  lang:string;
+  block:uint;
+  quote:string;         // at most 300 characters
+  prefix:string;        // at most 32 characters right before it in its block, 32 after it
+  suffix:string;
+  text:string (json_null);  // the whole block as it was; in answers only once the post no longer has it
+  status:string;        // answers: ok; orphaned, its text is no longer in the post; kept, the admin left it so
+}
+
+table Comment {
+  id:uint;
+  target:string;
+  parentId:uint = null;
+  status:string;        // visible, hidden (to moderators), deleted
+  body:string;
+  createdAt:string;
+  editedAt:string (json_null);
+  author:CommentAuthor; // none once deleted
+  replyTo:CommentReplyTo;
+  replies:[Comment] (json_omit);    // a thread's, oldest first
+  replyToId:uint = null;            // the comment a reply answers
+  anchor:CommentAnchor;             // its own passage, a post's comment's
+}
+
+// Threads, newest first, each with its replies
+table CommentsList {
+  threads:[Comment];
+  nextCursor:string (json_null);
+}
+
+table CommentInput {
+  target:string;
+  postId:long = null;   // the older post:<postId>
+  body:string;
+  replyTo:long = null;  // the comment answered
+  anchor:CommentAnchor; // on a post: a passage of it (without status)
+}
+
+// Its text, or its passage (a post's comment's): its author within the edit window; its author or a
+// moderator later, once the post lost its passage (a moderator any time)
+table CommentsUpdateRequest {
+  id:uint = null;
+  body:string;
+  anchor:CommentAnchor;
+}
+
+// Every thread on a passage of a post in one language, oldest first, with its replies
+table CommentsAnchoredRequest {
+  target:string;        // post:<id>
+  lang:string;
+}
+
+table IdRequest {
+  id:uint = null;
+}
+
+table ReactionsListRequest {
+  targets:string;       // "post:7,comment:12", at most 100
+}
+
+table ReactionCount {
+  key:string;           // like, heart, ...
+  count:long;
+}
+
+table Reactions {
+  counts:[ReactionCount] (json_map);
+  mine:[string];        // the login's
+}
+
+table TargetReactions {
+  key:string;           // post:7
+  counts:[ReactionCount] (json_map);
+  mine:[string];
+}
+
+table ReactionsList {
+  reactions:[TargetReactions] (json_map);
+}
+
+table ReactRequest {
+  target:string;
+  kind:string;
+  on:bool = null;
+}
+
+// A page read: always ok, counted or not
+table ViewRequest {
+  path:string;          // /zh/posts/hello
+  referrer:string;
+}
+
+// Mail subscriptions
+
+// An address asks for the mails: a confirmation goes to it
+table SubscribeRequest {
+  email:string;
+  lang:string;
+  captchaId:string;     // the picture's, when Blog.Captcha is on
+  captcha:string;
+}
+
+table TokenRequest {
+  token:string;         // of the mail's link
+}
+
+table Subscription {
+  subscribed:bool;
+}
+
+// The account's own
+
+table Captcha {
+  enabled:bool;
+  id:string (json_omit);
+  image:string (json_omit);     // data:image/png;base64,...
+  width:uint (json_omit);
+  height:uint (json_omit);
+}
+
+table OAuthProviders {
+  providers:[string];   // github, google: those set up
+}
+
+table Account {
+  id:uint;
+  username:string;
+  displayName:string;
+  role:string;          // user, moderator, admin
+  avatar:string (json_null);
+  email:string;
+  emailVerified:bool;
+  locale:string;
+  totpEnabled:bool;
+  hasPassword:bool;
+  bannedUntil:string (json_omit);
+  denied:[string];      // what the admin took away: comment, react, ...
+  drive:bool;
+  replyMails:bool;
+  write:bool;           // writes posts of its own (the admin always)
+  editing:bool;         // invited to edit a post of someone else
+}
+
+// Who is logged in, none for nobody; the token a change over HTTP sends as X-CSRF-Token
+table Me {
+  user:Account;
+  csrfToken:string (json_null);
+}
+
+// The account after a change
+table Profile {
+  user:Account;
+}
+
+table MeUpdateRequest {
+  displayName:string;
+  locale:string;
+  replyMails:bool = null;
+}
+
+table EmailRequest {
+  email:string;
+  captchaId:string;
+  captcha:string;
+}
+
+table TotpSecret {
+  secret:string;        // base32
+  otpauthUri:string;
+}
+
+table TotpCodeRequest {
+  code:string;
+}
+
+table PasswordRequest {
+  password:string;
+}
+
+// An account made by a GitHub or Google login sets its first password without currentPassword
+table PasswordChangeRequest {
+  currentPassword:string;
+  newPassword:string;
+}
+
+table PasswordResetRequest {
+  token:string;         // of the mail's link
+  password:string;
+}
+
+table Identity {
+  provider:string;
+  login:string;
+  createdAt:string;
+  hasAvatar:bool;
+}
+
+table IdentitiesList {
+  identities:[Identity];
+}
+
+table ProviderRequest {
+  provider:string;      // github, google
+}
+
+// A picture of the account's own: PNG, JPEG, GIF or WebP
+table AvatarUploadRequest {
+  file:[ubyte];
+}
+
+table SubscriptionSetRequest {
+  subscribed:bool = null;
+}
+
+// The account's drive. user: the admin, on another account's drive (none: its own). A folder of
+// none or 0 is the root, which JSON's null says too (json_null)
+
+table DriveRequest {
+  user:uint = null;
+}
+
+table DriveListRequest {
+  user:uint = null;
+  folder:uint = null;
+}
+
+table DriveFolder {
+  id:uint;
+  parentId:uint = null;
+  name:string;
+  createdAt:string;
+}
+
+table DriveFile {
+  id:uint;
+  folderId:uint = null;
+  name:string;
+  size:ulong;
+  mime:string;
+  createdAt:string;
+  updatedAt:string;
+  thumb:bool;           // has a small picture
+}
+
+table PathStep {
+  id:uint;
+  name:string;
+}
+
+table DriveUsage {
+  used:ulong;
+  quota:ulong;
+  maxFileSize:ulong;
+  chunkSize:ulong;
+  trashDays:uint;
+}
+
+// A folder's folders and files, the way there from the root, how full the drive is
+table DriveList {
+  folders:[DriveFolder];
+  files:[DriveFile];
+  folder:DriveFolder;   // none: the root
+  path:[PathStep];
+  usage:DriveUsage;
+}
+
+table DriveFolders {
+  folders:[DriveFolder];
+}
+
+table DriveFolderInput {
+  user:uint = null;
+  id:uint = null;       // DriveFolderUpdate's
+  name:string;
+  parentId:uint = null (json_null);   // an update without one leaves it where it is
+}
+
+table DriveIdRequest {
+  user:uint = null;
+  id:uint = null;
+}
+
+// Into the trash, or for good when the account keeps none
+table DriveDeleted {
+  ok:bool;
+  trashed:bool;
+}
+
+table DriveFileInput {
+  user:uint = null;
+  id:uint = null;
+  name:string;
+  folderId:uint = null (json_null);   // none: where it is
+}
+
+table DriveTrashItem {
+  kind:string;          // file, folder
+  id:uint;
+  name:string;
+  size:ulong;
+  mime:string (json_omit);    // a file's
+  trashedAt:string;
+  purgeAt:string;
+  from:[string];        // the folders it was in
+}
+
+table DriveTrash {
+  trash:[DriveTrashItem];
+  days:uint;
+}
+
+table DriveTrashRequest {
+  user:uint = null;
+  kind:string;          // file, folder
+  id:uint = null;
+}
+
+// A file or a folder back, with its kind: a folder's fields or a file's
+table DriveRestored {
+  kind:string;
+  id:uint;
+  parentId:uint = null (json_null, json_omit);
+  folderId:uint = null (json_null, json_omit);
+  name:string;
+  size:ulong = null (json_omit);
+  mime:string (json_omit);
+  createdAt:string;
+  updatedAt:string (json_omit);
+  thumb:bool = null (json_omit);
+}
+
+// An upload sent in pieces of chunkSize (an HTTP route's), when the drive and the disk have room
+table DriveUploadInput {
+  user:uint = null;
+  folderId:uint = null (json_null);
+  name:string;
+  size:long = null;
+}
+
+table DriveUpload {
+  id:string;
+  received:ulong;
+  chunkSize:ulong;
+}
+
+table DriveUploadRequest {
+  user:uint = null;
+  id:string;
+}
+
+table DriveShare {
+  id:uint;
+  token:string;
+  kind:string;          // file, folder
+  targetId:uint;
+  name:string;
+  hasPassword:bool;
+  expiresAt:string (json_null);
+  expired:bool;
+  createdAt:string;
+  visitors:long;
+  views:ulong;
+  downloads:ulong;
+  trashed:bool;         // what it shows is in the trash: it opens nothing until restored
+}
+
+table DriveShares {
+  shares:[DriveShare];
+}
+
+// One of fileId and folderId; expires: 1d, 7d, 30d or never
+table DriveShareInput {
+  user:uint = null;
+  fileId:uint = null (json_null);
+  folderId:uint = null (json_null);
+  expires:string;
+  password:string;
+}
+
+table ShareVisitor {
+  userId:uint;
+  displayName:string;
+  username:string;
+  views:uint;
+  downloads:uint;
+  firstAt:string;
+  lastAt:string;
+}
+
+table DriveShareAccess {
+  access:[ShareVisitor];
+}
+
+// What a link shows, to any account: the file, or a folder (the link's own by default) with the way
+// there from the link's folder; nothing but its share while locked by a password
+table ShareGetRequest {
+  token:string;
+  folder:uint = null;
+}
+
+table ShareInfo {
+  kind:string;
+  owner:string;
+  expiresAt:string (json_null);
+  locked:bool;
+  isOwner:bool;
+  name:string (json_omit);
+}
+
+table ShareView {
+  share:ShareInfo;
+  file:DriveFile (json_omit);
+  folders:[DriveFolder] (json_omit);
+  files:[DriveFile] (json_omit);
+  folder:DriveFolder (json_omit);
+  path:[PathStep] (json_omit);
+}
+
+table ShareUnlockRequest {
+  token:string;
+  password:string;
+}
+
+// User friendship (social) between readers
+
+table UserFriendItem {
+  id:uint;
+  username:string;
+  displayName:string;
+  avatar:string (json_null);
+  online:bool;
+  since:string;
+}
+
+table UserFriendsList {
+  friends:[UserFriendItem];
+}
+
+table UserFriendRequestItem {
+  id:uint;
+  user:UserFriendItem;
+  message:string;
+  createdAt:string;
+}
+
+table UserFriendRequests {
+  incoming:[UserFriendRequestItem];
+  outgoing:[UserFriendRequestItem];
+}
+
+table UserFriendRequestSendRequest {
+  to:string;
+  message:string;
+}
+
+table UserFriendRequestActionRequest {
+  id:uint;
+}
+
+table UserFriendRemoveRequest {
+  id:uint;
+}
+
+table UserFriendshipStatusRequest {
+  username:string;
+}
+
+table UserFriendshipStatus {
+  status:string;
+  requestId:uint = null (json_null);
+}
+
+// Chat system (Square & Direct Friend chats)
+
+table ChatMessageItem {
+  id:ulong;
+  channelId:string;
+  senderId:uint;
+  senderName:string;
+  senderAvatar:string (json_null);
+  content:string;
+  createdAt:string;
+}
+
+table ChatMessagesList {
+  messages:[ChatMessageItem];
+  hasMore:bool;
+}
+
+table ChatChannelItem {
+  id:string;
+  type:string;          // "square" | "group" | "direct"
+  name:string;
+  avatar:string (json_null);
+  friend:UserFriendItem (json_null);  // present for direct chat
+  lastMessage:ChatMessageItem (json_null);
+  unreadCount:uint;
+  memberCount:uint;
+}
+
+table ChatChannelsList {
+  channels:[ChatChannelItem];
+}
+
+table ChatMessagesListRequest {
+  channelId:string;
+  before:ulong = null;
+  limit:uint = null;
+}
+
+table ChatMessageSendRequest {
+  channelId:string;
+  content:string;
+}
+
+table ChatMarkReadRequest {
+  channelId:string;
+  lastReadId:ulong;
+}
+
+table ChatUnreadCount {
+  count:uint;
+}
+
+table ChatGroupMemberItem {
+  id:uint;
+  username:string;
+  displayName:string;
+  avatar:string (json_null);
+  role:string;        // "owner" | "member"
+  online:bool;
+}
+
+table ChatGroupMembersList {
+  members:[ChatGroupMemberItem];
+}
+
+table ChatGroupCreateRequest {
+  name:string;
+  memberIds:[uint];
+}
+
+table ChatGroupActionRequest {
+  id:uint;
+}
+
+
+

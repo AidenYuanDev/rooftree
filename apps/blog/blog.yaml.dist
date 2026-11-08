@@ -1,0 +1,610 @@
+##################################
+# blog server configuration file #
+##################################
+
+###################################################################################################
+# SECTION INDEX
+#
+#    LOGGING SYSTEM SETTINGS
+#    DATABASE SETTINGS
+#    SERVER SETTINGS
+#    AUTH SETTINGS
+#    MAIL SETTINGS
+#    LIMITS
+#
+#    Every variable can be overridden by an environment variable, read when the file is loaded:
+#    prefix ROOFTREE_, dots become underscores, all upper case. Example: Database.Blog.Password ->
+#    ROOFTREE_DATABASE_BLOG_PASSWORD
+#
+#    kill -HUP <pid> reloads this file while the server runs: the logging, auth, mail and limit
+#    settings change then; addresses, ports and thread counts are read once at startup.
+###################################################################################################
+
+###################################################################################################
+# LOGGING SYSTEM SETTINGS
+#
+#    Same format as examples/rooftree.yaml.dist, see the description there.
+#    Loggers used: blog, blog.auth, blog.admin, blog.mail, server.world, server.antidos,
+#    server.http, server.mail, sql.sql
+
+LogsDir: ""
+
+Appender:
+  Console:
+    Type: 1
+    Level: 3
+    Flags: 7
+    Colors: [9, 1, 8, 2, 6, 7]
+  # Blog:
+  #   Type: 2
+  #   Level: 3
+  #   Flags: 7
+  #   File: blog.log
+  #   Mode: a
+
+Logger:
+  root:
+    Level: 3
+    Appenders: [Console]
+
+#
+###################################################################################################
+
+###################################################################################################
+# DATABASE SETTINGS
+#
+#    Database.Blog
+#        Description: The blog database, see examples/rooftree.yaml.dist for every field.
+#        Important:   The tables come from apps/blog/db/migrations, applied with dbmate before the
+#                     server starts (pnpm db:up in apps/blog); the server refuses to start while one
+#                     is missing. Host, User and Name are required.
+#                     Most requests run their queries on the worker threads (Server.WorkerThreads) with
+#                     synchronous connections: give it as many SynchThreads as workers.
+#
+#    Blog.MigrationsDirectory
+#        Description: The migrations to check for.
+#        Default:     "blog-migrations" - (Copied next to the binary by the build)
+
+Database:
+  Blog:
+    Host: "127.0.0.1"
+    Port: 5432
+    User: ""
+    Password: ""
+    Name: "rooftree_blog"
+    WorkerThreads: 1
+    SynchThreads: 4
+
+#
+###################################################################################################
+
+###################################################################################################
+# SERVER SETTINGS
+#
+#    The frame and its front ends: networking, threads, the main loop, sessions and AntiDOS. Shared
+#    with the game the same process runs (docs/29-server-core.md); the blog's own settings are under
+#    Blog. A config written before they moved has these as Blog.<key>: still read, with a warning.
+#
+#    Reloadable (SIGHUP, the console's server reload): Sessions, AntiDos, MinUpdateDiff, WorldTick,
+#    StatsInterval, ShutdownDelay. The rest (addresses, ports, threads, the Http and WebSocket limits,
+#    the console) is read at startup: a restart, announced (ShutdownDelay).
+#
+#    Server.Http.BindIP, Server.Http.Port
+#        Description: Where the plain HTTP service listens. Development keeps it on 127.0.0.1;
+#                     on the server it faces the internet ("::", 80, see README).
+#        Default:     "127.0.0.1", 8100
+#
+#    Server.Http.NetworkThreads
+#        Description: Threads reading and answering this port's connections. With RedirectToHttps it
+#                     only redirects and answers Let's Encrypt, 1 is plenty; the pages come over HTTPS.
+#        Default:     2
+#
+#    Server.Http.TrustedProxies
+#        Description: Peers whose X-Forwarded-For is believed, the client address for sessions and
+#                     limits is taken from it then. In development the vite dev server is such a
+#                     proxy. Facing the internet directly: [], nobody's X-Forwarded-For is believed.
+#                     Behind a CDN: its address ranges.
+#        Default:     ["127.0.0.1", "::1"]
+#
+#    Server.Http.MaxRequestBodySize
+#        Description: Bytes, bigger requests get 413. Covers an image upload.
+#        Default:     11534336 - (11 MiB)
+#
+#    Server.Http.RedirectToHttps
+#        Description: Answer every request with a 301 to Blog.PublicOrigin, for the plain port 80 next
+#                     to Server.Https. The ACME challenges and 127.0.0.1 (the rebuild calling the API)
+#                     are still answered.
+#        Default:     false
+#
+#    Server.Http.AcmeChallengeDirectory
+#        Description: certbot --webroot's directory: /.well-known/acme-challenge/<token> is answered
+#                     from <directory>/.well-known/acme-challenge/<token>, so certificates renew while
+#                     the server runs. Empty: none.
+#        Default:     ""
+#        Example:     "/srv/blog/acme"
+#
+#    Server.Https.Port, Server.Https.BindIP, Server.Https.NetworkThreads
+#        Description: The TLS service, with the same routes as Server.Http. Port 0: none (development,
+#                     or a TLS terminating proxy in front).
+#        Default:     0, Server.Http.BindIP, 2
+#
+#    Server.Https.CertificateFile, Server.Https.PrivateKeyFile
+#        Description: PEM files: the certificate with its intermediates (certbot's fullchain.pem) and
+#                     its key. Read again on reload (SIGHUP) after a renewal; a pair that can't be used
+#                     leaves the current one. TLS 1.2 and 1.3 only.
+#        Example:     "/etc/blog/tls/fullchain.pem", "/etc/blog/tls/privkey.pem"
+#
+#    Server.Http.RequestTimeout
+#        Description: Seconds from the connection, or the first byte of a request, to the end of its
+#                     headers, then at most between two reads of its body. A client sending half a
+#                     request, a byte now and then, is closed. 0 disables.
+#        Default:     60
+#
+#    Server.Http.KeepAliveTimeout
+#        Description: Seconds an open connection may wait for its next request. 0 disables.
+#        Default:     75
+#
+#    Server.Http.MaxConnectionsPerIp
+#        Description: Connections open at once per client address, more are closed right away.
+#                     Server.Http.TrustedProxies and the host itself (127.0.0.1, ::1) are exempt.
+#                     0 is no limit.
+#        Default:     64
+#
+#    Server.WebSocket.IdleTimeout
+#        Description: Seconds without anything from a page's WebSocket (/ws, on the same ports as the
+#                     pages) before it is closed. Pages say where they are every 25 seconds. 0 disables.
+#        Default:     90
+#
+#    Server.WebSocket.MaxWriteQueueSize
+#        Description: Bytes waiting to be sent to one page; a page that stopped reading is closed
+#                     past it. 0 is no limit.
+#        Default:     1048576 - (1 MiB)
+#
+#    Server.WorkerThreads
+#        Description: Threads for password hashing, mail and the queries of requests.
+#        Default:     4
+#
+#    Server.MinUpdateDiff
+#        Description: Milliseconds between two updates of the main loop at least. Requests wait
+#                     for the next update, so keep it short: an API request waits about two of
+#                     them (its own, then its query's answer). An idle
+#                     server wakes 500 times a second with 2, which costs next to nothing.
+#        Default:     2
+#
+#    Server.WorldTick, Server.WorldTickMaxCatchUp
+#        Description: Milliseconds between two updates of the game's world, which the loop runs at its
+#                     own pace (every MinUpdateDiff) for the messages meanwhile: a web request never
+#                     waits for a tick. A world behind runs at most WorldTickMaxCatchUp ticks in one
+#                     update and drops the rest. Nothing ticks while no game is loaded.
+#        Default:     50, 3
+#        Reloadable:  Yes
+#
+#    Server.ShutdownDelay
+#        Description: Seconds between a stop (SIGTERM: docker stop, systemctl stop, a deploy) and the
+#                     server stopping, the pages (and the game's players) told meanwhile, again at 60,
+#                     30, 10 and 5 seconds left. A second SIGTERM stops it right away. Keep it under
+#                     docker's stop_grace_period and systemd's TimeoutStopSec (300). 0: right away.
+#        Default:     0
+#        Reloadable:  Yes
+#
+#    Server.MaxCoreStuckTime
+#        Description: Seconds without an update before the server aborts (and systemd restarts it).
+#        Default:     60 - (0 disables)
+#
+#    Server.StatsInterval
+#        Description: Seconds between two logs of the update times ("server.world").
+#        Default:     60 - (0 disables)
+#
+#    Server.Console.Enable
+#        Description: The console ("help" lists the commands): on the terminal
+#                     the server runs on (when stdin is one), and on Server.Console.Socket for
+#                     blog --console.
+#        Default:     true
+#
+#    Server.Console.Socket
+#        Description: The unix socket of blog --console, relative to the
+#                     working directory. Only the server's user and root may connect. "" disables it.
+#        Default:     "console.sock" - (/var/lib/blog/console.sock with blog.service and the image)
+#
+#    Server.Sessions
+#        Description: rooftree-server's session core (docs/29-server-core.md). The keys right under it are
+#                     the default class's, the web's: a session per client address (an IPv6 one by
+#                     its /64). Classes.<name> are the others, over the default class's values: the
+#                     game's players, a session per account. Classes are served by Priority, lowest
+#                     first, each within its own MaxMessagesPerUpdate, so a flood of web requests
+#                     never takes the game's share of an update. The web's is kept small (500): every
+#                     message it lets into an update makes the update, and the players' wait, longer
+#                     (benchmarks [gameweb]); 500 every 2 ms is still far more than the site needs.
+#                     Per class: messages per session per update, per update in all, queued per
+#                     session, sessions in all (a new address past it gets 503).
+#                     An idle session goes after SessionIdleTimeout seconds, after
+#                     SessionIdleTimeoutWhenBusy once three quarters of MaxSessions are taken: many
+#                     addresses that came once can't hold the table full for the next readers.
+#                     MaxPendingWorkPerSession: a session with that many requests at work (their
+#                     queries, password hashing) waits for them before its next one, so it can't take
+#                     every one of WorkerThreads from the others.
+#                     Block: what AntiDOS blocks when a session is refused too often (AntiDos.BlockAfter):
+#                     Address, its address and connections (anonymous web clients), or Session, only
+#                     its key (a player, others may play from the same address).
+#
+#    Server.AntiDos
+#        Description: Per client address and message type, see docs/29-server-core.md. Policy Log,
+#                     Reject (429) or Kick (refuse the address for KickDuration seconds).
+#                     Message types: auth.captcha, auth.oauth, auth.register, auth.login, auth.session, auth.profile,
+#                     auth.token, auth.mail, auth.password, auth.totp, posts.read, posts.search,
+#                     comments.read, comments.write, reactions.write, friends.apply, chat (reading the
+#                     chats, marking them read), chat.write (a message sent, a group made or left), admin,
+#                     drive (an account's own drive, every piece of an upload is one), drive.share
+#                     (opening links), ws.page (the WebSocket's page messages), ws.doc (editors writing a post
+#                     together, Collab.h), views (the pages
+#                     reporting a read, for the statistics)
+#                     Comments and pictures also have a limit per account, Blog.Comments.PerUser and
+#                     Blog.Avatars.PerUser
+#                     A type missing here keeps the limit of this file; MaxCount: 0 lifts one.
+#                     BlockAfter: an address refused Rejections times within Window seconds (no
+#                     browser comes near) is blocked for KickDuration: its connections are closed and
+#                     refused without an answer. Rejections: 0 never blocks.
+#                     Exempt: addresses never counted, the host itself by default: deploy/rebuild.sh
+#                     reads every post through the API from it. Behind a reverse proxy the client's
+#                     address is the one it forwards, so only the host's own requests are spared.
+
+Server:
+  Http:
+    BindIP: "127.0.0.1"
+    Port: 8100
+    NetworkThreads: 2
+    TrustedProxies: ["127.0.0.1", "::1"]
+    MaxRequestBodySize: 11534336
+    RequestTimeout: 60
+    KeepAliveTimeout: 75
+    MaxConnectionsPerIp: 64
+    RedirectToHttps: false
+    AcmeChallengeDirectory: ""
+  Https:
+    BindIP: "127.0.0.1"
+    Port: 0
+    NetworkThreads: 2
+    CertificateFile: ""
+    PrivateKeyFile: ""
+  WebSocket:
+    IdleTimeout: 90
+    MaxWriteQueueSize: 1048576
+  WorkerThreads: 4
+  MinUpdateDiff: 2
+  WorldTick: 50
+  WorldTickMaxCatchUp: 3
+  ShutdownDelay: 30
+  MaxCoreStuckTime: 60
+  StatsInterval: 60
+  Console:
+    Enable: true
+    Socket: "console.sock"
+
+  Sessions:
+    MaxMessagesPerSessionPerUpdate: 100
+    MaxMessagesPerUpdate: 500
+    MaxQueuedMessagesPerSession: 64
+    MaxPendingWorkPerSession: 4
+    MaxPendingMessages: 100000
+    MaxSessions: 100000
+    SessionIdleTimeout: 300
+    SessionIdleTimeoutWhenBusy: 10
+    Priority: 100
+    Block: Address
+    Classes:
+      game:
+        Priority: 0
+        MaxMessagesPerUpdate: 20000
+        MaxQueuedMessagesPerSession: 200
+        MaxSessions: 10000
+        Block: Session
+
+  AntiDos:
+    Policy: Reject
+    KickDuration: 600
+    Exempt: ["127.0.0.1", "::1"]
+    BlockAfter: { Window: 10, Rejections: 1000 }
+    Limits:
+      auth.captcha: { Window: 60, MaxCount: 20 }
+      auth.oauth: { Window: 60, MaxCount: 20 }
+      auth.register: { Window: 3600, MaxCount: 20 }
+      auth.login: { Window: 60, MaxCount: 10 }
+      auth.token: { Window: 60, MaxCount: 10 }
+      auth.mail: { Window: 3600, MaxCount: 10 }
+      auth.password: { Window: 60, MaxCount: 5 }
+      auth.totp: { Window: 60, MaxCount: 10 }
+      auth.session: { Window: 10, MaxCount: 200 }
+      auth.profile: { Window: 60, MaxCount: 60 }
+      posts.read: { Window: 10, MaxCount: 200 }
+      posts.search: { Window: 60, MaxCount: 30 }
+      comments.read: { Window: 10, MaxCount: 200 }
+      comments.write: { Window: 60, MaxCount: 20 }
+      reactions.write: { Window: 60, MaxCount: 60 }
+      friends.apply: { Window: 3600, MaxCount: 5 }
+      chat: { Window: 10, MaxCount: 200 }
+      chat.write: { Window: 60, MaxCount: 30 }
+      drive: { Window: 10, MaxCount: 1000 }
+      drive.share: { Window: 60, MaxCount: 300 }
+      ws.page: { Window: 60, MaxCount: 30 }
+      ws.doc: { Window: 10, MaxCount: 300 }
+      views: { Window: 60, MaxCount: 30 }
+
+###################################################################################################
+# BLOG SETTINGS
+#
+#    Blog.SiteName
+#        Description: Shown in mails and in authenticator apps.
+#        Reloadable:  Yes
+#
+#    Blog.PublicOrigin
+#        Description: The origin readers open the site at, without a path. Mail links point there, and
+#                     state-changing requests must come from it (Origin header).
+#        Default:     "http://localhost:5173" - (vite dev server)
+#        Reloadable:  Yes
+#
+#    Blog.AllowedOrigins
+#        Description: Origins state-changing requests may come from.
+#        Default:     [] - (Blog.PublicOrigin only)
+#        Reloadable:  Yes
+
+Blog:
+  SiteName: "My Blog"
+  PublicOrigin: "http://localhost:5173"
+  AllowedOrigins: []
+  MigrationsDirectory: "blog-migrations"
+
+###################################################################################################
+# AUTH SETTINGS
+#
+#    Blog.Auth.CookieName
+#        Default:     "blog_session"
+#
+#    Blog.Auth.CookieSecure
+#        Description: Mark the session cookie Secure (HTTPS only). Turn it off for a local http setup.
+#        Default:     true
+#        Reloadable:  Yes
+#
+#    Blog.Auth.SessionLifetime, Blog.Auth.SessionRenewAfter
+#        Description: Seconds a login lasts, and after how long without being seen it is extended.
+#        Default:     2592000 (30 days), 86400 (1 day)
+#
+#    Blog.Auth.CacheLifetime
+#        Description: Seconds a cached login is believed without asking the database. Changes made by
+#                     the server itself (logout, password, ban) apply at once anyway.
+#        Default:     300
+#
+#    Blog.Auth.EmailVerificationLifetime, Blog.Auth.PasswordResetLifetime
+#        Description: Seconds the mailed links work.
+#        Default:     86400, 3600
+#
+#    Blog.Auth.Argon2.Iterations, Blog.Auth.Argon2.MemoryCost
+#        Description: Cost of new password hashes (MemoryCost in KiB). Existing hashes keep theirs.
+#        Default:     2, 19456 - (OWASP's minimum for Argon2id)
+#
+#    Blog.Auth.TotpIssuer
+#        Description: The name authenticator apps show.
+#        Default:     "" - (Blog.SiteName)
+#
+#    Blog.Auth.MailInterval
+#        Description: Seconds between two mails to one address: verification, password reset and
+#                     subscription mails. 0: no limit.
+#        Default:     60
+#
+#    Blog.Auth.LoginFailuresPerAccount, Blog.Auth.LoginFailureWindow
+#        Description: Wrong passwords for one login name within the window (seconds), after which
+#                     logging in as it waits for the window to pass, from every address.
+#        Default:     10, 900
+
+  Auth:
+    CookieName: "blog_session"
+    CookieSecure: true
+    SessionLifetime: 2592000
+    SessionRenewAfter: 86400
+    CacheLifetime: 300
+    EmailVerificationLifetime: 86400
+    PasswordResetLifetime: 3600
+    Argon2:
+      Iterations: 2
+      MemoryCost: 19456
+    TotpIssuer: ""
+    MailInterval: 60
+    LoginFailuresPerAccount: 10
+    LoginFailureWindow: 900
+
+###################################################################################################
+# GITHUB AND GOOGLE LOGINS
+#
+#    Blog.OAuth.GitHub.ClientId, Blog.OAuth.GitHub.ClientSecret
+#        Description: An OAuth app of GitHub (Settings, Developer settings, OAuth Apps), its
+#                     callback URL <Blog.PublicOrigin>/api/auth/oauth/github/callback. The secret
+#                     goes in blog.env: ROOFTREE_BLOG_OAUTH_GITHUB_CLIENTSECRET. Empty: no GitHub login.
+#        Default:     "", ""
+#
+#    Blog.OAuth.Google.ClientId, Blog.OAuth.Google.ClientSecret
+#        Description: An OAuth client of Google Cloud (APIs & Services, Credentials, a web
+#                     application), its redirect URI <Blog.PublicOrigin>/api/auth/oauth/google/callback.
+#                     The secret goes in blog.env: ROOFTREE_BLOG_OAUTH_GOOGLE_CLIENTSECRET. Empty: no
+#                     Google login.
+#        Default:     "", ""
+#
+#    Blog.OAuth.<Provider>.AuthorizeUrl, .TokenUrl, .UserUrl, .EmailsUrl (GitHub)
+#        Description: The provider's endpoints, only set for tests against a fake provider.
+
+  OAuth:
+    GitHub:
+      ClientId: ""
+      ClientSecret: ""
+    Google:
+      ClientId: ""
+      ClientSecret: ""
+
+###################################################################################################
+# CAPTCHA SETTINGS
+#
+#    Blog.Captcha.Enable
+#        Description: Registering, subscribing and asking for a password reset need the characters
+#                     of a picture (GET /api/captcha), so a script can't have the server mail any
+#                     address it likes.
+#        Default:     true
+#
+#    Blog.Captcha.Lifetime
+#        Description: Seconds a picture can be answered.
+#        Default:     600
+
+  Captcha:
+    Enable: true
+    Lifetime: 600
+
+###################################################################################################
+# MAIL SETTINGS
+#
+#    Blog.Mail.Url
+#        Description: smtps://host:465 or smtp://host:587 (STARTTLS). Empty: mails are only logged.
+#        Example:     "smtps://smtp.example.com:465"
+#
+#    Blog.Mail.Username, Blog.Mail.Password
+#
+#    Blog.Mail.From, Blog.Mail.FromName
+#        Description: The sender. From is required.
+#
+#    Blog.Mail.RequireTls
+#        Description: Refuse to send without TLS. Off only for a local test server (Mailpit).
+#        Default:     true
+#
+#    Blog.Mail.OutboxDirectory
+#        Description: Set: mails are written there as .eml files instead of sent (development, tests).
+#        Default:     ""
+
+  Mail:
+    Url: ""
+    Username: ""
+    Password: ""
+    From: "noreply@blog.example.com"
+    FromName: "My Blog"
+    RequireTls: true
+    Timeout: 30
+    OutboxDirectory: ""
+
+###################################################################################################
+# LIMITS
+#
+#    Blog.Comments.MaxPerUserPerPost
+#        Description: Comments one account may write under one post (note, thinking, the guestbook), in all.
+#        Default:     1024
+#
+#    Blog.Comments.EditWindow
+#        Description: Seconds after posting during which its author may still edit a comment.
+#        Default:     300
+#
+#    Blog.Comments.PerUser
+#        Description: At most MaxCount comments per account within Window seconds, wherever they come from.
+#        Default:     { Window: 60, MaxCount: 3 }
+#
+#    Blog.Avatars.PerUser
+#        Description: At most MaxCount changes of an account's picture within Window seconds: uploads,
+#                     the provider's (the server downloads it), back to the initials. Per account, not per
+#                     address: many readers share one.
+#        Default:     { Window: 3600, MaxCount: 10 }
+#
+#    Blog.Uploads.Directory, Blog.Uploads.MaxSize
+#        Description: Where uploaded images are stored, the largest size in bytes. The server answers
+#                     /uploads/<name> from Directory itself; the address is fixed, posts link to it.
+#        Default:     "uploads", 10485760
+#
+#    Blog.Drive.Directory
+#        Description: Where the accounts' drives keep their files (files/) and the uploads on their way
+#                     (parts/), under random names; the database has which is whose. Back it up with
+#                     the database. Nothing answers it directly: files are only read through the API.
+#        Default:     "drive"
+#
+#    Blog.Drive.Quota, Blog.Drive.AdminQuota
+#        Description: Bytes a drive may hold, an account's and the admin's, unless the admin gave the
+#                     account a size of its own (the account's page, the admin's own too). Only the
+#                     admin and accounts the admin gave one have a drive. 0: nothing can be uploaded
+#                     until the admin sets a size.
+#        Default:     0, 0
+#
+#    Blog.Drive.MaxFileSize
+#        Description: The largest file in bytes. Uploads come in pieces of 8 MiB, under
+#                     Server.Http.MaxRequestBodySize.
+#        Default:     2147483648 - (2 GiB)
+#
+#    Blog.Drive.MinFreeSpace
+#        Description: An upload that would leave less than this many bytes free on the disk of
+#                     Directory is refused, whatever the quotas say.
+#        Default:     2147483648 - (2 GiB)
+#
+#    Blog.Drive.TrashDays
+#        Description: Days a deleted file or folder stays in its account's trash, where it can be
+#                     restored (it still counts against the quota), unless the admin gave the account
+#                     days of its own. Removed for good afterwards, at the latest an hour later. At
+#                     most 365; 0: no trash, deleting is for good.
+#        Default:     1
+#
+#    Blog.Newsletter.MailsPerMinute
+#        Description: Newsletters (new posts, notes when asked) go out one after another at this pace,
+#                     on a thread of their own, so the SMTP server doesn't take them for spam.
+#        Default:     60
+#
+#    Blog.Static.Directory
+#        Description: The prerendered site (deploy/rebuild.sh's current release), read into memory and
+#                     answered by the server itself. Loaded again after every rebuild and on reload
+#                     (SIGHUP), after a rebuild by hand. Empty: no site (development: the vite dev
+#                     server has the pages).
+#        Default:     ""
+#        Example:     "/srv/blog/site/current"
+#
+#    Blog.Rebuild.Command
+#        Description: Run after something on the prerendered pages changed (a published post, note or
+#                     thinking, a tag, the profile, friends, projects): rebuilds them (deploy/rebuild.sh).
+#                     Empty: never, rebuild by hand.
+#        Default:     ""
+#        Example:     "/opt/blog/rebuild.sh"
+#
+#    Blog.Rebuild.Debounce
+#        Description: Seconds without another change before the command runs, so a burst of edits
+#                     rebuilds once.
+#        Default:     10
+#
+#    Blog.Status.SampleInterval
+#        Description: Seconds between two samples of the status page (/zh/status), which keeps the
+#                     last 1440 of them: a day with the default.
+#        Default:     60
+#
+#    Blog.Stats.DayOffset
+#        Description: Where the statistics' day begins (the admin's Statistics page), in minutes east
+#                     of UTC: 480 is China's midnight, 0 UTC's.
+#        Default:     480
+
+  Comments:
+    MaxPerUserPerPost: 1024
+    EditWindow: 300
+    PerUser: { Window: 60, MaxCount: 3 }
+
+  Avatars:
+    PerUser: { Window: 3600, MaxCount: 10 }
+
+  Uploads:
+    Directory: "uploads"
+    MaxSize: 10485760
+
+  Drive:
+    Directory: "drive"
+    Quota: 0
+    AdminQuota: 0
+    MaxFileSize: 2147483648
+    MinFreeSpace: 2147483648
+    TrashDays: 1
+
+  Newsletter:
+    MailsPerMinute: 60
+  Static:
+    Directory: ""
+  Rebuild:
+    Command: ""
+    Debounce: 10
+  Status:
+    SampleInterval: 60
+
+  Stats:
+    DayOffset: 480

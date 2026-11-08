@@ -1,0 +1,213 @@
+/* The painting behind every page and its motions (components/scenery). SVG transforms: transform-box
+   picks the element's own box */
+
+/* Only the painting that shows is fetched: by theme, wide or tall by the window's shape, 1024 or 2048
+   pixels by how many it covers on screen (painting.tsx prefetches the other theme's from --day and
+   --night). Under it while it loads, a sketch of it: the painting 40 pixels wide, inline, blurred */
+.scenery {
+  --day: url('/scenery/day-wide.webp');
+  --night: url('/scenery/night-wide.webp');
+  --day-sketch: url('data:image/webp;base64,UklGRkABAABXRUJQVlA4IDQBAABwBwCdASooABYAPrVMnUunJCKhqqoA4BaJQBdmbLX/wFFnS8VFseh1EC1H82/29OHj/Tr25UuFa/7uEBgC9pUm3pN0AAD+w/LoKmT/JDqUlOoLMqI2yQLpX27Y3o9L3Lcu3iWk1Zypg2S6/pzpDqaGor5pz5WT2Qxgu5B+VJaN7EVAoPWdDVmX+gONkZ1F5AN6UmtEOQ4XlZ32e+e4+GmTGXiPPcz5cl5gmJHOzrDfrZOeDIVmENlParyz0IYOThweI2l+/9klw1LBVj3FME5+GIgVMtBTtW84MH5dURaQaLgBmBiG9ljVmvL8PMtR1JxWYGXxslf3rHPTf/eqqpAZ/x4BRG0T+VHUgZa+X8CEsUy0Il+ahNMYyAsCWw1KgXzIwqqniUJM+MxaTY/h2IAQTd/AAA==');
+  --night-sketch: url('data:image/webp;base64,UklGRsoAAABXRUJQVlA4IL4AAADwBQCdASooABYAPrVKn0onJCKhqqwA4BaJZQDDrBQbvJwSXs7SH+F7T8poOKVBBZS0KyF12IqiAAD+9ZnFmZO7XU7BefbtrcekR/BmOh6N7WxBXvOOwPoTxCLmtezgtRXckk8Sl2vlM/qqArEpA1oqv+oesO3XYnIy4w7uLtWbuBkjiRlVgDtI9wWSl9AU+sJzKezQdc7ldbKY0yM80xgrQdxq8x0Vd5rNokLknws3fKC/H87AK1Tt8AFfAAAA');
+}
+.scenery-sketch {
+  background: var(--painting-tint) var(--day-sketch) center / cover no-repeat;
+  filter: blur(24px);
+  /* The blur's edge fades to the color under it: off screen */
+  transform: scale(1.1);
+}
+.dark .scenery-sketch {
+  background-image: var(--night-sketch);
+}
+.scenery-painting {
+  background: var(--day) center / cover no-repeat;
+}
+.dark .scenery-painting {
+  background-image: var(--night);
+}
+/* 2048 once the painting's long side covers some 1280 pixels of the screen: CSS pixels times the ratio
+   (browser zoom raises both), in steps; or the height, on a window squarer than the painting (1.79) */
+@media (min-aspect-ratio: 1/1) and ((min-width: 1280px) or (min-height: 716px) or ((min-width: 1024px) and (min-resolution: 1.25dppx)) or ((min-width: 854px) and (min-resolution: 1.5dppx)) or (min-resolution: 2dppx)) {
+  .scenery {
+    --day: url('/scenery/day-wide-2x.webp');
+    --night: url('/scenery/night-wide-2x.webp');
+  }
+}
+.scenery-tall {
+  display: none;
+}
+@media (max-aspect-ratio: 1/1) {
+  .scenery {
+    --day: url('/scenery/day-tall.webp');
+    --night: url('/scenery/night-tall.webp');
+    --day-sketch: url('data:image/webp;base64,UklGRlQBAABXRUJQVlA4IEgBAAAwBwCdASoWACgAPrVUpU2nJKOiJWmY4BaJZAC32U2JZi2bXFma/wZZ7mVeXId27NnsETI8ctfuXdcWXwX8fmGKbAAA/t/DXATpdTHLVyrUpaordHYozfbwSMa89P+HZfMHexoihC4kls8/U+t35EVnrlTiFANQyEWt0Be2jzQL2OHVf6TEtrJZ0WUIogF1GYSIYLngWfJjB6N6SABnht2pHbgH9pI6eL+KYQK4gWuC3fqcC8URm8Ht0ywC5IuB+gY2cDf8ncqylWYXtk1ElmRi16xles7sBFiOVundONsOMBtus8XxAPTQ947qAjTD9B8TNixOodhDRmuCROnsP+smwAOgkYqHXSinbgsho2GNqNYYwsbFCGmlnCdCGo9E4jLu9UUQ3LrW/VfK5C+kxyzZj338cPty4qvW1XTQveICM8SsjF224AAA');
+    --night-sketch: url('data:image/webp;base64,UklGRuwAAABXRUJQVlA4IOAAAACwBQCdASoWACgAPrVIn0wnI6KiKrgMAOAWiWMAnQAhn6l+7eaWkku4EcaqhuYdZ3k9QIz0VIAA/vrv+N6MRhANHswpOXmRnP8prjFCCcwPBFV+zr79mB8YnfASyDr790bo1dtbiyAPjJyMvVD4fhH+addjiO9m6+6XmQcNbPiuISNKd/m4ZRsyukwYXMci4DzS87SsH9+Ow/zDXIEanFqCM7R27Dyow8wrWm54Gu8kbEEUfZuQoXqsQZwSx4V68JNUoj/MSmNLsLa1GnCm1doMzvbv/j913jF40H4a046AAA==');
+  }
+  .scenery-wide {
+    display: none;
+  }
+  .scenery-tall {
+    display: block;
+  }
+}
+/* Tall: the height, or the width on a squarish window (the portrait is 0.56 as wide as high) */
+@media (max-aspect-ratio: 1/1) and ((min-height: 1280px) or (min-width: 720px) or ((min-height: 1024px) and (min-resolution: 1.25dppx)) or ((min-height: 854px) and (min-resolution: 1.5dppx)) or (min-resolution: 2dppx)) {
+  .scenery {
+    --day: url('/scenery/day-tall-2x.webp');
+    --night: url('/scenery/night-tall-2x.webp');
+  }
+}
+
+/* The motions belong on the painting: hidden until painting.tsx has seen it loaded (without scripts
+   they don't move anyway) */
+.scenery-wide,
+.scenery-tall {
+  transition: opacity 0.6s;
+}
+.scenery:not([data-ready]) :is(.scenery-wide, .scenery-tall) {
+  opacity: 0;
+}
+
+.scenery-veil {
+  background: var(--veil);
+  transition: opacity 0.4s;
+}
+/* The home page shows the painting clearly at the top; the veil comes as one reads down */
+@supports (animation-timeline: scroll()) {
+  body:has(.home-hero) .scenery-veil {
+    animation: scenery-veil linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 70vh;
+  }
+}
+@keyframes scenery-veil {
+  from {
+    opacity: var(--veil-home, 0.35);
+  }
+}
+
+/* What only shows by day or only at night */
+.dark .scenery-day-only {
+  display: none;
+}
+:root:not(.dark) .scenery-night-only {
+  display: none;
+}
+
+.scenery-sparkle,
+.scenery-star {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.scenery-meteor {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scenery-sparkle {
+    animation: scenery-sparkle 3.6s ease-in-out infinite;
+  }
+  .scenery-loading .scenery-sparkle {
+    animation-duration: 1.2s;
+  }
+  .scenery-loading .scenery-sparkle:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .scenery-loading .scenery-sparkle:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  /* Each star's period and phase set on it (painting.tsx) */
+  .scenery-star {
+    animation: scenery-sparkle 3s ease-in-out infinite;
+  }
+  .scenery-meteor {
+    animation: scenery-meteor 17s ease-in 6s infinite;
+  }
+  .scenery-lamp,
+  .dark .scenery-mark-lamp {
+    animation: scenery-lamp 4.2s steps(1, end) infinite;
+    animation-delay: calc(var(--lamp-index, 0) * -1.7s);
+  }
+
+  .scenery-sun {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: scenery-sun 9s ease-in-out infinite alternate;
+  }
+  .scenery-sunlight {
+    animation: scenery-sunlight 6s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes scenery-sparkle {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.55);
+    opacity: 0.45;
+  }
+}
+
+/* Most of the cycle nothing; then a short streak down to the left */
+@keyframes scenery-meteor {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  1% {
+    opacity: 1;
+  }
+  7% {
+    opacity: 0;
+    transform: translate(calc(var(--meteor-length) * -1.6), calc(var(--meteor-length) * 0.71));
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* A flame behind the glass: mostly steady, now and then a little lower */
+@keyframes scenery-lamp {
+  0% {
+    opacity: 1;
+  }
+  31% {
+    opacity: 0.82;
+  }
+  34% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 0.9;
+  }
+  64% {
+    opacity: 0.75;
+  }
+  67% {
+    opacity: 1;
+  }
+}
+
+@keyframes scenery-sun {
+  from {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes scenery-sunlight {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 0.9;
+  }
+}

@@ -1,0 +1,12 @@
+Rooftree
+Copyright (C) 2026 Aiden Yuan
+
+Rooftree is free software under the GNU General Public License, version 2 or
+later. See COPYING.
+
+Third party code
+----------------
+  - deps/kcp: KCP 1.7.1 (https://github.com/skywind3000/kcp), MIT license, kept as
+    it is. Its license is in that directory.
+
+Every other dependency is a system package, see the build section of README.md.

@@ -1,0 +1,146 @@
+# Helgrind suppressions for Rooftree
+#
+#   valgrind --tool=helgrind --suppressions=contrib/valgrind/helgrind.supp ./http_server
+#
+# Build with -DHELGRIND=1 (annotates libstdc++ and turns off jemalloc).
+#
+# Every entry is anchored at the top of the stack, i.e. it only matches when the racing access
+# itself happens inside the library. Rooftree's own handlers run inside
+# boost::asio::detail::scheduler::run too, so a looser "asio anywhere in the stack" pattern would
+# hide real races in them.
+
+# ------------------------------------------------------------------------------------------------
+# [1] Boost.Asio internals
+#
+# Boost.Asio protects its reactor/scheduler state with its own futex based
+# conditionally_enabled_mutex<futex_slim_mutex> instead of pthread mutexes. Helgrind only knows
+# pthread primitives, so everything guarded by it looks unsynchronized.
+# ------------------------------------------------------------------------------------------------
+
+# descriptor_state objects are recycled through epoll_reactor's object pool
+{
+   [1] asio: epoll_reactor descriptor state pool
+   Helgrind:Race
+   fun:alloc<*>
+   fun:_ZN5boost4asio6detail13epoll_reactor25allocate_descriptor_state*
+}
+{
+   [1] asio: epoll_reactor descriptor state pool
+   Helgrind:Race
+   fun:free
+   fun:_ZN5boost4asio6detail13epoll_reactor21free_descriptor_state*
+}
+
+# Accesses directly inside epoll_reactor (register/deregister/run/perform_io)
+{
+   [1] asio: epoll_reactor
+   Helgrind:Race
+   fun:_ZN5boost4asio6detail13epoll_reactor*
+}
+{
+   [1] asio: epoll_reactor (one inlined helper)
+   Helgrind:Race
+   fun:*
+   fun:_ZN5boost4asio6detail13epoll_reactor*
+}
+{
+   [1] asio: epoll_reactor (two inlined helpers)
+   Helgrind:Race
+   fun:*
+   fun:*
+   fun:_ZN5boost4asio6detail13epoll_reactor*
+}
+
+# Accesses directly inside the scheduler's own bookkeeping (op queues, task cleanup)
+{
+   [1] asio: scheduler
+   Helgrind:Race
+   fun:_ZN5boost4asio6detail9scheduler*
+}
+{
+   [1] asio: scheduler op queue
+   Helgrind:Race
+   fun:next<*>
+   fun:p*
+   fun:_ZN5boost4asio6detail9scheduler*
+}
+{
+   [1] asio: scheduler task_cleanup
+   Helgrind:Race
+   fun:push
+   fun:_ZN5boost4asio6detail9scheduler12task_cleanup*
+}
+# scheduler_operation::complete reads the op's function pointer, the op was queued by another thread
+{
+   [1] asio: scheduler_operation::complete
+   Helgrind:Race
+   fun:complete
+   fun:_ZN5boost4asio6detail9scheduler10do_run_one*
+}
+
+# Starting a socket operation registers it with the reactor
+{
+   [1] asio: reactive_socket_service_base::start_op
+   Helgrind:Race
+   fun:start_op
+   fun:do_start_op
+   fun:_ZN5boost4asio6detail28reactive_socket_service_base8start_op*
+}
+{
+   [1] asio: reactive_socket_service_base::start_op
+   Helgrind:Race
+   fun:empty
+   fun:start_op
+   fun:do_start_op
+}
+
+# The futex mutex itself: its atomics and the "enabled" flag
+{
+   [1] asio: conditionally_enabled_mutex
+   Helgrind:Race
+   fun:load
+   fun:enabled
+   fun:lock
+}
+{
+   [1] asio: conditionally_enabled_mutex
+   Helgrind:Race
+   fun:store
+   fun:unlock
+   fun:_ZN5boost4asio6detail27conditionally_enabled_mutex*
+}
+{
+   [1] asio: conditionally_enabled_mutex
+   Helgrind:Race
+   fun:store
+   fun:unlock
+   fun:~scoped_lock
+}
+{
+   [1] asio: futex_slim_mutex
+   Helgrind:Race
+   fun:exchange
+   fun:lock
+   fun:lock
+}
+{
+   [1] asio: mutex initialized while the object is reused
+   Helgrind:Race
+   fun:pthread_mutex_init
+   fun:posix_mutex
+   fun:_ZN5boost4asio6detail27conditionally_enabled_mutex*
+}
+
+# ------------------------------------------------------------------------------------------------
+# [2] libstdc++ shared_ptr reference counting
+#
+# _M_release() reads the use and weak counts together with one 8-byte atomic load (fast path in
+# newer libstdc++). HELGRIND's _GLIBCXX_SYNCHRONIZATION_HAPPENS_* annotations do not cover it, and
+# Helgrind does not understand the atomics, so two threads dropping the last references look like
+# a race.
+# ------------------------------------------------------------------------------------------------
+{
+   [2] libstdc++: shared_ptr reference count
+   Helgrind:Race
+   fun:_ZNSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE10_M_release*
+}

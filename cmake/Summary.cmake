@@ -1,0 +1,32 @@
+# This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+#
+# What this configuration builds, once configured
+
+function(rooftree_summary_line label value)
+  if(value)
+    set(value "yes")
+  else()
+    set(value "no")
+  endif()
+  string(LENGTH "${label}" length)
+  math(EXPR padding "24 - ${length}")
+  string(REPEAT " " ${padding} spaces)
+  message("  ${label}${spaces}${value}")
+endfunction()
+
+message("")
+message("Rooftree, ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}, ${CMAKE_BUILD_TYPE}, into ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+rooftree_summary_line("examples" "${EXAMPLES}")
+rooftree_summary_line("apps" "${APPS}")
+rooftree_summary_line("tests" "${BUILD_TESTING}")
+rooftree_summary_line("benchmarks" "${BUILD_BENCHMARKS}")
+rooftree_summary_line("precompiled headers" "${USE_COREPCH}")
+rooftree_summary_line("all warnings" "${WITH_WARNINGS}")
+rooftree_summary_line("warnings are errors" "${WITH_WARNINGS_AS_ERRORS}")
+rooftree_summary_line("jemalloc" "${USE_JEMALLOC}")
+foreach(tool ASAN UBSAN TSAN MSAN HELGRIND)
+  if(${tool})
+    message("  ${tool} is on: a build for finding bugs, not for running a server")
+  endif()
+endforeach()
+message("")

@@ -1,0 +1,62 @@
+// test_Packets.cpp and test_ServerNetwork.cpp's packets
+attribute "json_null";
+attribute "json_omit";
+attribute "json_closed";
+attribute "json_map";
+
+namespace Test;
+
+enum Color : ubyte { Red, Green, Blue }
+
+table Item {
+  id:uint = null;
+  name:string;
+}
+
+table Everything {
+  flag:bool = null;
+  small:byte = null;
+  count:uint = null;
+  big:ulong = null;
+  ratio:double = null;
+  plain:int = 7;            // not optional: written with its default
+  color:Color = null;
+  name:string;
+  gone:string (json_null);  // null is "", "" and none are null
+  child:Item (json_null);   // null is an empty table, an empty one is null
+  items:[Item];
+  tags:[string];
+  numbers:[short];
+  colors:[Color];
+  old:int (deprecated);
+  extra:string (json_omit); // not in the JSON when not in the buffer
+  named:Item (json_closed); // only id and name in it
+}
+
+// json_map: an object by key, of one value or of the other fields
+table Count {
+  key:string;
+  count:uint;
+}
+
+table Size {
+  key:string;
+  width:ushort;
+  height:ushort;
+}
+
+table Maps {
+  counts:[Count] (json_map);
+  sizes:[Size] (json_map);
+}
+
+// json_null on a scalar: null is 0, the way an id says "none"
+table Move {
+  folder:uint = null (json_null);
+}
+
+table Ping {
+  text:string;
+}
+
+root_type Everything;

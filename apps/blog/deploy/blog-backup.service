@@ -1,0 +1,10 @@
+# /etc/systemd/system/blog-backup.service, started by blog-backup.timer
+[Unit]
+Description=Back up the blog database and uploads
+
+[Service]
+Type=oneshot
+User=blog
+Group=blog
+EnvironmentFile=/etc/blog/blog.env
+ExecStart=/opt/blog/src/apps/blog/deploy/backup.sh

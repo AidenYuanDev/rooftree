@@ -1,0 +1,859 @@
+// The admin's operations as packets (ApiPackets.h): opcodes, and per opcode the table it sends
+// (...Request) and the one it gets back. A table mirrors the JSON of the HTTP route, key for key,
+// the route's path and query parameters among the request's fields.
+//
+// Rules, so old clients keep working: fields are only ever added at the end of a table, never
+// removed (deprecated instead) or retyped; an opcode keeps its number. A request's scalars are
+// optional (= null): a field not sent is one the operation leaves as it is. Names are camelCase, the
+// JSON keys, not the snake_case flatc suggests.
+// json_null: null in JSON is the field empty (a request's "remove this"), and an absent one is null.
+// json_omit: an absent one isn't in the JSON at all. json_closed: an object whose keys must all be
+// fields (FlatJson.h)
+attribute "json_null";
+attribute "json_omit";
+attribute "json_closed";
+
+namespace Blog.Admin;
+
+enum Opcode : ushort {
+  // 0 is Rooftree.Packets.Error
+  PostsList = 0x0100,
+  PostsGet = 0x0101,
+  PostsCreate = 0x0102,
+  PostsUpdate = 0x0103,
+  PostsDelete = 0x0104,
+  PostsRevisions = 0x0105,
+  PostsEditors = 0x0106,
+  PostsEditorSet = 0x0107,
+  PostsEditorRemove = 0x0108,
+  PostsPublish = 0x0109,
+  PostsRevision = 0x010A,
+  PostsSaveVersion = 0x010B,
+  PostsRestore = 0x010C,
+  PostsUpload = 0x010D,
+  TagsCreate = 0x0110,
+  TagsUpdate = 0x0111,
+  TagsDelete = 0x0112,
+  NotesList = 0x0120,
+  NotesGet = 0x0121,
+  NotesCreate = 0x0122,
+  NotesUpdate = 0x0123,
+  NotesDelete = 0x0124,
+  ThinkingList = 0x0130,
+  ThinkingGet = 0x0131,
+  ThinkingCreate = 0x0132,
+  ThinkingUpdate = 0x0133,
+  ThinkingDelete = 0x0134,
+  CommentsList = 0x0140,
+  CommentsModerate = 0x0141,
+  FriendsList = 0x0150,
+  FriendsCreate = 0x0151,
+  FriendsUpdate = 0x0152,
+  FriendsDelete = 0x0153,
+  ProjectsCreate = 0x0160,
+  ProjectsUpdate = 0x0161,
+  ProjectsDelete = 0x0162,
+  SiteGet = 0x0170,
+  SiteUpdate = 0x0171,
+  UsersList = 0x0180,
+  UsersCreate = 0x0181,
+  UsersGet = 0x0182,
+  UsersUpdate = 0x0183,
+  UsersDelete = 0x0184,
+  UsersMailPasswordReset = 0x0185,
+  UsersDisableTotp = 0x0186,
+  UsersDeleteSessions = 0x0187,
+  UsersDeleteSession = 0x0188,
+  UsersSetDrive = 0x0189,
+  UsersBan = 0x018A,
+  UsersUnban = 0x018B,
+  UsersSetWrite = 0x018C,
+  IpBansList = 0x01A0,
+  IpBansAdd = 0x01A1,
+  IpBansDelete = 0x01A2,
+  Upload = 0x01B0,
+  Online = 0x01C0,
+  Stats = 0x01C1,
+  Status = 0x01C2,
+  Drives = 0x01C3,
+  ChatGroupsList = 0x01D0,
+  ChatMessagesList = 0x01D1,
+  ChatMessageDelete = 0x01D2,
+  ChatChannelClear = 0x01D3,
+  ChatGroupDelete = 0x01D4,
+}
+
+// What has nothing more to say than that it worked: a delete, a mail sent
+table Ok {
+  ok:bool;
+}
+
+// The operations with an id in their path and nothing else
+table IdRequest {
+  id:uint = null;
+}
+
+table PageRequest {
+  page:uint = null;
+}
+
+table EmptyRequest {
+}
+
+// Posts
+
+table PostText {
+  title:string;
+  summary:string;
+  body:string;
+}
+
+// In a request an empty language (a PostText without fields) deletes it
+table PostTranslations {
+  zh:PostText (json_null, json_omit);
+  en:PostText (json_null, json_omit);
+}
+
+table Post {
+  id:uint;
+  slug:string;
+  status:string;          // draft, published
+  originalLang:string;    // zh, en
+  cover:string;
+  commentsEnabled:bool;
+  tags:[string];
+  translations:PostTranslations;
+  publishedAt:string (json_null);     // ISO 8601, none while a draft
+  publishAt:string (json_null);       // when the server publishes the draft, none if not scheduled
+  updatedAt:string;
+  createdAt:string;
+  owner:PostPerson;
+  rights:[string];        // what the one asking may do on top of editing its text: publish, settings, editors, delete
+  draftLangs:[string];    // the languages its working copy has (Collab.h), published or not
+  reviewRequestedAt:string (json_null);   // publishing it was asked for, the admin's to do (reviewWriters)
+}
+
+// Who a post is of, or edited by
+table PostPerson {
+  id:uint;
+  username:string;
+  displayName:string;
+  avatar:string (json_null);
+}
+
+table PostInput {
+  id:uint = null;               // PostsUpdate's
+  slug:string;
+  status:string;
+  originalLang:string;
+  cover:string;
+  commentsEnabled:bool = null;
+  tags:[string];                // [] removes them all
+  translations:PostTranslations (json_closed);
+  publishAt:string (json_null); // "" not scheduled any more
+  owner:string;                 // the admin's: the user name of its new owner
+  reviewRequested:bool = null;  // false: no longer asked to be published (the admin says no, or who asked takes it back)
+}
+
+table PostsListRequest {
+  status:string;          // draft, published, review (asked to be published)
+  page:uint = null;
+}
+
+table PostsListItem {
+  id:uint;
+  slug:string;
+  status:string;
+  originalLang:string;
+  updatedAt:string;
+  publishedAt:string (json_null);
+  title:string;
+  translations:[string];
+  publishAt:string (json_null);
+  mine:bool;              // the one asking owns it
+  reviewRequested:bool;
+}
+
+table PostsList {
+  posts:[PostsListItem];
+  hasMore:bool;
+}
+
+// Who edits a post besides its owner (PostRights of BlogTypes.h)
+
+table PostEditor {
+  user:PostPerson;
+  rights:[string];        // publish, settings, editors
+  createdAt:string;
+}
+
+table PostEditors {
+  owner:PostPerson;
+  editors:[PostEditor];
+}
+
+// Invites an editor, or changes its rights
+table PostEditorInput {
+  id:uint = null;         // the post's
+  username:string;
+  rights:[string];
+}
+
+table PostEditorRemoveRequest {
+  id:uint = null;         // the post's
+  user:uint = null;
+}
+
+// Tags
+
+table Tag {
+  slug:string;
+  nameZh:string;
+  nameEn:string;
+  postCount:uint;
+}
+
+table TagInput {
+  slug:string;
+  nameZh:string;
+  nameEn:string;
+}
+
+table SlugRequest {
+  slug:string;
+}
+
+// Notes
+
+table NoteText {
+  title:string;
+  body:string;
+}
+
+table NoteTranslations {
+  zh:NoteText (json_null, json_omit);
+  en:NoteText (json_null, json_omit);
+}
+
+table Note {
+  id:uint;
+  status:string;
+  originalLang:string;
+  mood:string;
+  weather:string;
+  cover:string;
+  commentsEnabled:bool;
+  translations:NoteTranslations;
+  publishedAt:string (json_null);
+  updatedAt:string;
+  createdAt:string;
+}
+
+table NoteInput {
+  id:uint = null;
+  status:string;
+  originalLang:string;
+  mood:string;
+  weather:string;
+  cover:string;
+  commentsEnabled:bool = null;
+  notify:bool = null;           // mail the subscribers once it is published
+  translations:NoteTranslations (json_closed);
+}
+
+table NotesListRequest {
+  status:string;
+  page:uint = null;
+}
+
+table NotesListItem {
+  id:uint;
+  status:string;
+  originalLang:string;
+  updatedAt:string;
+  publishedAt:string (json_null);
+  title:string;
+  translations:[string];
+}
+
+table NotesList {
+  notes:[NotesListItem];
+  hasMore:bool;
+}
+
+// Thinking
+
+table ThinkingText {
+  body:string;
+}
+
+table ThinkingTranslations {
+  zh:ThinkingText (json_null, json_omit);
+  en:ThinkingText (json_null, json_omit);
+}
+
+table Thinking {
+  id:uint;
+  status:string;
+  originalLang:string;
+  commentsEnabled:bool;
+  translations:ThinkingTranslations;
+  publishedAt:string (json_null);
+  updatedAt:string;
+  createdAt:string;
+}
+
+table ThinkingInput {
+  id:uint = null;
+  status:string;
+  originalLang:string;
+  commentsEnabled:bool = null;
+  translations:ThinkingTranslations (json_closed);
+}
+
+table ThinkingListItem {
+  id:uint;
+  status:string;
+  originalLang:string;
+  updatedAt:string;
+  publishedAt:string (json_null);
+  body:string;
+  translations:[string];
+}
+
+table ThinkingList {
+  thinking:[ThinkingListItem];
+  hasMore:bool;
+}
+
+// Comments
+
+table CommentsListRequest {
+  status:string;        // visible, hidden, deleted
+  cursor:string;        // the last page's nextCursor
+  passage:string;       // any: those on a passage of a post; orphaned: those whose passage the post lost
+}
+
+// The passage of a post a comment is on (Reader.fbs CommentAnchor): its language, what was selected,
+// its whole block as it was, ok or orphaned (its text no longer in the post) or kept (left so)
+table CommentPassage {
+  lang:string;
+  quote:string;
+  text:string;
+  status:string;
+}
+
+table CommentsListAuthor {
+  id:uint;
+  username:string;
+  displayName:string;
+  banned:bool;
+}
+
+table CommentsListItem {
+  id:uint;
+  target:string;        // "post:12"
+  postSlug:string (json_null);
+  author:CommentsListAuthor;
+  body:string;
+  status:string;
+  createdAt:string;
+  ip:string;
+  isReply:bool;
+  passage:CommentPassage;
+}
+
+table CommentsList {
+  comments:[CommentsListItem];
+  nextCursor:string (json_null);    // none on the last page
+}
+
+// Its status, or its lost passage left so (kept: the post keeps showing it in "the text changed"), or both
+table CommentsModerateRequest {
+  id:uint = null;
+  status:string;        // visible, hidden
+  passage:string;       // kept
+}
+
+table CommentAuthor {
+  id:uint;
+  username:string;
+  displayName:string;
+  role:string;
+  avatar:string (json_null);
+  deleted:bool;
+}
+
+table CommentReplyTo {
+  id:uint;
+  displayName:string;
+}
+
+table Comment {
+  id:uint;
+  target:string;
+  parentId:uint = null;
+  status:string;
+  body:string;
+  createdAt:string;
+  editedAt:string (json_null);
+  author:CommentAuthor;   // none once deleted
+  replyTo:CommentReplyTo;
+  passage:CommentPassage;
+}
+
+// Every version of a post, kept: each publication, each time an editor saved its working copy as one
+table PostRevision {
+  id:uint;
+  lang:string;
+  createdAt:string;
+  title:string;
+  body:string (json_omit);          // PostsRevision's, not the list's
+  kind:string;                      // published, draft
+  note:string;
+  length:uint;                      // of its Markdown, in characters
+  author:PostPerson;                // none: the server published it (scheduled)
+  summary:string (json_omit);       // PostsRevision's
+  previous:PostRevisionText (json_omit);  // PostsRevision's: the version before it in its language
+}
+
+table PostRevisionText {
+  title:string;
+  summary:string;
+  body:string;
+}
+
+// Newest first, a page before a version (none: from the newest)
+table PostRevisionsRequest {
+  id:uint = null;
+  before:uint = null;
+}
+
+table PostRevisions {
+  revisions:[PostRevision];
+  hasMore:bool;
+}
+
+table PostRevisionRequest {
+  id:uint = null;                   // the post's
+  revision:uint = null;
+}
+
+// The working copy saved as a version, of each language it changed since its last one
+table PostSaveVersionRequest {
+  id:uint = null;
+  note:string;
+}
+
+// Friends' links
+
+table FriendApplicant {
+  id:uint;
+  username:string;
+  displayName:string;
+}
+
+table Friend {
+  id:uint;
+  name:string;
+  url:string;
+  avatar:string;
+  description:string;
+  status:string;          // pending, approved, rejected
+  message:string;
+  rejectReason:string;
+  sort:int;
+  createdAt:string;
+  reviewedAt:string (json_null);
+  applicant:FriendApplicant;
+}
+
+table FriendsListRequest {
+  status:string;
+}
+
+table FriendsList {
+  friends:[Friend];
+}
+
+table FriendInput {
+  id:uint = null;         // FriendsUpdate's
+  name:string;
+  url:string;
+  avatar:string;
+  description:string;
+  sort:int = null;
+  status:string;          // FriendsUpdate: approved, rejected
+  rejectReason:string;
+}
+
+// Projects
+
+table Project {
+  id:uint;
+  name:string;
+  url:string;
+  repoUrl:string;
+  icon:string;
+  descriptionZh:string;
+  descriptionEn:string;
+  sort:int;
+}
+
+table ProjectInput {
+  id:uint = null;
+  name:string;
+  url:string;
+  repoUrl:string;
+  icon:string;
+  descriptionZh:string;
+  descriptionEn:string;
+  sort:int = null;
+}
+
+// The site's profile
+
+table Localized {
+  zh:string;
+  en:string;
+}
+
+table Social {
+  kind:string;
+  url:string;
+}
+
+table SiteProfile {
+  name:Localized;
+  author:string;
+  avatar:string;
+  tagline:Localized;
+  bio:Localized;
+  quote:Localized;
+  since:string;           // 2020-01-01
+  about:Localized;
+  aboutSite:Localized;
+  socials:[Social];
+  reviewWriters:bool;     // the admin reads what writers publish first: their publishing asks for it
+}
+
+// Accounts
+
+table UsersListRequest {
+  q:string;
+  role:string;
+  status:string;
+  sort:string;            // lastSeen
+  page:uint = null;
+}
+
+table UserDrive {
+  enabled:bool;
+  quota:ulong = null;     // none: the default
+  defaultQuota:ulong;
+  used:ulong;
+  trashDays:uint = null;
+  defaultTrashDays:uint;
+}
+
+table UserOnline {
+  since:string;
+  pages:[string];
+  connections:uint;
+}
+
+table UserIdentity {
+  provider:string;
+  login:string;
+  createdAt:string;
+}
+
+table UserSession {
+  id:string;
+  ip:string;
+  userAgent:string;
+  createdAt:string;
+  lastSeenAt:string;
+  expiresAt:string;
+  current:bool;
+}
+
+// A list's account, UsersGet's with what is after onlineSeconds too
+table User {
+  id:uint;
+  username:string;
+  displayName:string;
+  role:string;
+  emailVerified:bool;
+  bannedUntil:string (json_null);
+  banReason:string (json_null);
+  createdAt:string;
+  commentCount:uint;
+  avatar:string (json_null);
+  denied:[string];
+  deleted:bool;
+  totpEnabled:bool;
+  lastSeenAt:string (json_null);
+  onlineSeconds:ulong;
+  email:string (json_omit);
+  drive:UserDrive (json_omit);
+  online:UserOnline;
+  reactionCount:uint = null (json_omit);
+  locale:string (json_omit);
+  hasPassword:bool = null (json_omit);
+  identities:[UserIdentity] (json_omit);
+  sessions:[UserSession] (json_omit);
+  write:bool;             // writes posts of its own
+}
+
+table UsersList {
+  users:[User];
+  hasMore:bool;
+}
+
+table UserInput {
+  id:uint = null;         // UsersUpdate's
+  username:string;
+  displayName:string;
+  email:string;
+  emailVerified:bool = null;
+  locale:string;
+  role:string;
+  denied:[string];
+  password:string;        // UsersCreate without one: the account is mailed to choose it
+}
+
+table UserCreated {
+  id:uint;
+}
+
+table UsersDeleteRequest {
+  id:uint = null;
+  mode:string;            // anonymize (default), purge
+}
+
+table UsersDeleteSessionRequest {
+  id:uint = null;
+  session:string;         // a UserSession's id
+}
+
+table UsersSetDriveRequest {
+  id:uint = null;
+  enabled:bool = null;
+  quota:ulong = null;     // none: the default
+  trashDays:uint = null;
+}
+
+table UsersSetWriteRequest {
+  id:uint = null;
+  enabled:bool = null;
+}
+
+table UsersBanRequest {
+  id:uint = null;
+  reason:string;
+  days:uint = null;       // none: for good
+}
+
+table UsersBanned {
+  ok:bool;
+  bannedUntil:string;
+}
+
+// Banned addresses
+
+table IpBan {
+  ip:string;
+  reason:string;
+  createdAt:string;
+  expiresAt:string (json_null);
+}
+
+table IpBansList {
+  bans:[IpBan];
+}
+
+table IpBansAddRequest {
+  ip:string;
+  reason:string;
+  days:uint = null;
+}
+
+table IpBanRequest {
+  ip:string;
+}
+
+// An image for posts: its bytes, the size and placeholder the admin's page computes
+
+table UploadRequest {
+  name:string;            // the file's, for nothing but logs
+  data:[ubyte];
+  width:ushort = null;
+  height:ushort = null;
+  thumbhash:string;
+  id:uint = null;         // PostsUpload's: the post an editor puts it in, its owner's space
+}
+
+table Uploaded {
+  url:string;
+  mime:string;
+  size:ulong;
+}
+
+// Numbers
+
+table OnlineCounts {
+  viewers:uint;
+  users:uint;
+}
+
+table StatsRequest {
+  days:uint = null;
+}
+
+table StatsDay {
+  day:string;
+  views:ulong;
+  visitors:ulong;
+}
+
+table StatsPage {
+  path:string;
+  views:ulong;
+  visitors:ulong;
+}
+
+table StatsReferrer {
+  host:string;
+  views:ulong;
+}
+
+table Stats {
+  days:[StatsDay];
+  pages:[StatsPage];
+  referrers:[StatsReferrer];
+  today:string;
+}
+
+table StatusRequest {
+  since:long = null;      // only the samples after this (unix seconds)
+}
+
+table StatusNow {
+  at:long;
+  uptime:long;
+  readers:uint;
+  pages:uint;
+  requests:uint;          // a minute
+  updateAvgUs:uint;
+  updateMaxUs:uint;
+  memoryMiB:uint;
+  cpuPercent:double;
+  load:double;
+  hostMemoryPercent:uint;
+  diskFreePercent:uint;
+  cores:uint;
+  chatMessagesTotal:ulong;
+  chatChannelsCount:uint;
+}
+
+// By column, a day of samples
+table StatusSeries {
+  at:[long];
+  readers:[uint];
+  pages:[uint];
+  requests:[uint];
+  updateAvgUs:[uint];
+  updateMaxUs:[uint];
+  memoryMiB:[uint];
+  cpuPercent:[double];
+  load:[double];
+  hostMemoryPercent:[uint];
+  diskFreePercent:[uint];
+}
+
+table Status {
+  now:StatusNow;
+  interval:long;
+  series:StatusSeries;
+}
+
+table DriveDisk {
+  total:ulong;
+  free:ulong;
+  minFree:ulong;
+}
+
+table DriveAccount {
+  id:uint;
+  username:string;
+  displayName:string;
+  role:string;
+  enabled:bool;
+  quota:ulong;
+  used:ulong;
+  files:ulong;
+  trashed:ulong;
+  trashDays:uint;
+}
+
+table Drives {
+  disk:DriveDisk;
+  quotas:ulong;
+  used:ulong;
+  accounts:[DriveAccount];
+}
+
+// Chat (ChatHandlers.cpp): the square and the readers' groups. Not the direct chats, only their two
+// read those
+
+table ChatGroup {
+  id:uint;
+  name:string;
+  ownerId:uint;
+  ownerUsername:string;
+  members:uint;
+  messages:uint;
+  createdAt:string;
+}
+
+table ChatGroupsList {
+  groups:[ChatGroup];
+}
+
+table ChatMessagesListRequest {
+  channel:string;       // square or group:<id>
+  cursor:string;        // the last page's nextCursor
+}
+
+table ChatMessage {
+  id:ulong;
+  channelId:string;
+  senderId:uint;
+  senderUsername:string;
+  senderName:string;
+  content:string;
+  createdAt:string;
+}
+
+// Newest first
+table ChatMessagesList {
+  messages:[ChatMessage];
+  nextCursor:string (json_null);    // none on the last page
+}
+
+table ChatMessageRequest {
+  id:ulong = null;
+}
+
+table ChatChannelRequest {
+  channel:string;
+}
+
+// How many messages went
+table ChatRemoved {
+  removed:uint;
+}
+
+// Any: flatc embeds the binary schema (OkBinarySchema) only for a file with a root type
+root_type Ok;

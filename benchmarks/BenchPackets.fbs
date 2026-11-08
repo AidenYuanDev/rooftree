@@ -1,0 +1,61 @@
+// bench_Packets.cpp: the post tables of apps/blog/server/schema/Admin.fbs, copied
+attribute "json_null";
+
+namespace BenchPackets;
+
+table PostText {
+  title:string;
+  summary:string;
+  body:string;
+}
+
+table PostTranslations {
+  zh:PostText (json_null);
+  en:PostText (json_null);
+}
+
+table Post {
+  id:uint;
+  slug:string;
+  status:string;          // draft, published
+  originalLang:string;    // zh, en
+  cover:string;
+  commentsEnabled:bool;
+  tags:[string];
+  translations:PostTranslations;
+  publishedAt:string;     // ISO 8601, none while a draft
+  publishAt:string;       // when the server publishes the draft, none if not scheduled
+  updatedAt:string;
+  createdAt:string;
+}
+
+table PostInput {
+  id:uint = null;               // PostsUpdate's
+  slug:string;
+  status:string;
+  originalLang:string;
+  cover:string;
+  commentsEnabled:bool = null;
+  tags:[string];                // [] removes them all
+  translations:PostTranslations;
+  publishAt:string (json_null); // "" not scheduled any more
+}
+
+table PostsListItem {
+  id:uint;
+  slug:string;
+  status:string;
+  originalLang:string;
+  updatedAt:string;
+  publishedAt:string;
+  title:string;
+  translations:[string];
+  publishAt:string;
+}
+
+table PostsList {
+  posts:[PostsListItem];
+  hasMore:bool;
+}
+
+root_type Post;

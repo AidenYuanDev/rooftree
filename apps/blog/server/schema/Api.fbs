@@ -1,0 +1,12 @@
+// Every operation's tables, the admin's and the readers': the schema the JSON edge (ApiJson.h) and the
+// packets' verifier read
+include "Admin.fbs";
+include "Reader.fbs";
+
+namespace Blog;
+
+// Nothing: what a binary schema needs as its root, ApiBinarySchema
+table Api {
+}
+
+root_type Api;

@@ -1,0 +1,40 @@
+###################################################
+# Rooftree tests and benchmarks configuration #
+###################################################
+
+###################################################################################################
+# SECTION INDEX
+#
+#    DATABASE SETTINGS
+#
+#    Like rooftree.yaml: build/bin/rooftree_test.yaml.dist is refreshed on every configure, while
+#    build/bin/rooftree_test.yaml is only created once, so local edits (passwords) stay out of git.
+#    Another file can be used with ROOFTREE_TEST_CONFIG=/path/to/file.yaml.
+#
+#    Every variable can be overridden by an environment variable, read when the file is loaded:
+#    prefix ROOFTREE_, dots become underscores, all upper case. Example: Database.Test.Password ->
+#    ROOFTREE_DATABASE_TEST_PASSWORD
+#
+###################################################################################################
+
+###################################################################################################
+# DATABASE SETTINGS
+#
+#    Database.Test
+#        Description: PostgreSQL database for tests/test_Database.cpp and benchmarks/bench_Database.cpp.
+#        Important:   Host, User and Name are required, without them those tests are skipped.
+#                     They create and drop their own tables (rooftree_test, rooftree_test_logs, rooftree_bench),
+#                     use a database of its own. Same fields as Database.Demo in rooftree.yaml.dist,
+#                     the connection counts are fixed by the tests.
+#        Example:     Host: "127.0.0.1", User: "root", Password: "root", Name: "rooftree_test"
+
+Database:
+  Test:
+    Host: ""
+    Port: 5432
+    User: ""
+    Password: ""
+    Name: ""
+
+#
+###################################################################################################

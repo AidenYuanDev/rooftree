@@ -1,0 +1,71 @@
+# /srv/blog/compose.yaml: the blog and its database on the host's network, the server facing the
+# internet on 80 and 443 itself. ship.sh copies it there and runs docker compose up -d.
+#   /etc/blog/blog.yaml, blog.env   config and secrets (blog.env also has PostgreSQL's, postgres.env.example)
+#   /etc/blog/tls                   the certificate, certbot-deploy-hook.sh copies it there
+#   /srv/blog/{site,uploads,drive,backups,acme}   owned by uid 2000 (the image's blog user)
+#   /srv/blog/postgres              the database's files
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    network_mode: host
+    # A small host; only the blog connects. 5433: the host may have a PostgreSQL of its own on 5432
+    command:
+      - -c
+      - listen_addresses=127.0.0.1
+      - -c
+      - port=5433
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - max_connections=50
+    env_file: /etc/blog/postgres.env
+    volumes:
+      - /srv/blog/postgres:/var/lib/postgresql/18/docker
+    environment:
+      PGDATA: /var/lib/postgresql/18/docker
+    healthcheck:
+      test: ["CMD", "pg_isready", "--host=127.0.0.1", "--port=5433", "--username=blog"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # The old database, only while a deployment moves (README.md): docker compose --profile migrate up -d mysql
+  mysql:
+    image: mysql:8.4
+    profiles: [migrate]
+    network_mode: host
+    command:
+      - --bind-address=127.0.0.1
+      - --mysqlx=OFF
+      - --performance-schema=OFF
+      - --innodb-buffer-pool-size=128M
+      - --max-connections=50
+    env_file: /etc/blog/mysql.env
+    volumes:
+      - /srv/blog/mysql:/var/lib/mysql
+
+  blog:
+    image: blog:latest
+    restart: unless-stopped
+    network_mode: host
+    # Reaps rebuild.sh's children and passes SIGHUP on
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: /etc/blog/blog.env
+    volumes:
+      - /etc/blog:/etc/blog:ro
+      - /srv/blog/site:/srv/blog/site
+      - /srv/blog/uploads:/srv/blog/uploads
+      # The drives: where Blog.Drive.Directory points when set, and its default ("drive" in the
+      # working directory) for a blog.yaml from before them
+      - /srv/blog/drive:/srv/blog/drive
+      - /srv/blog/drive:/var/lib/blog/drive
+      - /srv/blog/backups:/srv/blog/backups
+      - /srv/blog/acme:/srv/blog/acme:ro
+    ulimits:
+      nofile: 65536
+    # A running rebuild is waited for
+    stop_grace_period: 300s

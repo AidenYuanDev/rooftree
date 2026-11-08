@@ -1,0 +1,391 @@
+<!doctype html>
+<!-- arena's browser client, served by AuthService at GET / -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coin Arena</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --text: #1d2330; --muted: #6b7280; --border: #dfe2e8;
+    --accent: #2563eb; --field: #fbfbfd; --grid: #eceef3; --coin: #e0a100; --error: #c0392b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c; --panel: #1a1e27; --text: #e6e8ee; --muted: #8b93a3; --border: #2b313d;
+      --accent: #5b8cff; --field: #161a22; --grid: #20252f; --coin: #f5c542; --error: #ff6b5b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  header h1 { font-size: 17px; margin: 0; }
+  header .status { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  input { font: inherit; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+
+  #login { max-width: 360px; margin: 48px auto; padding: 0 16px; }
+  #login form { display: grid; gap: 10px; }
+  #login .buttons { display: flex; gap: 8px; }
+  #login .buttons button { flex: 1; }
+  #login-error { color: var(--error); min-height: 1.45em; margin: 0; }
+  #login .hint { color: var(--muted); font-size: 13px; margin: 0; }
+
+  #game { display: none; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+  #game.active { display: grid; }
+  #field-wrap { position: relative; }
+  canvas { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--border); background: var(--field); touch-action: none; }
+  #banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--coin); color: #1d1600; font-weight: 600; padding: 4px 12px; border-radius: 999px; display: none; }
+  #pad { display: none; gap: 6px; justify-content: center; margin-top: 10px; grid-template-columns: repeat(3, 56px); }
+  #pad button { height: 48px; font-size: 18px; touch-action: none; user-select: none; }
+  @media (pointer: coarse) { #pad { display: grid; } }
+
+  aside { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; }
+  .rows { list-style: none; margin: 0; padding: 0; }
+  .rows li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+  .rows li.me { font-weight: 600; }
+  .rows .num { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  #chat-log { height: 220px; overflow-y: auto; margin-bottom: 8px; overflow-wrap: anywhere; }
+  #chat-log .system { color: var(--muted); font-style: italic; }
+  #chat-log b { font-weight: 600; }
+  #chat-form { display: flex; gap: 6px; }
+  #chat-form input { flex: 1; }
+
+  @media (max-width: 860px) {
+    #game { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Coin Arena</h1>
+  <span class="status" id="status">not connected</span>
+  <button id="logout" hidden>Leave</button>
+</header>
+
+<section id="login">
+  <div class="card">
+    <h2>Play</h2>
+    <form id="login-form">
+      <input id="username" placeholder="Username (3-16: letters, digits, _)" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Password (6+ characters)" autocomplete="current-password" required>
+      <div class="buttons">
+        <button class="primary" type="submit">Log in</button>
+        <button type="button" id="register">Register</button>
+      </div>
+      <p id="login-error"></p>
+      <p class="hint">Move with WASD or the arrow keys and collect coins. Coins are saved to your account.</p>
+    </form>
+  </div>
+</section>
+
+<main id="game">
+  <div id="field-wrap">
+    <canvas id="field" width="1000" height="700"></canvas>
+    <div id="banner">GOLD RUSH</div>
+    <div id="pad">
+      <span></span><button data-dy="-1">▲</button><span></span>
+      <button data-dx="-1">◀</button><button data-dy="1">▼</button><button data-dx="1">▶</button>
+    </div>
+  </div>
+  <aside>
+    <div class="card"><h2>Online</h2><ul class="rows" id="online"></ul></div>
+    <div class="card"><h2>All time</h2><ul class="rows" id="leaderboard"></ul></div>
+    <div class="card">
+      <h2>Chat</h2>
+      <div id="chat-log"></div>
+      <form id="chat-form"><input id="chat-input" maxlength="200" placeholder="Say something" autocomplete="off"><button>Send</button></form>
+    </div>
+  </aside>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+let ws = null;
+let me = null;              // welcome message
+let snapshots = [];         // last two states with their arrival time, for interpolation
+let leaderboardTimer = null;
+let pingTimer = null;
+let rtt = null;
+
+// ---- login --------------------------------------------------------------------------------------
+
+async function api(path, body) {
+  const response = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  const data = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  return data;
+}
+
+function credentials() {
+  return { username: $('username').value.trim(), password: $('password').value };
+}
+
+$('login-form').onsubmit = async e => {
+  e.preventDefault();
+  $('login-error').textContent = '';
+  try {
+    connect(await api('/api/login', credentials()));
+  } catch (err) {
+    $('login-error').textContent = err.message;
+  }
+};
+
+$('register').onclick = async () => {
+  $('login-error').textContent = '';
+  if (!$('login-form').reportValidity()) return;
+  try {
+    await api('/api/register', credentials());
+    connect(await api('/api/login', credentials()));
+  } catch (err) {
+    $('login-error').textContent = err.message;
+  }
+};
+
+$('logout').onclick = () => ws && ws.close(1000, 'bye');
+
+// ---- connection ---------------------------------------------------------------------------------
+
+function connect(login) {
+  const url = (login.wsUrl || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${login.wsPort}/arena`)
+    + '?ticket=' + encodeURIComponent(login.ticket);
+  setStatus('connecting…');
+  ws = new WebSocket(url);
+  ws.onmessage = e => handle(JSON.parse(e.data));
+  ws.onclose = e => {
+    clearInterval(pingTimer);
+    clearInterval(leaderboardTimer);
+    ws = null; me = null; snapshots = [];
+    $('game').classList.remove('active');
+    $('login').hidden = false;
+    $('logout').hidden = true;
+    setStatus('not connected');
+    if (e.code !== 1000) $('login-error').textContent = e.reason ? `Disconnected: ${e.reason}` : `Disconnected (${e.code})`;
+  };
+}
+
+function send(message) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
+}
+
+function setStatus(text) { $('status').textContent = text; }
+
+function handle(msg) {
+  switch (msg.type) {
+    case 'welcome':
+      me = msg;
+      $('field').width = msg.width;
+      $('field').height = msg.height;
+      $('login').hidden = true;
+      $('game').classList.add('active');
+      $('logout').hidden = false;
+      $('chat-log').textContent = '';
+      if (msg.motd) addChat(null, msg.motd);
+      pingTimer = setInterval(() => send({ type: 'ping', t: performance.now() }), 5000);
+      send({ type: 'ping', t: performance.now() });
+      refreshLeaderboard();
+      leaderboardTimer = setInterval(refreshLeaderboard, 15000);
+      lastInput = { dx: 0, dy: 0 };
+      updateInput();
+      break;
+    case 'state':
+      snapshots.push({ time: performance.now(), players: new Map(msg.players.map(p => [p.id, p])), coins: msg.coins, goldRush: msg.goldRush });
+      if (snapshots.length > 2) snapshots.shift();
+      renderOnline(msg.players);
+      $('banner').style.display = msg.goldRush ? 'block' : 'none';
+      break;
+    case 'chat':
+      addChat(msg.from, msg.text);
+      break;
+    case 'system':
+      addChat(null, msg.text);
+      break;
+    case 'pong':
+      rtt = Math.round(performance.now() - msg.t);
+      break;
+  }
+  if (me) setStatus(`${me.name} · ${rtt === null ? '…' : rtt + ' ms'}`);
+}
+
+// ---- input --------------------------------------------------------------------------------------
+
+const keys = new Set();
+const padKeys = new Set();
+let lastInput = { dx: 0, dy: 0 };
+const KEYMAP = { ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r' };
+
+function updateInput() {
+  const held = new Set([...keys, ...padKeys]);
+  const input = { dx: (held.has('r') ? 1 : 0) - (held.has('l') ? 1 : 0), dy: (held.has('d') ? 1 : 0) - (held.has('u') ? 1 : 0) };
+  // Only changes are sent, the server keeps moving with the last input
+  if (input.dx !== lastInput.dx || input.dy !== lastInput.dy) {
+    lastInput = input;
+    send({ type: 'input', ...input });
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (!me || e.target.tagName === 'INPUT' || !KEYMAP[e.code]) return;
+  e.preventDefault();
+  keys.add(KEYMAP[e.code]);
+  updateInput();
+});
+document.addEventListener('keyup', e => {
+  if (!KEYMAP[e.code]) return;
+  keys.delete(KEYMAP[e.code]);
+  updateInput();
+});
+window.addEventListener('blur', () => { keys.clear(); padKeys.clear(); updateInput(); });
+
+for (const button of document.querySelectorAll('#pad button')) {
+  const key = button.dataset.dx === '1' ? 'r' : button.dataset.dx === '-1' ? 'l' : button.dataset.dy === '1' ? 'd' : 'u';
+  button.addEventListener('pointerdown', e => { e.preventDefault(); padKeys.add(key); updateInput(); });
+  for (const type of ['pointerup', 'pointerleave', 'pointercancel'])
+    button.addEventListener(type, () => { padKeys.delete(key); updateInput(); });
+}
+
+// ---- chat and lists -----------------------------------------------------------------------------
+
+function addChat(from, text) {
+  const line = document.createElement('div');
+  if (from === null) {
+    line.className = 'system';
+    line.textContent = text;
+  } else {
+    const name = document.createElement('b');
+    name.textContent = from + ': ';
+    line.append(name, text);
+  }
+  const log = $('chat-log');
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
+  log.appendChild(line);
+  while (log.childNodes.length > 200) log.firstChild.remove();
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+$('chat-form').onsubmit = e => {
+  e.preventDefault();
+  const text = $('chat-input').value.trim();
+  if (!text) return;
+  send({ type: 'chat', text });
+  $('chat-input').value = '';
+};
+
+function renderRows(list, rows) {
+  list.replaceChildren(...rows.map(({ name, value, color, isMe }) => {
+    const li = document.createElement('li');
+    if (isMe) li.className = 'me';
+    const label = document.createElement('span');
+    if (color) {
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = color;
+      label.append(dot);
+    }
+    label.append(name);
+    const num = document.createElement('span');
+    num.className = 'num';
+    num.textContent = value;
+    li.append(label, num);
+    return li;
+  }));
+}
+
+function renderOnline(players) {
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  renderRows($('online'), sorted.map(p => ({ name: p.name, value: p.score, color: colorOf(p.id), isMe: me && p.id === me.id })));
+}
+
+async function refreshLeaderboard() {
+  try {
+    const data = await api('/api/leaderboard');
+    renderRows($('leaderboard'), data.players.map(p => ({ name: p.name, value: p.coins, isMe: me && p.name === me.name })));
+  } catch { /* shown again on the next refresh */ }
+}
+
+// ---- rendering ----------------------------------------------------------------------------------
+
+function colorOf(id) {
+  return `hsl(${(id * 137.508) % 360} 65% 55%)`;
+}
+
+// Draws between the last two snapshots, one tick behind, so movement is smooth at any frame rate
+function interpolated(now) {
+  if (snapshots.length === 0) return null;
+  const last = snapshots[snapshots.length - 1];
+  if (snapshots.length === 1) return last;
+  const prev = snapshots[0];
+  const span = last.time - prev.time || 1;
+  const t = Math.min(1, Math.max(0, (now - last.time) / span));
+  const players = new Map();
+  for (const [id, p] of last.players) {
+    const from = prev.players.get(id) || p;
+    players.set(id, { ...p, x: from.x + (p.x - from.x) * t, y: from.y + (p.y - from.y) * t });
+  }
+  return { ...last, players };
+}
+
+function render(now) {
+  requestAnimationFrame(render);
+  if (!me) return;
+
+  const canvas = $('field');
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = css('--field');
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = css('--grid');
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 50; x < canvas.width; x += 50) { ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, canvas.height); }
+  for (let y = 50; y < canvas.height; y += 50) { ctx.moveTo(0, y + .5); ctx.lineTo(canvas.width, y + .5); }
+  ctx.stroke();
+
+  const state = interpolated(now);
+  if (!state) return;
+
+  const coinColor = css('--coin');
+  for (const coin of state.coins) {
+    const r = coin.value > 1 ? 13 : 10;
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = coinColor;
+    ctx.fill();
+    if (coin.value > 1) {
+      ctx.fillStyle = '#1d1600';
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(coin.value, coin.x, coin.y + 1);
+    }
+  }
+
+  const text = css('--text');
+  for (const p of state.players.values()) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, me.playerRadius, 0, Math.PI * 2);
+    ctx.fillStyle = colorOf(p.id);
+    ctx.fill();
+    if (p.id === me.id) {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = text;
+      ctx.stroke();
+    }
+    ctx.fillStyle = text;
+    ctx.font = `${p.id === me.id ? '600 ' : ''}13px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`${p.name} · ${p.score}`, p.x, p.y - me.playerRadius - 4);
+  }
+}
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

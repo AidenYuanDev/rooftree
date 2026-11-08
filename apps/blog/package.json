@@ -1,0 +1,22 @@
+{
+  "name": "blog",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "scripts": {
+    "db:up": "dbmate --migrations-dir db/migrations --no-dump-schema up",
+    "db:down": "dbmate --migrations-dir db/migrations --no-dump-schema down",
+    "db:new": "dbmate --migrations-dir db/migrations new",
+    "db:status": "dbmate --migrations-dir db/migrations status",
+    "test:api": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "totp": "node --input-type=module -e \"import { totp } from './tests/server.mjs'; console.log(totp(process.argv[1]))\"",
+    "dev": "pnpm -C web dev",
+    "build:web": "pnpm -C web build",
+    "test:web": "pnpm -C web test",
+    "test:e2e": "pnpm -C web test:e2e",
+    "lint": "pnpm -C web lint && pnpm -C web format:check"
+  },
+  "devDependencies": {
+    "dbmate": "2.37.0"
+  }
+}

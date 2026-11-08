@@ -1,0 +1,28 @@
+// The framework's own packets (Packet.h): what any server answers with when a request failed
+namespace Rooftree.Packets;
+
+table ErrorField {
+  name:string;
+  code:string;
+}
+
+// More about the error, as the request's API names it: a value, or a list of them
+table ErrorDetail {
+  name:string;
+  value:string;
+  values:[string];
+}
+
+// Opcode 0, with the requestId of what failed. status like HTTP's: 400 invalid, 401 not logged in,
+// 403 not allowed, 404 not found, 409 conflict, 429 rate limited, 500 the server's fault, 503 busy
+table Error {
+  status:ushort;
+  code:string;
+  message:string;
+  fields:[ErrorField];  // validation_failed and conflict: which field, why
+  opcode:ushort;        // the request's
+  retryAfter:uint;      // 429: seconds until it may be sent again, 0 when not said
+  details:[ErrorDetail];
+}
+
+root_type Error;

@@ -1,0 +1,52 @@
+# /etc/systemd/system/blog.service: the server, facing the internet on 80 and 443 itself (no reverse
+# proxy). The layout is README.md's:
+#   /opt/blog/bin/blog              the server binary
+#   /opt/blog/src                   a checkout of this repository, with apps/blog's node_modules
+#   /etc/blog/blog.yaml, blog.env   config and secrets
+#   /etc/blog/tls                   the certificate, copied there by certbot-deploy-hook.sh
+#   /srv/blog                       site, uploads, drives, backups, ACME challenges
+[Unit]
+Description=Blog server (Rooftree)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=blog
+Group=blog
+# ROOFTREE_DATABASE_BLOG_PASSWORD, ROOFTREE_BLOG_MAIL_PASSWORD, DATABASE_URL for dbmate
+EnvironmentFile=/etc/blog/blog.env
+Environment=HOME=/var/lib/blog
+StateDirectory=blog
+WorkingDirectory=/var/lib/blog
+
+# The schema first: the server refuses to start while a migration is missing
+ExecStartPre=/opt/blog/src/apps/blog/node_modules/.bin/dbmate --migrations-dir /opt/blog/src/apps/blog/db/migrations --no-dump-schema --wait up
+ExecStart=/opt/blog/bin/blog --config /etc/blog/blog.yaml
+# Reloads blog.yaml between two updates, the certificate and the site right away
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Also when FreezeDetector aborted a hung main loop (Server.MaxCoreStuckTime)
+Restart=on-failure
+RestartSec=2
+# A running rebuild is waited for at shutdown
+TimeoutStopSec=300
+
+# Ports 80 and 443 without running as root, and nothing else
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+# Open connections: two per reader at least (pages, WebSocket)
+LimitNOFILE=65536
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+# The site, uploads and drives; web/ for rebuild.sh's build directory
+ReadWritePaths=/srv/blog /opt/blog/src/apps/blog/web
+
+[Install]
+WantedBy=multi-user.target

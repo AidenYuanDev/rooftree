@@ -1,0 +1,219 @@
+###################################
+# arena server configuration file #
+###################################
+
+###################################################################################################
+# SECTION INDEX
+#
+#    LOGGING SYSTEM SETTINGS
+#    DATABASE SETTINGS
+#    NETWORK SETTINGS
+#    GAME SETTINGS
+#
+#    Every variable can be overridden by an environment variable, read when the file is loaded:
+#    prefix ROOFTREE_, dots become underscores, all upper case. Example: Arena.Http.Port -> ROOFTREE_ARENA_HTTP_PORT
+#
+#    kill -HUP <pid> reloads this file while the server runs. Only the settings marked "Reloadable"
+#    and the logging settings change then, the others are read once at startup.
+###################################################################################################
+
+###################################################################################################
+# LOGGING SYSTEM SETTINGS
+#
+#    Same format as examples/rooftree.yaml.dist, see the description there.
+#    Loggers used: arena, arena.world, arena.session, arena.chat, arena.http, network.websocket,
+#    network.kcp, server.http, sql.sql
+
+LogsDir: ""
+
+Appender:
+  Console:
+    Type: 1
+    Level: 3
+    Flags: 7
+    Colors: [9, 1, 8, 2, 6, 7]
+  # Arena:
+  #   Type: 2
+  #   Level: 2
+  #   Flags: 7
+  #   File: arena.log
+  #   Mode: a
+
+Logger:
+  root:
+    Level: 3
+    Appenders: [Console]
+
+#
+###################################################################################################
+
+###################################################################################################
+# DATABASE SETTINGS
+#
+#    Database.Arena
+#        Description: The arena database, see examples/rooftree.yaml.dist for every field.
+#        Important:   The database (Name) must exist, its tables are created from Arena.SqlFile at
+#                     startup. Host, User and Name are required.
+#                     Keep WorkerThreads at 1: the saves of one player are queued in order and two
+#                     async connections could run them out of order.
+#
+#    Arena.SqlFile
+#        Description: Schema applied at every start, every statement in it must be idempotent.
+#        Default:     "arena.sql" - (Copied next to the binary by the build)
+
+Database:
+  Arena:
+    Host: ""
+    Port: 5432
+    User: ""
+    Password: ""
+    Name: ""
+    WorkerThreads: 1
+    SynchThreads: 2
+
+#
+###################################################################################################
+
+###################################################################################################
+# NETWORK SETTINGS
+#
+#    Arena.Http.BindIP, Arena.Http.Port
+#        Description: Where the page, login and leaderboard are served.
+#        Default:     "0.0.0.0", 8090
+#
+#    Arena.Http.NetworkThreads
+#        Default:     1
+#
+#    Arena.Http.WorkerThreads
+#        Description: Threads for password hashing and the HTTP handlers' database queries.
+#        Default:     2
+#
+#    Arena.WebSocket.BindIP, Arena.WebSocket.Port
+#        Description: Where the game connections go.
+#        Default:     "0.0.0.0", 8091
+#
+#    Arena.WebSocket.NetworkThreads
+#        Default:     1
+#
+#    Arena.WebSocket.PublicUrl
+#        Description: The WebSocket URL clients connect to, for a proxy in front of the server.
+#        Example:     "wss://arena.example.com/arena"
+#        Default:     "" - (ws://<host of the page>:<Arena.WebSocket.Port>/arena)
+#
+#    Arena.Kcp.Enabled
+#        Description: Game connections over UDP (KCP) for native clients, next to the WebSocket.
+#                     The login then also answers kcpPort and kcpKey, see apps/arena/ArenaKcp.h.
+#        Default:     1
+#
+#    Arena.Kcp.BindIP, Arena.Kcp.Port
+#        Description: The UDP port of KCP connections.
+#        Default:     "0.0.0.0", 8092
+#
+#    Arena.Kcp.IdleTimeout
+#        Description: Milliseconds without a datagram from a client before its connection is
+#                     closed (clients ping every 5 s when they send nothing else).
+#        Default:     15000
+#
+#    Arena.Kcp.MaxConnectionsPerAddress
+#        Description: KCP connections one address may have open, 0 is no limit.
+#        Default:     0
+#
+#    Arena.WebRoot
+#        Description: Directory of index.html.
+#        Default:     "arena-www" - (Copied next to the binary by the build)
+#
+#    Arena.Argon2.Iterations, Arena.Argon2.MemoryCost
+#        Description: Cost of new password hashes (MemoryCost in KiB). Existing hashes keep the
+#                     cost they were made with.
+#        Default:     2, 19456 - (OWASP's minimum for Argon2id)
+
+Arena:
+  Http:
+    BindIP: "0.0.0.0"
+    Port: 8090
+    NetworkThreads: 1
+    WorkerThreads: 2
+  WebSocket:
+    BindIP: "0.0.0.0"
+    Port: 8091
+    NetworkThreads: 1
+    PublicUrl: ""
+  Kcp:
+    Enabled: 1
+    BindIP: "0.0.0.0"
+    Port: 8092
+    IdleTimeout: 15000
+    MaxConnectionsPerAddress: 0
+  WebRoot: "arena-www"
+  SqlFile: "arena.sql"
+  Argon2:
+    Iterations: 2
+    MemoryCost: 19456
+
+#
+###################################################################################################
+
+###################################################################################################
+# GAME SETTINGS
+#
+#    Arena.TickInterval
+#        Description: Minimum time between two world updates in milliseconds, also how often
+#                     clients get the state.
+#        Default:     50
+#
+#    Arena.World.Width, Arena.World.Height
+#        Description: Size of the field. Reloadable only while nobody is online.
+#        Default:     1000, 700
+#
+#    Arena.World.PlayerSpeed
+#        Description: Units per second. Reloadable.
+#        Default:     220
+#
+#    Arena.Coins.Max, Arena.Coins.SpawnInterval
+#        Description: Coins on the field at most, milliseconds between two spawns. Reloadable.
+#        Default:     15, 1000
+#
+#    Arena.GoldRush.Interval, Arena.GoldRush.Duration, Arena.GoldRush.CoinValue
+#        Description: Every Interval ms coins spawn 3 times as fast and are worth CoinValue for
+#                     Duration ms. Reloadable, applies from the next rush.
+#        Default:     60000, 10000, 3
+#
+#    Arena.SaveInterval
+#        Description: Milliseconds between two saves of everyone online. Reloadable.
+#        Default:     30000
+#
+#    Arena.IdleTimeout
+#        Description: Disconnect clients that send nothing for this long (the page pings every
+#                     5 s). Reloadable.
+#        Default:     30000
+#
+#    Arena.Chat.MaxLength, Arena.Chat.Interval
+#        Description: Longest chat line in characters, milliseconds between two lines of one
+#                     player. Reloadable.
+#        Default:     200, 500
+#
+#    Arena.Motd
+#        Description: Shown when a player enters. Reloadable.
+#        Default:     ""
+
+  TickInterval: 50
+  World:
+    Width: 1000
+    Height: 700
+    PlayerSpeed: 220
+  Coins:
+    Max: 15
+    SpawnInterval: 1000
+  GoldRush:
+    Interval: 60000
+    Duration: 10000
+    CoinValue: 3
+  SaveInterval: 30000
+  IdleTimeout: 30000
+  Chat:
+    MaxLength: 200
+    Interval: 500
+  Motd: "Welcome to the arena! Move with WASD or the arrow keys, collect the coins."
+
+#
+###################################################################################################
