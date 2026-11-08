@@ -57,6 +57,10 @@ ctest --preset release
 
 这些预设最多并行 16 个任务。Ninja 默认按 CPU 线程数并行，线程多、内存少的机器上可能耗尽内存。用 Clang 和预编译头构建时，单个文件的峰值约 0.3 GB，最大 0.7 GB；16 个任务全量构建，一台 30 GB 的机器的可用内存最多减少 5 GB。
 
+同样的条件下（32 线程的机器，空闲），`release` 从零全量构建 44 秒，共 193 步、累计 522 秒 CPU，最慢的单个文件 15 秒；改几个文件的增量构建中位数约 19 秒，时间主要花在单个大文件和链接上。
+
+GCC 且不用预编译头时，内存要多得多。一台 30 GB 的机器用满 32 线程时，内核的 OOM 记录里 32–34 个 `cc1plus` 合计占 12–19 GB，再加上 clangd 的 6–10 GB，内存就耗尽了，被杀的是浏览器这类分数高的进程。预设的并行数只管 `cmake --build --preset`，Docker 镜像里的构建不受它限制。
+
 测试要串行跑（不加 `-j`）：日志的用例共用同一个临时文件 `rooftree_test.log`，网络的用例依赖时序，并行时偶尔失败或卡住。
 
 数据库测试默认跳过（CTest 中显示为 Skipped），在 `build/bin/rooftree_test.yaml` 的 `Database.Test` 里填好 `Host`、`User`、`Password`、`Name` 后才会运行。这个文件在配置时从 `tests/rooftree_test.yaml.dist` 复制一次，本地修改不会被覆盖，也不会进 git；也可以用 `ROOFTREE_TEST_CONFIG=/path/to/file.yaml` 指定别的文件，或用 `ROOFTREE_DATABASE_TEST_PASSWORD` 这类环境变量逐项覆盖。测试会在该库里创建并删除 `rooftree_test`、`rooftree_test_logs` 表。
