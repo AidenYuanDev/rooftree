@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Comments on a post, a note, a thinking or the guestbook (the target, "post:7", "note:3",
  * "thinking:5", "guestbook"). Two levels like most Chinese sites: top-level comments start threads, every reply sits

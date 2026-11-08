@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The browsers' WebSocket (/ws on the site's own port, plain or TLS), for what changes while a page is
  * open: how many read it (Presence.h) and what was just published. The HTTP socket of the handshake

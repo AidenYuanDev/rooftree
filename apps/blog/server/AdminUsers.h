@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A user as the admin's pages show it (AdminHandlers.cpp lists them, UserAdminHandlers.cpp shows and
  * changes one): the account, its standing (role, bans, what it may not do) and when it was online.

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Boost.Asio's io_context under a name that can be declared without including Boost.Asio
  * (AsioHacksFwd.h), and the executor type the sockets and timers are made for: a concrete one, not

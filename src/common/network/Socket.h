@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A TCP connection owned by one network thread (NetworkThread.h), over a Stream: the TCP socket itself,
  * TLS on it (SslStream.h) or either (OptionalSslStream.h).

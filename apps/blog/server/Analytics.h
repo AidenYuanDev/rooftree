@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Reads of the site's pages, counted on the main thread as the readers' pages report them
  * (POST /api/views) and written once a minute as sums per page and day (page_view, page_referrer).

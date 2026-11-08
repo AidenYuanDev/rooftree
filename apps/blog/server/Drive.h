@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Accounts' drives: folders and files of one account each, that nobody else lists or reads but the
  * admin (?user=); others only see what a share link shows them. The admin and the accounts the admin

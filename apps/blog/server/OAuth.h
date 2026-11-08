@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Logging in with GitHub or Google (OAuth 2.0 authorization code flow with PKCE), the provider side:
  * the address to send the browser to, and on a worker, the code exchanged for a token and the

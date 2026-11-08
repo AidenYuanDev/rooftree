@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * User friendship (social) operations: friend requests, accept/reject, friend list with online status,
  * removing friends, and checking friendship status with another user.

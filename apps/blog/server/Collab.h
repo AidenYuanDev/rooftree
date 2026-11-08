@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A post's editors writing together, in real time: each field of a language of a post (its title,
  * summary or Markdown) is a document, "post:12:zh:body", that the editors' pages open over their

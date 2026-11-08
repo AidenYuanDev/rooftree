@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The arena's messages are FlatBuffers (schema/Arena.fbs) in the server core's packets (Packet.h):
  * the session's handlers read the tables, World and the session build them. What a transport carries:

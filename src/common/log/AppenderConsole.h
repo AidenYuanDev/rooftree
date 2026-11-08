@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Lines on stdout, errors and fatal ones on stderr, each flushed: with systemd or Docker stdout is a
  * pipe, buffered until full, so lines would come late and the last ones would be lost to an abort.

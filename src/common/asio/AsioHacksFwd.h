@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Rooftree's Boost.Asio classes, declared only: for headers that keep a pointer or a reference and
  * shouldn't pull Boost.Asio into everything that includes them.

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The main-thread object of one client, which owns the client's
  * queued messages and the asynchronous work started for it. SessionMgr creates sessions by key on the

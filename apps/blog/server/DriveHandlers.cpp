@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The drive's API (Drive.h). /api/drive/... is the account's own drive: only accounts with one
  * (UserRow::IsGranted("drive")), and every query names the account, so an id of someone else's file

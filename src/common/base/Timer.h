@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Milliseconds since the process started, in 32 bits: they wrap after 49.7 days, so compare two of
  * them by their difference (getMSTimeDiff, or int32(a - b) < 0 for "a is before b"), never with <.

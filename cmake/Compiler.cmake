@@ -1,4 +1,4 @@
-# This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+# This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
 #
 # GCC or Clang on a Unix: C++20, the warnings, the sanitizers. rooftree-core-interface carries them,
 # every target of ours links it

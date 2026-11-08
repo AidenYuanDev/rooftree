@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Readers' answers that are the same for everyone, kept in memory until what they show changes: the
  * published posts' lists and pages, the comments of a post, note, thinking or the guestbook as readers

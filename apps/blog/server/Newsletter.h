@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Mailing new writing to the subscribers, on a thread of its own: a mailing may take long (one mail
  * after another, at Blog.Newsletter.MailsPerMinute so the SMTP server doesn't take us for spam), and

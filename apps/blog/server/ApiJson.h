@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The edge between JSON and the operations, which work in FlatBuffers (ApiCall.h): what a route (or
  * the console) was sent becomes the operation's request table, by the schema (FlatJson.h), and the

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Sends mail over SMTP with libcurl: smtps://host:465 (TLS from the start) or smtp://host:587, where
  * STARTTLS is required unless RequireTls is off (a local test server such as Mailpit). Send() blocks

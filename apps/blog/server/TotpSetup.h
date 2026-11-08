@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * What sets an authenticator app up for a new TOTP secret, printed by --create-admin and the console's
  * "account set 2fa": the otpauth link as a QR code, the link, and the secret to enter by hand.

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The admin managing accounts: making one, changing its name, address, role (user or moderator) and
  * what it may do, its password and logins, deleting it. Only the admin; moderators get the list and

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * One value of a result row, as PostgreSQL sent it: text (bytea decoded). Each getter parses what it is
  * asked for, so the column only has to hold something of that kind: GetUInt32 reads an integer column of

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Catch2 for the tests, and how they print an Optional in a failure: its value, or <empty>. Only for
  * values that print themselves, the rest shows as {?}.

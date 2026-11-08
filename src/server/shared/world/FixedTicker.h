@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A world updated at a fixed tick inside a loop that runs more often. One loop serves the game and
  * web pages: the loop runs every MinUpdateDiff (2 ms) to answer messages, and the game's world is

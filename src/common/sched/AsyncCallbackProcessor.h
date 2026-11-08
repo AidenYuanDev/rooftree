@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The callbacks of one thread's asynchronous work (a session's database queries), run by that thread
  * when it polls: ProcessReadyCallbacks() once an update runs those whose work finished and keeps the

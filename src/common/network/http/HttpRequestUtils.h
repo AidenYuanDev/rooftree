@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * What a JSON API needs from a request beyond Beast's message, all returning plain std
  * types so callers don't depend on Boost.URL:

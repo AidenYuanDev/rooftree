@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * What a user may do to a post (PostRights of BlogTypes.h): the admin and its owner all of it, an
  * editor (post_editor) its text and the rights it was given, anyone else nothing. The post operations

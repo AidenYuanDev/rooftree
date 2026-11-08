@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * One connection to PostgreSQL (libpq) and its prepared statements, used by one thread at a time; the
  * pool (DatabaseWorkerPool.h) sees to that. An application derives from it to list its statements:

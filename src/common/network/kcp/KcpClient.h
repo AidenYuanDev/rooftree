@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The client end of a Kcp::Server connection, for tests and tools, and the reference
  * a game client (Unreal, Unity) implements the protocol after (KcpProtocol.h):

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The admin's pages as console commands: each runs the same ApiOp as its route (ApiCall.h), in
  * the server, as the admin, and prints the answer as text. What only a reader does (logging in,

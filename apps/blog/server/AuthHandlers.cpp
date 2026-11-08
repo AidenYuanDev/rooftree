@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Accounts: register (with a mailed verification link), log in (TOTP for whoever turned it on), log out, the current user, password reset by mail, password change, two-step login setup.
  *

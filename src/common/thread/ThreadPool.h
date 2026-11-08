@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Threads that run what is posted to them, in no particular order: SessionMgr's workers (OnWorker),
  * the arena's. Boost.Asio's thread_pool under a name of ours.

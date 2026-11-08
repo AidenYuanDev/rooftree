@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Where lines go: the console, a file, a database. An appender has a level of its own on top of the
  * logger's, and flags for what goes before each line (time, level, the logger's name).

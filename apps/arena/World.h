@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The world thread's state: the sessions, the coins on the field and the
  * timed world events. Everything here runs on the world thread (main.cpp's update loop) except

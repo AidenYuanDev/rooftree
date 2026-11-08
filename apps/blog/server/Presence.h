@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Who is reading what, from the browsers' WebSockets (BlogWebSocket.h): each open page says which
  * page it shows ("page", again every 25 seconds), the main thread counts readers per page, and once a

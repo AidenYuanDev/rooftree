@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The game connection: checks the login ticket during the WebSocket handshake,
  * creates the ArenaSession and hands it to World, then turns every message into a ClientMessage for

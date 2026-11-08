@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * What may not happen: ASSERT(condition) or ASSERT(condition, "printf format", arguments...) writes
  * where and what to stderr and aborts, for a core dump (systemd starts the server again). On in every

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * An HTTP server: a SocketMgr (SocketMgr.h) of SessionImpl connections and the routes their requests
  * go to. A SessionImpl's RequestHandler passes the request to HandleRequest, which sets the common

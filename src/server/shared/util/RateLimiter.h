@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * "At most MaxCount per Window" for any key, on one thread (the main thread). AntiDOS limits each
  * session; this is for limits by something else that the app only knows once a request runs: per

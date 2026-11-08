@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A query running on another thread and what to do with its answer, on the thread that polls this
  * (a session's update). The callbacks run in the order they were added; one that calls SetNextQuery()

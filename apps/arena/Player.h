@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The character of a logged in account, the in-world part of its session.
  * World thread only. Survives a relog: when the same account logs in again, the new session takes it

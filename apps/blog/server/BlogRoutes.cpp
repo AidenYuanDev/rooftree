@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The API. Message types group routes for AntiDOS (Server.AntiDos.Limits in blog.yaml): auth.login
  * covers one route, posts.read every public read. Routes that carry passwords or session tokens are

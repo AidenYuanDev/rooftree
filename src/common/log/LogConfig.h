@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Lets Appender.* / Logger.* be written as YAML mappings instead of one-line values. A mapping is
  * turned back into its line so Log parses both the same way. The values are the log's numbers, see

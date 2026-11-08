@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The console on a unix socket, for the host's own admin. Whoever may open the socket file is let in,
  * so it is created for its owner only (0600) and a client must run as the server's user or root

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * What both ends of a KCP connection do with its datagrams (KcpProtocol.h). A Link
  * seals what goes out and opens what comes in, and runs the KCP control block for the reliable

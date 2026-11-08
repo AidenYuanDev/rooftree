@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A thread with an io_context of its own and the sockets on it: their reads and writes complete here,
  * and every millisecond Update() calls each socket's Update() (which writes what was queued) and lets

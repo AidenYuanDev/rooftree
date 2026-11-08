@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * One logged in connection. Created by ArenaSocket once the
  * WebSocket handshake presented a valid ticket (or by ArenaKcpConnection once a KCP Hello did), then

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The readers' first, then the admin's, the status page's first: /api/status is the admin's although
  * not under /api/admin, counted as posts.read like the pages it sits between.

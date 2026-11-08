@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The site around the writing: its profile (the home page's introduction, the about pages, the
  * links), the numbers on the home page, the timeline of everything published, friends' links and

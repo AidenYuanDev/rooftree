@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Reads of the site (Analytics.h): POST /api/views from the readers' pages, the admin's page of them
  * (GET /api/admin/stats). Only pages of the site count (the prerendered ones, when there is a site):

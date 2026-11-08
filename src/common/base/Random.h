@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Quick random numbers for the game and pictures (where a coin lands, a captcha's noise): one
  * generator per thread, seeded from the system. Not for secrets: tokens, keys and salts come from

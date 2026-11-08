@@ -1,4 +1,4 @@
-# This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+# This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
 #
 # CollectAndAddSourceFiles(target dir [EXCLUDE dirs...]): the .cpp files under dir into target, its
 # headers as a header file set, every directory an include directory. Directories starting with a dot

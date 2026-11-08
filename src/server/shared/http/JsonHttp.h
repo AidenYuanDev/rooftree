@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * JSON bodies for the HTTP API, with Boost.JSON. Errors always have one shape, so a client handles
  * them in one place:

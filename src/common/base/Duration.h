@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Short names for the durations and clocks used everywhere, and the chrono literals (5s, 100ms).
  * TimePoint is the steady clock's, for timeouts and intervals; SystemTimePoint the wall clock's, for

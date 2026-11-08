@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A listening TCP socket. AsyncAccept(select, accepted) accepts until Close(): each connection onto
  * the io_context select() picks (the network thread with the fewest connections), then hands it to

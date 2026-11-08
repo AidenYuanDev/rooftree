@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The operations of the API (ApiOperations.h) as packets on /ws (Packet.h), for clients of our own:
  * a binary message with an operation's opcode and its request table (schema/Admin.fbs, Reader.fbs)

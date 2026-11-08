@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Blog.* of blog.yaml, and the Sessions and AntiDos of Server.*. LoadFromConfig runs at startup and
  * again on SIGHUP (between two updates, on the main thread); the network settings (addresses, ports,

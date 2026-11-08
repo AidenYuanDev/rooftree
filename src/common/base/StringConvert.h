@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * StringTo<T>(text): the whole text as a T, or nothing. No spaces around it and no '+', so what comes
  * from a URL or a config value is either exactly a number or rejected.

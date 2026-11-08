@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * How many connections one address may have open at once, so a single client can't
  * take all the file descriptors and memory with thousands of idle sockets. SocketMgr asks before it

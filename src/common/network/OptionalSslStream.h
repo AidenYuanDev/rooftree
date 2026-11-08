@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A stream that is TLS or plain, decided per connection when it is accepted. Picking one at compile
  * time (Http::Socket or Http::SslSocket) would make one service need two socket types, two

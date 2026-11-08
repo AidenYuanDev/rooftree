@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Every client message runs on the main thread: a network thread only parses it and queues it on its
  * session, and SessionMgr runs a bounded number of them per session and update, each through AntiDOS

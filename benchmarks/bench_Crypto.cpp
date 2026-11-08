@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Crypto at the sizes the framework uses it: token and handshake hashes, TOTP, random bytes, and
  * password hashing (Argon2, slow on purpose).

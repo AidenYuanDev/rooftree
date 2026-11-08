@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A queue that a consumer waits on: worker threads that sleep until there is work (a map updater
  * handing each map's update to one of them per world tick). Any number of threads on both ends.

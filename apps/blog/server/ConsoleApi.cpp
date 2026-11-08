@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Like ConsoleCommands.cpp: the arguments are checked on the main thread; the account, its session,
  * the files and the request itself are a worker's, which waits for the response. One call at a time,

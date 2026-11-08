@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * What an operation of the API does, in FlatBuffers: its route, its packet (ApiPackets.h) and, for the
  * admin's, the console's commands (ConsoleAdmin.cpp) run the same function, an ApiOp, found by its row

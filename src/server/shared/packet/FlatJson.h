@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * FlatBuffers to JSON and back by a schema read at run time (its binary form, the
  * _bfbs_generated.h flatc writes with --bfbs-gen-embed), for front ends that speak JSON to handlers

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Every operation of the API, once: its opcode (schema/Admin.fbs, schema/Reader.fbs), who may call
  * it, its HTTP route and the ApiOp doing it (ApiCall.h). The front ends are made from this table, so

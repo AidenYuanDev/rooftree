@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Client addresses refused for a while (an IP ban, kept in memory). The main thread blocks an address
  * that floods (SessionMgr, after AntiDOS refused it too often); the network threads ask before they

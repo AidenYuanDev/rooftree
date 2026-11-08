@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * RT_LOG_INFO("server.http", "{} answered {}", who, status): a line to the logger of that name, or of
  * the nearest name above it ("server.http" falls back to "server", then "root"), if that logger's level

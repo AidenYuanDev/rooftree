@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A listening port and the network threads its connections are spread over. Traits names three types:
  * Self (the class deriving from SocketMgr), SocketType and ThreadType (a NetworkThread).

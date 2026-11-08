@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * WebSocket connections feeding SessionMgr, the way WorldHttpService does for HTTP. Messages are JSON
  * objects with a "type" member, the rest is the body:

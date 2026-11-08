@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A WebSocket connection once its opening handshake is done, apart from the socket it
  * runs on. Two kinds of socket run one:

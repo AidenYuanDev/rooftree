@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Rows and values the blog passes around, and how they look in JSON. Times are UTC everywhere: in the
  * database (DATETIME written with setDate) and in JSON (ISO 8601 with Z); the frontend shows them in

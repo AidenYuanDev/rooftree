@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Lock-free queue of pointers from any number of threads to one: Enqueue(T*) on any thread, Dequeue
  * on one thread only. The queue owns what is in it: what is left is deleted with it.

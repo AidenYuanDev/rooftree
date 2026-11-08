@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Text from a {fmt} format, checked when compiled: StringFormat("{} of {}", a, b). Enums print as
  * their number, an empty Optional as "(none)". FormatString and FormatArgs are for functions that

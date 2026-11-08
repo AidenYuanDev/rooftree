@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A queue under a mutex, for any number of threads on both ends: what a consumer polls once an update
  * (SessionMgr's finished work, the arena's new sessions). next() never waits.

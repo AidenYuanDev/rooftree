@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The datagrams of a KCP connection (Kcp::Server, Kcp::Client). A game whose client we write ourselves
  * can take UDP, where a lost packet

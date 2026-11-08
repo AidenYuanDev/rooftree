@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The sessions plus the queue in front of them. Network threads Enqueue() messages into
  * one lock-free inbox; every Update() on the main thread:

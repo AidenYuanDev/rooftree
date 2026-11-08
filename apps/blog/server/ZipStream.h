@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A zip of files on the disk, made while it is read: stored (not compressed, a drive's pictures and
  * videos are already), each file's CRC-32 counted as it goes out and written after it (a data

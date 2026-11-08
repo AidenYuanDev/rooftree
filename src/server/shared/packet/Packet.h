@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A packet is a binary WebSocket message (WorldWebSocket.h) for clients of our own: an opcode says
  * what it is, its payload is a FlatBuffer whose root type the

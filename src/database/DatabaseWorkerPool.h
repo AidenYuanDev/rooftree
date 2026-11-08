@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The connections of one database and how the application's threads share them:
  *  - Query, DirectExecute, DirectCommitTransaction block the calling thread on a free connection of the

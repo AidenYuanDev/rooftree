@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Mail subscriptions. Anyone may subscribe an address: a mail with a link confirms it (double opt-in),
  * so nobody gets mail they didn't ask for. A logged in reader switches it on and off in the account

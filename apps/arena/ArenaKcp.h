@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The game over UDP, for native clients (a browser can only open the WebSocket): what ArenaSocket
  * does for a WebSocket, for a Kcp::Connection. The login answered a ticket and a key; the Hello

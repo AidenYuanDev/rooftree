@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Passwords as Argon2id hashes, encoded with their parameters and a salt of their own
  * ($argon2id$v=19$m=19456,t=2,p=1$salt$hash), so Verify needs only the stored text: hashes made with

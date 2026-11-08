@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The search, in memory: an inverted index of everything published, posts and notes, every language
  * version of each (a document per version). Built once from the database (Load, a worker or startup),

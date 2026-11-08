@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Any route of the API from the console (ConsoleCommands.h), for what the console's own commands
  * don't do: what a reader does (logging in, commenting, a drive's uploads and links, subscribing). The

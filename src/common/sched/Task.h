@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * A coroutine that returns a T: it starts when awaited, and whoever awaited it goes on where it finished,
  * without another stack frame (symmetric transfer). An exception it lets out comes out of the co_await.

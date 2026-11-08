@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Outgoing HTTP(S) requests with libcurl, e.g. to an OAuth provider's token and user endpoints.
  * HttpFetch blocks until the whole response is in, so it runs on a worker (Session::OnWorker),

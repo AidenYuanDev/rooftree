@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The session of one client address. Handlers run on the main thread; the
  * ones that need several dependent queries or Argon2 hand that to a worker with co_await OnWorker and

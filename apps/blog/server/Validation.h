@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Reading a JSON request body field by field, collecting one error code per bad field, so a single
  * 400 tells the form about every field at once:

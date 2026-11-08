@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Accounts' pictures. Each is a file of Blog.Uploads.Directory named avatar-<token>.<extension>,
  * served at /uploads/<name> like any upload; user.avatar holds the name. A new picture gets a new

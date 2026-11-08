@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * The blog's database: one connection type with its prepared statements.
  * The schema comes from apps/blog/db/migrations (dbmate); the server only checks at startup that every

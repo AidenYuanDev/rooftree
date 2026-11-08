@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * Reactions: a logged in reader with a confirmed address gives a post, note, thinking or comment one
  * of a few kinds (like, heart, ...), each kind once, and may take it back. Pages ask for the counts of

@@ -1,5 +1,5 @@
 /*
- * This file is part of Rooftree, under the GNU GPL, version 2 or later: see COPYING.
+ * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * RFC 6238 time-based one-time passwords as authenticator apps make them: HMAC-SHA1, 30 second steps,
  * 6 digits.
