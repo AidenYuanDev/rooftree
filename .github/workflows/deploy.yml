@@ -1,6 +1,5 @@
 # Ships the blog once CI has passed on a push to main; Actions -> Deploy -> Run workflow, on main, ships
-# main again by hand. It waits for a reviewer of the production environment, checks that CI passed on
-# the commit, then runs ship.sh like a deploy from a workstation (the image builds here, its C++ tests
+# main again by hand. It checks that CI passed on the commit, then runs ship.sh like a deploy from a workstation (the image builds here, its C++ tests
 # included).
 #
 # The production environment holds:
