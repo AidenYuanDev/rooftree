@@ -1,6 +1,7 @@
 # Ships the blog once CI has passed on a push to main; Actions -> Deploy -> Run workflow, on main, ships
-# main again by hand. It checks that CI passed on the commit, then runs ship.sh like a deploy from a workstation (the image builds here, its C++ tests
-# included).
+# main again by hand. It checks that CI passed on the commit, then runs ship.sh like a deploy from a
+# workstation, the image taking the server CI built and tested; if CI's copy has expired the image
+# builds it. Docker's layers are kept between runs.
 #
 # The production environment holds:
 #   DEPLOY_HOST         user@host, as given to ship.sh
@@ -42,15 +43,30 @@ jobs:
         with:
           ref: ${{ env.DEPLOY_SHA }}
 
-      - name: CI passed on this commit
+      - name: CI passed on this commit, and its server
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          passed=$(gh run list -R "$GITHUB_REPOSITORY" -w ci.yml -c "$DEPLOY_SHA" -s success --json databaseId -q length)
-          if [ "$passed" -eq 0 ]; then
-            echo "::error::no successful CI run on $DEPLOY_SHA"
+          run=$(gh run list -R "$GITHUB_REPOSITORY" -w ci.yml -c "$DEPLOY_SHA" -s success --json databaseId -q '.[0].databaseId // empty')
+          if [ -z "$run" ]; then
+            echo "::error::no successful CI run on $DEPLOY_SHA (a commit of only documentation has none: run CI by hand)"
             exit 1
           fi
+          stage=build
+          if gh run download "$run" -R "$GITHUB_REPOSITORY" -n blog-server -D prebuilt; then
+            chmod 755 prebuilt/blog
+            stage=prebuilt
+          fi
+          echo "BLOG_BINARY_STAGE=$stage" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/buildx-cache
+          key: docker-layers-${{ env.DEPLOY_SHA }}
+          restore-keys: docker-layers-
+
+      - name: Docker builder
+        run: docker buildx create --use
 
       - name: SSH key
         env:
@@ -65,4 +81,11 @@ jobs:
       - name: Ship
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        run: apps/blog/deploy/docker/ship.sh "$DEPLOY_HOST"
+          BLOG_DOCKER_BUILD: >-
+            docker buildx build --load --build-arg BLOG_BINARY_STAGE=${{ env.BLOG_BINARY_STAGE }}
+            --cache-from type=local,src=${{ runner.temp }}/buildx-cache
+            --cache-to type=local,dest=${{ runner.temp }}/buildx-new,mode=max
+        run: |
+          apps/blog/deploy/docker/ship.sh "$DEPLOY_HOST"
+          rm -rf "$RUNNER_TEMP/buildx-cache"
+          mv "$RUNNER_TEMP/buildx-new" "$RUNNER_TEMP/buildx-cache"

@@ -5,6 +5,11 @@
 #
 # The image holds the server, apps/blog with its node_modules (dbmate, the prerender build) and node;
 # config, site, uploads and backups are the host's (compose.yaml).
+#
+# --build-arg BLOG_BINARY_STAGE=prebuilt takes the server from prebuilt/blog in the context, built and
+# tested on this Ubuntu by CI, instead of building it.
+
+ARG BLOG_BINARY_STAGE=build
 
 FROM ubuntu:26.04 AS build
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -34,6 +39,12 @@ RUN cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DEXAMPLES=0 \
     && cmake --build build \
     && ctest --test-dir build --output-on-failure
 
+# Never nothing to copy: a builder without BuildKit runs this stage even when it is unused
+FROM ubuntu:26.04 AS prebuilt
+COPY apps/blog/deploy/docker/Dockerfile prebuilt/blo[g] /src/build/bin/
+
+FROM ${BLOG_BINARY_STAGE} AS binary
+
 FROM ubuntu:26.04
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       libboost-filesystem1.90.0 libboost-json1.90.0 libboost-url1.90.0 libssl3t64 libpq5 \
@@ -46,7 +57,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 RUN groupadd --system --gid 2000 blog \
     && useradd --system --uid 2000 --gid blog --home-dir /var/lib/blog --create-home --shell /usr/sbin/nologin blog
 
-COPY --from=build /src/build/bin/blog /opt/blog/bin/blog
+COPY --from=binary /src/build/bin/blog /opt/blog/bin/blog
 # Ports 80 and 443 as blog, the host's network (no root, no proxy)
 RUN setcap cap_net_bind_service=+ep /opt/blog/bin/blog \
     && ! ldd /opt/blog/bin/blog | grep 'not found'

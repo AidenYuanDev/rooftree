@@ -3,14 +3,17 @@
 #  - Release: everything, the C++ tests, then the blog's: lint, typecheck, web tests and build, and the
 #    API tests against the server just built
 #  - ASan: the C++ tests under the address sanitizer
-# Deploy (deploy.yml) asks for a successful run of this on the commit it ships.
+# Deploy (deploy.yml) ships Release's server from a successful run of this on the commit. Changes to
+# nothing but documentation run neither.
 
 name: CI
 
 on:
   push:
     branches: [main]
+    paths-ignore: ['docs/**', '**.md', LICENSE]
   pull_request:
+    paths-ignore: ['docs/**', '**.md', LICENSE]
   workflow_dispatch:
 
 permissions:
@@ -105,3 +108,12 @@ jobs:
           BLOG_BIN: ${{ github.workspace }}/build/bin/blog
           TEST_DATABASE_URL: postgres://postgres:postgres@postgres:5432/rooftree_blog_test?sslmode=disable
         run: pnpm test:api
+
+      - name: Keep the server for Deploy
+        if: matrix.id == 'release'
+        uses: actions/upload-artifact@v7
+        with:
+          name: blog-server
+          path: build/bin/blog
+          retention-days: 14
+          if-no-files-found: error
