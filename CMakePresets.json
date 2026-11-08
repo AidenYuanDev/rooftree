@@ -1,0 +1,51 @@
+{
+  "version": 5,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja"
+    },
+    {
+      "name": "dev",
+      "displayName": "Debug, into build/",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release with the benchmarks, into build-release/",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_BENCHMARKS": "ON"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "Tests under the address sanitizer, into build-asan/",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build-asan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "ASAN": "ON",
+        "EXAMPLES": "OFF",
+        "APPS": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev", "jobs": 16 },
+    { "name": "release", "configurePreset": "release", "jobs": 16 },
+    { "name": "asan", "configurePreset": "asan", "jobs": 16 }
+  ],
+  "testPresets": [
+    { "name": "dev", "configurePreset": "dev", "output": { "outputOnFailure": true } },
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
+    { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } }
+  ]
+}

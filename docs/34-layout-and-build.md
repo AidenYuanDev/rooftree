@@ -47,6 +47,16 @@ cmake --build build
 ctest --test-dir build
 ```
 
+常用的三种构建写在 `CMakePresets.json` 里：`dev`（Debug，`build/`）、`release`（Release 加基准测试，`build-release/`）、`asan`（地址检查下的测试，`build-asan/`）。编译器沿用环境里的 `CC`、`CXX`：
+
+```sh
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
+```
+
+这些预设最多并行 16 个任务。Ninja 默认按 CPU 线程数并行，线程多、内存少的机器上可能耗尽内存。用 Clang 和预编译头构建时，单个文件的峰值约 0.3 GB，最大 0.7 GB；16 个任务全量构建，一台 30 GB 的机器的可用内存最多减少 5 GB。
+
 测试要串行跑（不加 `-j`）：日志的用例共用同一个临时文件 `rooftree_test.log`，网络的用例依赖时序，并行时偶尔失败或卡住。
 
 数据库测试默认跳过（CTest 中显示为 Skipped），在 `build/bin/rooftree_test.yaml` 的 `Database.Test` 里填好 `Host`、`User`、`Password`、`Name` 后才会运行。这个文件在配置时从 `tests/rooftree_test.yaml.dist` 复制一次，本地修改不会被覆盖，也不会进 git；也可以用 `ROOFTREE_TEST_CONFIG=/path/to/file.yaml` 指定别的文件，或用 `ROOFTREE_DATABASE_TEST_PASSWORD` 这类环境变量逐项覆盖。测试会在该库里创建并删除 `rooftree_test`、`rooftree_test_logs` 表。
