@@ -9,6 +9,7 @@
 #include "Log.h"
 #include "PreparedStatement.h"
 #include "QueryResult.h"
+#include "SpellInfo.h"
 #include "TicketMgr.h"
 #include "Transaction.h"
 #include "Util.h"
@@ -57,6 +58,15 @@ bool ReadCredentials(Rooftree::Net::Http::RequestContext& context, std::string& 
     username = name->get_string();
     password = pass->get_string();
     return true;
+}
+
+UnitClass ReadClass(Rooftree::Net::Http::RequestContext const& context)
+{
+    boost::system::error_code error;
+    boost::json::value body = boost::json::parse(context.request.body(), error);
+    boost::json::object const* object = error ? nullptr : body.if_object();
+    boost::json::value const* name = object ? object->if_contains("class") : nullptr;
+    return name && name->is_string() && name->get_string() == "rogue" ? UnitClass::Rogue : UnitClass::Adventurer;
 }
 
 bool IsValidUsername(std::string_view name)
@@ -272,7 +282,8 @@ void AuthService::HandleLogin(RequestContext& context)
         return SetError(context, http::status::unauthorized, "wrong username or password");
     }
 
-    LoginTicket loginTicket{ .AccountId = account->Id, .Name = account->Name };
+    // The class a new player starts as, the login's choice: "rogue", or the old kit
+    LoginTicket loginTicket{ .AccountId = account->Id, .Name = account->Name, .Class = uint8(ReadClass(context)) };
     std::string ticket = sTicketMgr->Create(loginTicket, _settings.TicketLifetime);
 
     RT_LOG_INFO("arena.http", "Account {} ({}) logged in", account->Name, account->Id);

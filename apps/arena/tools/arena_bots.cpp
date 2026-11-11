@@ -382,7 +382,7 @@ Optional<Login> LogIn(std::string const& host, std::string const& port, std::str
 void PrintStats(char const* title, double seconds, uint32 bots)
 {
     static constexpr char const* CastErrors[] = { "Ok", "UnknownSpell", "Dead", "Casting", "Stunned", "Moving", "NotReady", "NoMana",
-        "NoTarget", "TargetDead", "BadTarget", "OutOfRange" };
+        "NoTarget", "TargetDead", "BadTarget", "OutOfRange", "NoComboPoints" };
     static constexpr char const* EventTypes[] = { "CastStart", "SpellGo", "CastInterrupted", "Damage", "Heal", "AuraApplied", "AuraRemoved",
         "Death", "Swing" };
     static constexpr char const* Reasons[] = { "None", "Cancelled", "Moved", "Stunned", "Died", "TargetLost", "OutOfRange" };

@@ -8,10 +8,30 @@
 #include "SpellInfo.h"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 Unit::Unit(uint32 id, uint32 maxHealth, uint32 maxMana)
-    : _id(id), _health(maxHealth), _maxHealth(maxHealth), _mana(maxMana), _maxMana(maxMana)
+    : _id(id), _class(&SpellStore::GetClass(UnitClass::Adventurer)), _health(maxHealth), _maxHealth(maxHealth), _mana(maxMana), _maxMana(maxMana)
 {
+}
+
+void Unit::SetClass(UnitClass unitClass)
+{
+    _class = &SpellStore::GetClass(unitClass);
+    _mana = _maxMana = _class->MaxPower;
+    _manaRegen = _class->PowerRegen;
+    _manaRegenTimer = 0;
+    _comboPoints = 0;
+}
+
+bool Unit::KnowsSpell(uint32 spellId) const
+{
+    return std::ranges::find(_class->Spells, spellId) != _class->Spells.end();
+}
+
+void Unit::SetFacing(float facing)
+{
+    _facing = std::remainder(facing, 2.0f * float(M_PI));
 }
 
 Unit::~Unit()
@@ -39,7 +59,7 @@ CastResult Unit::CastSpell(uint32 spellId, uint32 targetId)
     ASSERT(_map, "unit %u casts outside a map", _id);
 
     SpellInfo const* spell = SpellStore::GetSpell(spellId);
-    if (!spell)
+    if (!spell || !KnowsSpell(spellId))
         return CastResult::UnknownSpell;
     if (!IsAlive())
         return CastResult::Dead;
@@ -53,6 +73,8 @@ CastResult Unit::CastSpell(uint32 spellId, uint32 targetId)
         return CastResult::NotReady;
     if (_mana < spell->ManaCost)
         return CastResult::NoMana;
+    if (spell->Finisher && !_comboPoints)
+        return CastResult::NoComboPoints;
 
     Unit* target = this;
     if (spell->Target == SpellTarget::Enemy)
@@ -101,6 +123,15 @@ bool Unit::IsStunned() const
     return std::ranges::any_of(_auras, [](Aura const& aura) { return aura.Info->Type == AuraType::Stun; });
 }
 
+float Unit::GetSpeedMultiplier() const
+{
+    float multiplier = 1.0f;
+    for (Aura const& aura : _auras)
+        if (aura.Info->Type == AuraType::SpeedBoost)
+            multiplier += float(aura.Info->Amount) / 100.0f;
+    return multiplier;
+}
+
 void Unit::TakeDamage(uint32 attackerId, uint32 spellId, uint32 amount, bool crit, bool periodic)
 {
     if (!IsAlive() || !amount)
@@ -125,13 +156,13 @@ void Unit::TakeHeal(uint32 healerId, uint32 spellId, uint32 amount, bool crit)
     Notify({ .Type = CombatEventType::Heal, .Caster = healerId, .Target = _id, .Spell = spellId, .Amount = amount, .Crit = crit });
 }
 
-void Unit::ApplyAura(uint32 casterId, AuraInfo const& info)
+void Unit::ApplyAura(uint32 casterId, AuraInfo const& info, uint32 extraDuration /*= 0*/)
 {
     if (!IsAlive())
         return;
 
     // The same one again from the same caster starts over; from another caster it is a second one
-    uint32 duration = uint32(info.Duration.count());
+    uint32 duration = uint32(info.Duration.count()) + extraDuration;
     auto itr = std::ranges::find_if(_auras, [&](Aura const& aura) { return aura.Info == &info && aura.CasterId == casterId; });
     if (itr != _auras.end())
         *itr = { .Info = &info, .CasterId = casterId, .Remaining = duration };
@@ -175,6 +206,7 @@ void Unit::Revive()
     _health = _maxHealth;
     _mana = _maxMana;
     _manaRegenTimer = 0;
+    _comboPoints = 0;
     _cooldowns.clear();
     _globalCooldown = 0;
     _swingTimer = 0;
@@ -190,9 +222,9 @@ void Unit::Update(uint32 diff)
     if (!IsAlive())
         return;
 
-    // Whole points, the remainder carries over to the next update
-    _manaRegenTimer += diff;
-    _mana = std::min(_maxMana, _mana + _manaRegenTimer / 1000 * _manaRegen);
+    // Point by point as they come (energy fills smoothly), the remainder carries over
+    _manaRegenTimer += diff * _manaRegen;
+    _mana = std::min(_maxMana, _mana + _manaRegenTimer / 1000);
     _manaRegenTimer %= 1000;
 
     if (_castSpell)
@@ -218,8 +250,8 @@ void Unit::UpdateAttack(uint32 diff)
     if (_swingTimer || IsCasting() || IsStunned() || GetDistance(*target) > MeleeRange)
         return;
 
-    _swingTimer = AttackInterval;
-    uint32 amount = _map->Roll(AttackMinDamage, AttackMaxDamage);
+    _swingTimer = _class->AttackInterval;
+    uint32 amount = _map->Roll(_class->AttackMinDamage, _class->AttackMaxDamage);
     bool crit = _map->Roll(1, 100) <= _critChance;
     if (crit)
         amount += amount / 2;
@@ -289,6 +321,9 @@ void Unit::Go(SpellInfo const& spell, Unit& target)
 
     Notify({ .Type = CombatEventType::SpellGo, .Caster = _id, .Target = target.GetId(), .Spell = spell.Id });
 
+    // A finisher spends them all, its effects grow with them
+    uint32 spent = spell.Finisher ? std::exchange(_comboPoints, 0) : 0;
+
     for (SpellEffect const& effect : spell.Effects)
     {
         // The first effect may have killed it
@@ -300,7 +335,7 @@ void Unit::Go(SpellInfo const& spell, Unit& target)
             case SpellEffectType::Damage:
             case SpellEffectType::Heal:
             {
-                uint32 amount = _map->Roll(uint32(effect.Min), uint32(effect.Max));
+                uint32 amount = _map->Roll(uint32(effect.Min), uint32(effect.Max)) + uint32(effect.PerComboPoint) * spent;
                 bool crit = _map->Roll(1, 100) <= _critChance;
                 if (crit)
                     amount = amount * 3 / 2;
@@ -313,10 +348,27 @@ void Unit::Go(SpellInfo const& spell, Unit& target)
             }
             case SpellEffectType::ApplyAura:
                 if (AuraInfo const* aura = SpellStore::GetAura(effect.AuraId))
-                    target.ApplyAura(_id, *aura);
+                    target.ApplyAura(_id, *aura, uint32(effect.PerComboPoint) * spent);
+                break;
+            case SpellEffectType::AddComboPoint:
+                _comboPoints = std::min(_comboPoints + uint32(effect.Min), SpellStore::MaxComboPoints);
+                break;
+            case SpellEffectType::TeleportBehind:
+                TeleportBehind(target);
                 break;
         }
     }
+}
+
+void Unit::TeleportBehind(Unit& target)
+{
+    // Just touching its back, kept inside the map's field; then facing it
+    float behind = 2 * Radius + 1.0f;
+    float x = target.GetX() - std::cos(target.GetFacing()) * behind;
+    float y = target.GetY() - std::sin(target.GetFacing()) * behind;
+    _map->ClampToField(x, y, Radius);
+    Relocate(x, y);
+    SetFacing(std::atan2(target.GetY() - y, target.GetX() - x));
 }
 
 void Unit::UpdateAuras(uint32 diff)
@@ -356,6 +408,7 @@ void Unit::UpdateAuras(uint32 diff)
 void Unit::Die(uint32 killerId)
 {
     _moving = false;
+    _comboPoints = 0;
     StopAttack();
     if (_castSpell)
         InterruptCast(InterruptReason::Died);

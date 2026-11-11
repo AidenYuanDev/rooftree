@@ -70,10 +70,16 @@ public:
     // Both ends included
     uint32 Roll(uint32 min, uint32 max);
 
+    // Where a unit may stand, for what moves units (Shadowstep); unbounded until told
+    void SetField(float width, float height) { _width = width; _height = height; }
+    void ClampToField(float& x, float& y, float radius) const;
+
 private:
     std::unordered_map<uint32, Unit*> _units;
     std::vector<CombatEvent> _events;
     std::mt19937 _random;
+    float _width = 0.0f;
+    float _height = 0.0f;
 };
 
 #endif // ARENA_COMBAT_MAP_H

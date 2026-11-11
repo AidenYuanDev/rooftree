@@ -28,6 +28,7 @@ struct LoginTicket
 {
     uint32 AccountId = 0;
     std::string Name;
+    uint8 Class = 0;                        // UnitClass, the login's "class"
     Rooftree::Net::Kcp::Key KcpKey = {};     // Create makes it
 };
 

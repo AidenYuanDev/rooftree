@@ -43,6 +43,7 @@ enum CastError : ubyte {
   TargetDead,
   BadTarget,
   OutOfRange,
+  NoComboPoints,
 }
 
 // combat/Unit.h's InterruptReason, same values
@@ -72,6 +73,17 @@ enum CombatEventType : ubyte {
 enum SpellTargetType : ubyte {
   Enemy,
   Self,
+}
+
+// combat/SpellInfo.h's UnitClass and PowerType, same values. The login's "class" picks one
+enum PlayerClass : ubyte {
+  Adventurer,
+  Rogue,
+}
+
+enum PowerType : ubyte {
+  Mana,
+  Energy,
 }
 
 // ---- client to server ---------------------------------------------------------------------------
@@ -131,6 +143,8 @@ table Welcome {
   playerRadius:float;
   totalCoins:uint;
   motd:string;
+  playerClass:PlayerClass;
+  power:PowerType;
 }
 
 table Pong {
@@ -153,6 +167,10 @@ table PlayerState {
   deaths:uint;
   facing:float; // radians, see Input
   attackTarget:uint;  // Attack's, 0 when not attacking
+  playerClass:PlayerClass;
+  power:PowerType;    // what mana and maxMana are
+  comboPoints:ubyte;
+  speed:float;        // walking now, per second: Arena.World.PlayerSpeed times its boosts
 }
 
 table CoinState {
@@ -186,11 +204,12 @@ table SpellData {
   castTime:uint;    // ms, 0 for an instant
   cooldown:uint;    // ms, starts when the cast completes
   gcd:bool;         // starts the global cooldown when the cast starts
-  manaCost:uint;    // spent when the cast completes
+  manaCost:uint;    // spent when the cast completes, of the caster's power
   range:float;      // between the two players' edges: 0 when they touch
+  finisher:bool;    // needs a combo point, spends them all, does more for each
 }
 
-// After Welcome: the spells every player has
+// After Welcome: the spells the player's class has, in the bar's order
 table Spells {
   spells:[SpellData];
   globalCooldown:uint;  // ms

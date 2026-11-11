@@ -80,7 +80,7 @@ bool ArenaSocket::OnHandshake(Rooftree::Net::Http::Request const& request, Rooft
 
 void ArenaSocket::OnOpen()
 {
-    std::shared_ptr<ArenaSession> session = std::make_shared<ArenaSession>(_ticket->AccountId, _ticket->Name,
+    std::shared_ptr<ArenaSession> session = std::make_shared<ArenaSession>(_ticket->AccountId, _ticket->Name, _ticket->Class,
         std::static_pointer_cast<ArenaSocket>(shared_from_this()));
     _session = session;
 

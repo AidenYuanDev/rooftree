@@ -42,7 +42,7 @@ void ArenaKcpConnection::Write(ServerPacket const& packet, bool unreliable)
 
 void ArenaKcpConnection::OnOpen()
 {
-    std::shared_ptr<ArenaSession> session = std::make_shared<ArenaSession>(_ticket.AccountId, _ticket.Name,
+    std::shared_ptr<ArenaSession> session = std::make_shared<ArenaSession>(_ticket.AccountId, _ticket.Name, _ticket.Class,
         std::static_pointer_cast<ArenaKcpConnection>(shared_from_this()));
     _session = session;
 

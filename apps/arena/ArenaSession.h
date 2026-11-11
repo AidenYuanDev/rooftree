@@ -37,7 +37,8 @@ enum SessionStatus
 class ArenaSession
 {
 public:
-    ArenaSession(uint32 accountId, std::string name, std::shared_ptr<ArenaConnection> connection);
+    // unitClass: a fresh player's (UnitClass); one taken over keeps its own
+    ArenaSession(uint32 accountId, std::string name, uint8 unitClass, std::shared_ptr<ArenaConnection> connection);
     ~ArenaSession();
 
     ArenaSession(ArenaSession const&) = delete;
@@ -84,6 +85,7 @@ private:
 
     uint32 _accountId;
     std::string _name;
+    uint8 _class;
     std::shared_ptr<ArenaConnection> _connection;
     std::unique_ptr<Player> _player;
     SessionStatus _status = STATUS_LOADING;

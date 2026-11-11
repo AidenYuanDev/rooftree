@@ -23,6 +23,11 @@ enum : uint32
     AURA_STUN   = 2,
 };
 
+ClassInfo const& Adventurer()
+{
+    return SpellStore::GetClass(UnitClass::Adventurer);
+}
+
 // Two units 0 apart at the edges (strike range), no crits unless a test wants them
 struct Duel
 {
@@ -68,7 +73,7 @@ TEST_CASE("Spell and aura ids are their places in the table", "[combat]")
     CHECK(SpellStore::GetAura(AURA_POISON)->Type == AuraType::PeriodicDamage);
     REQUIRE(SpellStore::GetAura(AURA_STUN));
     CHECK(SpellStore::GetAura(AURA_STUN)->Type == AuraType::Stun);
-    CHECK(SpellStore::GetAura(3) == nullptr);
+    CHECK(SpellStore::GetAura(6) == nullptr);
 }
 
 TEST_CASE("An instant spell hits at once and starts the global cooldown", "[combat]")
@@ -336,10 +341,13 @@ TEST_CASE("Mana runs out and comes back", "[combat]")
     CHECK(duel.A.GetMana() == 10);
     CHECK(duel.A.CastSpell(SPELL_POISON, duel.B.GetId()) == CastResult::NoMana);
 
+    // Point by point: 5 a second is one every 200 ms
     duel.A.SetManaRegen(5);
-    duel.A.Update(999);
+    duel.A.Update(199);
     CHECK(duel.A.GetMana() == 10);
     duel.A.Update(1);
+    CHECK(duel.A.GetMana() == 11);
+    duel.A.Update(800);
     CHECK(duel.A.GetMana() == 15);
     CHECK(duel.A.CastSpell(SPELL_POISON, duel.B.GetId()) == CastResult::Ok);
 }
@@ -456,13 +464,13 @@ TEST_CASE("An auto attack swings at once, then every interval, and doesn't use t
     CHECK(events[0].Target == 2);
     CHECK(events[1].Type == CombatEventType::Damage);
     CHECK(events[1].Spell == 0);
-    CHECK(events[1].Amount >= Unit::AttackMinDamage);
-    CHECK(events[1].Amount <= Unit::AttackMaxDamage);
+    CHECK(events[1].Amount >= Adventurer().AttackMinDamage);
+    CHECK(events[1].Amount <= Adventurer().AttackMaxDamage);
     CHECK(duel.A.GetGlobalCooldown() == 0);
     CHECK(duel.A.CastSpell(SPELL_STRIKE, duel.B.GetId()) == CastResult::Ok);
     duel.Map.TakeEvents();
 
-    duel.Wait(Unit::AttackInterval - 1);
+    duel.Wait(Adventurer().AttackInterval - 1);
     CHECK(duel.Take(CombatEventType::Swing).empty());
     duel.Wait(1);
     CHECK(duel.Take(CombatEventType::Swing).size() == 1);

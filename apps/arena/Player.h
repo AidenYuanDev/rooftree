@@ -27,11 +27,10 @@ public:
     // A direction of any length, kept until the client sends the next input; one too short to tell
     // is standing still. Not moving from now on is not moving for a cast in the same update
     void SetInput(float x, float y);
-    // Radians, the field's axes. Given by the client, or else the way it last walked
-    float GetFacing() const { return _facing; }
-    void SetFacing(float facing);
+    // Where the client says the player looks (Unit::GetFacing); until it says, the way it last walked
+    void SetClientFacing(float facing);
 
-    // Walks while alive and not stunned; also counts play time
+    // Walks while alive and not stunned, at speed times its speed boosts; also counts play time
     void UpdateMovement(uint32 diff, float speed, float worldWidth, float worldHeight);
 
     // This connection's
@@ -54,7 +53,6 @@ private:
 
     float _inputX = 0.0f;   // of length 1, or both 0
     float _inputY = 0.0f;
-    float _facing = 0.0f;
     bool _facingGiven = false;
 
     uint32 _score = 0;

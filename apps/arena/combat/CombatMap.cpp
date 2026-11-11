@@ -5,6 +5,7 @@
 #include "CombatMap.h"
 #include "Errors.h"
 #include "Unit.h"
+#include <algorithm>
 #include <utility>
 
 CombatMap::CombatMap() : _random(std::random_device()())
@@ -55,6 +56,15 @@ void CombatMap::Update(uint32 diff)
 std::vector<CombatEvent> CombatMap::TakeEvents()
 {
     return std::exchange(_events, {});
+}
+
+void CombatMap::ClampToField(float& x, float& y, float radius) const
+{
+    if (_width > 2 * radius && _height > 2 * radius)
+    {
+        x = std::clamp(x, radius, _width - radius);
+        y = std::clamp(y, radius, _height - radius);
+    }
 }
 
 uint32 CombatMap::Roll(uint32 min, uint32 max)

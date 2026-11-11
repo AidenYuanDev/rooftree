@@ -27,9 +27,9 @@ void Player::SetInput(float x, float y)
     SetMoving(IsWalking() && CanMove());
 }
 
-void Player::SetFacing(float facing)
+void Player::SetClientFacing(float facing)
 {
-    _facing = std::remainder(facing, 2.0f * float(M_PI));
+    SetFacing(facing);
     _facingGiven = true;
 }
 
@@ -43,11 +43,11 @@ void Player::UpdateMovement(uint32 diff, float speed, float worldWidth, float wo
         return;
 
     // The direction is of length 1: diagonals are no faster
-    float distance = speed * float(diff) / 1000.0f;
+    float distance = speed * GetSpeedMultiplier() * float(diff) / 1000.0f;
     Relocate(std::clamp(GetX() + _inputX * distance, Radius, worldWidth - Radius),
         std::clamp(GetY() + _inputY * distance, Radius, worldHeight - Radius));
     if (!_facingGiven)
-        _facing = std::atan2(_inputY, _inputX);
+        SetFacing(std::atan2(_inputY, _inputX));
 }
 
 void Player::AddCoins(uint32 coins)

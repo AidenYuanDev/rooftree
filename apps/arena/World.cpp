@@ -12,6 +12,7 @@
 #include "Log.h"
 #include "Player.h"
 #include "Random.h"
+#include "SpellInfo.h"
 #include "Transaction.h"
 #include "Unit.h"
 
@@ -76,6 +77,7 @@ void World::LoadConfigSettings(Config const& config)
     }
 
     _settings = std::move(settings);
+    _combat.SetField(_settings.Width, _settings.Height);
 }
 
 void World::SetInitialWorldSettings()
@@ -506,7 +508,9 @@ void World::SendState()
                 continue;
             players.push_back(Arena::CreatePlayerStateDirect(builder, player->GetId(), player->GetName().c_str(), player->GetX(), player->GetY(),
                 player->GetScore(), player->GetTotalCoins(), player->GetHealth(), player->GetMaxHealth(), player->GetMana(), player->GetMaxMana(),
-                player->GetTargetId(), player->GetKills(), player->GetDeaths(), player->GetFacing(), player->GetAttackTargetId()));
+                player->GetTargetId(), player->GetKills(), player->GetDeaths(), player->GetFacing(), player->GetAttackTargetId(),
+                Arena::PlayerClass(player->GetClass().Class), Arena::PowerType(player->GetClass().Power), uint8(player->GetComboPoints()),
+                _settings.PlayerSpeed * player->GetSpeedMultiplier()));
         }
 
         coins.clear();

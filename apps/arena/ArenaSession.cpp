@@ -51,7 +51,9 @@ std::unordered_map<Arena::Opcode, MessageHandler> const MessageHandlers =
 };
 
 // The client hears the combat core's reasons by their numbers
-static_assert(uint8(CastResult::OutOfRange) == uint8(Arena::CastError::OutOfRange) && uint8(Arena::CastError::MAX) == uint8(CastResult::OutOfRange));
+static_assert(uint8(CastResult::NoComboPoints) == uint8(Arena::CastError::NoComboPoints) && uint8(Arena::CastError::MAX) == uint8(CastResult::NoComboPoints));
+static_assert(uint8(UnitClass::Rogue) == uint8(Arena::PlayerClass::Rogue) && uint8(Arena::PlayerClass::MAX) == uint8(UnitClass::Rogue));
+static_assert(uint8(PowerType::Energy) == uint8(Arena::PowerType::Energy) && uint8(Arena::PowerType::MAX) == uint8(PowerType::Energy));
 
 std::string_view Trim(std::string_view text)
 {
@@ -62,8 +64,8 @@ std::string_view Trim(std::string_view text)
 }
 }
 
-ArenaSession::ArenaSession(uint32 accountId, std::string name, std::shared_ptr<ArenaConnection> connection)
-    : _accountId(accountId), _name(std::move(name)), _connection(std::move(connection))
+ArenaSession::ArenaSession(uint32 accountId, std::string name, uint8 unitClass, std::shared_ptr<ArenaConnection> connection)
+    : _accountId(accountId), _name(std::move(name)), _class(unitClass), _connection(std::move(connection))
 {
 }
 
@@ -170,14 +172,17 @@ void ArenaSession::OnPlayerLoaded(std::unique_ptr<Player> player, bool takenOver
     _player = std::move(player);
     _player->SetInput(0, 0);
     if (!takenOver)
+    {
+        _player->SetClass(UnitClass(_class));
         _player->Relocate(frand(Player::Radius, settings.Width - Player::Radius), frand(Player::Radius, settings.Height - Player::Radius));
+    }
     _status = STATUS_IN_GAME;
     // Taken over on a relog it is in already
     sWorld->GetCombatMap().AddUnit(*_player);
 
     flatbuffers::FlatBufferBuilder builder;
     builder.Finish(Arena::CreateWelcomeDirect(builder, _accountId, _name.c_str(), settings.Width, settings.Height, Player::Radius,
-        _player->GetTotalCoins(), settings.Motd.c_str()));
+        _player->GetTotalCoins(), settings.Motd.c_str(), Arena::PlayerClass(_player->GetClass().Class), Arena::PowerType(_player->GetClass().Power)));
     Send({ Arena::Opcode::Welcome, builder });
     SendSpells();
 
@@ -188,10 +193,13 @@ void ArenaSession::SendSpells()
 {
     flatbuffers::FlatBufferBuilder builder;
     std::vector<flatbuffers::Offset<Arena::SpellData>> spells;
-    for (SpellInfo const& spell : SpellStore::GetSpells())
+    for (uint32 spellId : _player->GetClass().Spells)
+    {
+        SpellInfo const& spell = *SpellStore::GetSpell(spellId);
         spells.push_back(Arena::CreateSpellDataDirect(builder, spell.Id, std::string(spell.Name).c_str(),
             spell.Target == SpellTarget::Self ? Arena::SpellTargetType::Self : Arena::SpellTargetType::Enemy,
-            uint32(spell.CastTime.count()), uint32(spell.Cooldown.count()), spell.TriggersGcd, spell.ManaCost, spell.Range));
+            uint32(spell.CastTime.count()), uint32(spell.Cooldown.count()), spell.TriggersGcd, spell.ManaCost, spell.Range, spell.Finisher));
+    }
 
     builder.Finish(Arena::CreateSpellsDirect(builder, &spells, uint32(SpellStore::GlobalCooldown.count())));
     Send({ Arena::Opcode::Spells, builder });
@@ -234,7 +242,7 @@ void ArenaSession::HandleInput(Arena::Input const& input)
     else
         _player->SetInput(float(std::clamp<int32>(input.dx(), -1, 1)), float(std::clamp<int32>(input.dy(), -1, 1)));
     if (std::isfinite(input.facing()))
-        _player->SetFacing(input.facing());
+        _player->SetClientFacing(input.facing());
 }
 
 void ArenaSession::HandleChat(Arena::Chat const& chat)
