@@ -72,9 +72,14 @@ public:
     void HandlePing(Arena::Ping const& ping);
     void HandleInput(Arena::Input const& input);
     void HandleChat(Arena::Chat const& chat);
+    void HandleSetTarget(Arena::SetTarget const& setTarget);
+    void HandleCastSpell(Arena::CastSpell const& castSpell);
+    void HandleCancelCast(Arena::CancelCast const& cancelCast);
+    void HandleAttack(Arena::Attack const& attack);
 
 private:
     void OnPlayerLoaded(std::unique_ptr<Player> player);
+    void SendSpells();
 
     uint32 _accountId;
     std::string _name;

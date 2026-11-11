@@ -169,6 +169,14 @@ Arena:
 #        Description: Units per second. Reloadable.
 #        Default:     220
 #
+#    Arena.World.ViewDistance, Arena.World.MaxVisible
+#        Description: A client hears only of what its player sees: the players within ViewDistance
+#                     units (the nearest MaxVisible of them, itself included; 0 for no limit), the
+#                     coins within it and the combat of the players it sees. A player is about 75 bytes
+#                     of the State: more than about 15 no longer fit a datagram, the State then goes
+#                     reliably. Reloadable.
+#        Default:     600, 30
+#
 #    Arena.Coins.Max, Arena.Coins.SpawnInterval
 #        Description: Coins on the field at most, milliseconds between two spawns. Reloadable.
 #        Default:     15, 1000
@@ -192,6 +200,11 @@ Arena:
 #                     player. Reloadable.
 #        Default:     200, 500
 #
+#    Arena.Combat.RespawnTime
+#        Description: Milliseconds a dead player waits to come back, at full health somewhere
+#                     else on the field. Reloadable, applies from the next death.
+#        Default:     5000
+#
 #    Arena.Motd
 #        Description: Shown when a player enters. Reloadable.
 #        Default:     ""
@@ -201,6 +214,8 @@ Arena:
     Width: 1000
     Height: 700
     PlayerSpeed: 220
+    ViewDistance: 600
+    MaxVisible: 30
   Coins:
     Max: 15
     SpawnInterval: 1000
@@ -213,6 +228,8 @@ Arena:
   Chat:
     MaxLength: 200
     Interval: 500
+  Combat:
+    RespawnTime: 5000
   Motd: "Welcome to the arena! Move with WASD or the arrow keys, collect the coins."
 
 #

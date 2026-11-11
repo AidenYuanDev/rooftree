@@ -35,6 +35,9 @@ add_subdirectory(deps)
 # add core sources
 add_subdirectory(src)
 
+# Before the apps: they add their own tests
+include(CTest)
+
 if(EXAMPLES)
   add_subdirectory(examples)
 endif()
@@ -43,7 +46,6 @@ if(APPS)
   add_subdirectory(apps)
 endif()
 
-include(CTest)
 if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()

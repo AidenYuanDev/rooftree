@@ -1,9 +1,28 @@
+# The combat rules on their own, nothing of the network or the database: the arena and its tests link them
+add_library(arena-combat STATIC)
+
+CollectAndAddSourceFiles(arena-combat ${CMAKE_CURRENT_SOURCE_DIR}/combat)
+
+target_link_libraries(arena-combat
+  PRIVATE
+    rooftree-core-interface
+  PUBLIC
+    rooftree-common)
+
+set_target_properties(arena-combat
+  PROPERTIES
+    COMPILE_WARNING_AS_ERROR ${WITH_WARNINGS_AS_ERRORS}
+    FOLDER "apps")
+
 add_executable(arena)
 
 CollectAndAddSourceFiles(
   arena
   ${CMAKE_CURRENT_SOURCE_DIR}
   EXCLUDE
+    ${CMAKE_CURRENT_SOURCE_DIR}/combat
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools
     ${CMAKE_CURRENT_SOURCE_DIR}/schema
     ${CMAKE_CURRENT_SOURCE_DIR}/sql
     ${CMAKE_CURRENT_SOURCE_DIR}/www
@@ -14,6 +33,7 @@ target_link_libraries(arena
   PRIVATE
     rooftree-core-interface
     rooftree-server
+    arena-combat
     utf8cpp)
 
 # The messages (ArenaPackets.h)
@@ -44,4 +64,36 @@ if(NOT EXISTS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/arena.yaml)
   file(COPY_FILE
     ${CMAKE_CURRENT_SOURCE_DIR}/arena.yaml.dist
     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/arena.yaml)
+endif()
+
+# Bots that fight over KCP, a client like a game's: the messages from the same schema
+add_executable(arena_bots tools/arena_bots.cpp)
+target_link_libraries(arena_bots
+  PRIVATE
+    rooftree-core-interface
+    rooftree-network
+    boost-json
+    flatbuffers)
+rooftree_add_flatbuffers(arena_bots PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/schema/Arena.fbs)
+set_target_properties(arena_bots
+  PROPERTIES
+    COMPILE_WARNING_AS_ERROR ${WITH_WARNINGS_AS_ERRORS}
+    FOLDER "apps")
+
+# A client that cheats and sends garbage, each check against what the server answers
+add_executable(arena_rogue tools/arena_rogue.cpp)
+target_link_libraries(arena_rogue
+  PRIVATE
+    rooftree-core-interface
+    rooftree-network
+    boost-json
+    flatbuffers)
+rooftree_add_flatbuffers(arena_rogue PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/schema/Arena.fbs)
+set_target_properties(arena_rogue
+  PROPERTIES
+    COMPILE_WARNING_AS_ERROR ${WITH_WARNINGS_AS_ERRORS}
+    FOLDER "apps")
+
+if(BUILD_TESTING)
+  add_subdirectory(tests)
 endif()

@@ -9,22 +9,45 @@
 #include <cmath>
 
 Player::Player(uint32 id, std::string name, uint32 totalCoins, uint32 playTimeSeconds)
-    : _id(id), _name(std::move(name)), _totalCoins(totalCoins), _playTimeMs(playTimeSeconds * 1000)
+    : Unit(id, MaxHealth, MaxMana), _name(std::move(name)), _totalCoins(totalCoins), _playTimeMs(playTimeSeconds * 1000)
 {
 }
 
-void Player::Update(uint32 diff, float speed, float worldWidth, float worldHeight)
+void Player::SetInput(float x, float y)
+{
+    // Callers pass finite numbers; a length this small is no direction
+    float length = std::sqrt(x * x + y * y);
+    if (length < 1e-3f)
+        _inputX = _inputY = 0.0f;
+    else
+    {
+        _inputX = x / length;
+        _inputY = y / length;
+    }
+    SetMoving(IsWalking() && CanMove());
+}
+
+void Player::SetFacing(float facing)
+{
+    _facing = std::remainder(facing, 2.0f * float(M_PI));
+    _facingGiven = true;
+}
+
+void Player::UpdateMovement(uint32 diff, float speed, float worldWidth, float worldHeight)
 {
     _playTimeMs += diff;
 
-    if (!_inputX && !_inputY)
+    // Every update: a stun that ended lets a held key walk again
+    SetMoving(IsWalking() && CanMove());
+    if (!IsMoving())
         return;
 
-    // Diagonal movement is not faster
-    float length = std::sqrt(float(_inputX * _inputX + _inputY * _inputY));
+    // The direction is of length 1: diagonals are no faster
     float distance = speed * float(diff) / 1000.0f;
-    _x = std::clamp(_x + _inputX / length * distance, Radius, worldWidth - Radius);
-    _y = std::clamp(_y + _inputY / length * distance, Radius, worldHeight - Radius);
+    Relocate(std::clamp(GetX() + _inputX * distance, Radius, worldWidth - Radius),
+        std::clamp(GetY() + _inputY * distance, Radius, worldHeight - Radius));
+    if (!_facingGiven)
+        _facing = std::atan2(_inputY, _inputX);
 }
 
 void Player::AddCoins(uint32 coins)
@@ -39,7 +62,7 @@ void Player::SaveToDB(ArenaDatabaseTransaction& trans)
     ArenaDatabasePreparedStatement* stmt = ArenaDatabase.GetPreparedStatement(ARENA_UPD_PLAYER);
     stmt->setUInt32(0, _totalCoins);
     stmt->setUInt32(1, _playTimeMs / 1000);
-    stmt->setUInt32(2, _id);
+    stmt->setUInt32(2, GetId());
     trans->Append(stmt);
 
     _saveNeeded = false;

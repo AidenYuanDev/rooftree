@@ -5,15 +5,19 @@
 #include "ArenaSession.h"
 #include "ArenaDatabase.h"
 #include "ArenaConnection.h"
+#include "CombatMap.h"
 #include "Field.h"
 #include "Log.h"
 #include "Player.h"
 #include "PreparedStatement.h"
 #include "QueryResult.h"
 #include "Random.h"
+#include "SpellInfo.h"
 #include "Util.h"
 #include "World.h"
 #include <utf8.h>
+#include <algorithm>
+#include <cmath>
 #include <unordered_map>
 
 namespace
@@ -40,7 +44,14 @@ std::unordered_map<Arena::Opcode, MessageHandler> const MessageHandlers =
     { Arena::Opcode::Ping,  { STATUS_LOADING, &CallHandler<Arena::Ping, &ArenaSession::HandlePing> } },
     { Arena::Opcode::Input, { STATUS_IN_GAME, &CallHandler<Arena::Input, &ArenaSession::HandleInput> } },
     { Arena::Opcode::Chat,  { STATUS_IN_GAME, &CallHandler<Arena::Chat, &ArenaSession::HandleChat> } },
+    { Arena::Opcode::SetTarget,  { STATUS_IN_GAME, &CallHandler<Arena::SetTarget, &ArenaSession::HandleSetTarget> } },
+    { Arena::Opcode::CastSpell,  { STATUS_IN_GAME, &CallHandler<Arena::CastSpell, &ArenaSession::HandleCastSpell> } },
+    { Arena::Opcode::CancelCast, { STATUS_IN_GAME, &CallHandler<Arena::CancelCast, &ArenaSession::HandleCancelCast> } },
+    { Arena::Opcode::Attack,     { STATUS_IN_GAME, &CallHandler<Arena::Attack, &ArenaSession::HandleAttack> } },
 };
+
+// The client hears the combat core's reasons by their numbers
+static_assert(uint8(CastResult::OutOfRange) == uint8(Arena::CastError::OutOfRange) && uint8(Arena::CastError::MAX) == uint8(CastResult::OutOfRange));
 
 std::string_view Trim(std::string_view text)
 {
@@ -160,13 +171,29 @@ void ArenaSession::OnPlayerLoaded(std::unique_ptr<Player> player)
     _player->SetInput(0, 0);
     _player->Relocate(frand(Player::Radius, settings.Width - Player::Radius), frand(Player::Radius, settings.Height - Player::Radius));
     _status = STATUS_IN_GAME;
+    // Taken over on a relog it is in already
+    sWorld->GetCombatMap().AddUnit(*_player);
 
     flatbuffers::FlatBufferBuilder builder;
     builder.Finish(Arena::CreateWelcomeDirect(builder, _accountId, _name.c_str(), settings.Width, settings.Height, Player::Radius,
         _player->GetTotalCoins(), settings.Motd.c_str()));
     Send({ Arena::Opcode::Welcome, builder });
+    SendSpells();
 
     sWorld->SendSystemMessage(Rooftree::StringFormat("{} joined", _name));
+}
+
+void ArenaSession::SendSpells()
+{
+    flatbuffers::FlatBufferBuilder builder;
+    std::vector<flatbuffers::Offset<Arena::SpellData>> spells;
+    for (SpellInfo const& spell : SpellStore::GetSpells())
+        spells.push_back(Arena::CreateSpellDataDirect(builder, spell.Id, std::string(spell.Name).c_str(),
+            spell.Target == SpellTarget::Self ? Arena::SpellTargetType::Self : Arena::SpellTargetType::Enemy,
+            uint32(spell.CastTime.count()), uint32(spell.Cooldown.count()), spell.TriggersGcd, spell.ManaCost, spell.Range));
+
+    builder.Finish(Arena::CreateSpellsDirect(builder, &spells, uint32(SpellStore::GlobalCooldown.count())));
+    Send({ Arena::Opcode::Spells, builder });
 }
 
 void ArenaSession::Send(ServerPacket const& packet, bool unreliable /*= false*/)
@@ -198,7 +225,15 @@ void ArenaSession::HandlePing(Arena::Ping const& ping)
 
 void ArenaSession::HandleInput(Arena::Input const& input)
 {
-    _player->SetInput(std::clamp<int32>(input.dx(), -1, 1), std::clamp<int32>(input.dy(), -1, 1));
+    // Any direction, or else the eight of dx, dy. Not a number or infinite is no direction
+    float x = input.x();
+    float y = input.y();
+    if (std::isfinite(x) && std::isfinite(y) && (x != 0.0f || y != 0.0f))
+        _player->SetInput(std::clamp(x, -1e6f, 1e6f), std::clamp(y, -1e6f, 1e6f));
+    else
+        _player->SetInput(float(std::clamp<int32>(input.dx(), -1, 1)), float(std::clamp<int32>(input.dy(), -1, 1)));
+    if (std::isfinite(input.facing()))
+        _player->SetFacing(input.facing());
 }
 
 void ArenaSession::HandleChat(Arena::Chat const& chat)
@@ -224,4 +259,34 @@ void ArenaSession::HandleChat(Arena::Chat const& chat)
     flatbuffers::FlatBufferBuilder builder;
     builder.Finish(Arena::CreateChatMessageDirect(builder, _name.c_str(), text.c_str()));
     sWorld->SendGlobalMessage({ Arena::Opcode::ChatMessage, builder });
+}
+
+void ArenaSession::HandleSetTarget(Arena::SetTarget const& setTarget)
+{
+    _player->SetTargetId(sWorld->GetCombatMap().FindUnit(setTarget.id()) ? setTarget.id() : 0);
+}
+
+void ArenaSession::HandleCastSpell(Arena::CastSpell const& castSpell)
+{
+    CastResult result = _player->CastSpell(castSpell.spell(), castSpell.target());
+    if (result == CastResult::Ok)
+        return;
+
+    flatbuffers::FlatBufferBuilder builder;
+    builder.Finish(Arena::CreateCastFailed(builder, castSpell.castId(), castSpell.spell(), Arena::CastError(result)));
+    Send({ Arena::Opcode::CastFailed, builder });
+}
+
+void ArenaSession::HandleAttack(Arena::Attack const& attack)
+{
+    // A refusal needs no answer: the State's attackTarget stays as it was
+    if (!attack.target())
+        _player->StopAttack();
+    else
+        _player->StartAttack(attack.target());
+}
+
+void ArenaSession::HandleCancelCast(Arena::CancelCast const& /*cancelCast*/)
+{
+    _player->CancelCast();
 }

@@ -1,8 +1,8 @@
 /*
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
- * The character of a logged in account, the in-world part of its session.
- * World thread only. Survives a relog: when the same account logs in again, the new session takes it
+ * The character of a logged in account, the in-world part of its session, and a unit
+ * of the world's CombatMap (its id is the account's). World thread only. Survives a relog: when the same account logs in again, the new session takes it
  * over from the old one instead of loading it again (and racing the old session's save).
  */
 
@@ -11,27 +11,34 @@
 
 #include "ArenaDatabase.h"
 #include "Define.h"
+#include "Unit.h"
 #include <string>
 
-class Player
+class Player : public Unit
 {
 public:
-    static constexpr float Radius = 16.0f;
+    static constexpr uint32 MaxHealth = 200;
+    static constexpr uint32 MaxMana = 100;
 
     Player(uint32 id, std::string name, uint32 totalCoins, uint32 playTimeSeconds);
 
-    uint32 GetId() const { return _id; }
     std::string const& GetName() const { return _name; }
 
-    float GetX() const { return _x; }
-    float GetY() const { return _y; }
-    void Relocate(float x, float y) { _x = x; _y = y; }
+    // A direction of any length, kept until the client sends the next input; one too short to tell
+    // is standing still. Not moving from now on is not moving for a cast in the same update
+    void SetInput(float x, float y);
+    // Radians, the field's axes. Given by the client, or else the way it last walked
+    float GetFacing() const { return _facing; }
+    void SetFacing(float facing);
 
-    // dx, dy in -1..1, kept until the client sends the next input
-    void SetInput(int32 dx, int32 dy) { _inputX = dx; _inputY = dy; }
+    // Walks while alive and not stunned; also counts play time
+    void UpdateMovement(uint32 diff, float speed, float worldWidth, float worldHeight);
 
-    // Also counts play time
-    void Update(uint32 diff, float speed, float worldWidth, float worldHeight);
+    // This connection's
+    uint32 GetKills() const { return _kills; }
+    uint32 GetDeaths() const { return _deaths; }
+    void AddKill() { ++_kills; }
+    void AddDeath() { ++_deaths; }
 
     uint32 GetScore() const { return _score; }      // this connection
     uint32 GetTotalCoins() const { return _totalCoins; }
@@ -41,15 +48,18 @@ public:
     void SaveToDB(ArenaDatabaseTransaction& trans);
 
 private:
-    uint32 _id;
     std::string _name;
 
-    float _x = 0.0f;
-    float _y = 0.0f;
-    int32 _inputX = 0;
-    int32 _inputY = 0;
+    bool IsWalking() const { return _inputX != 0.0f || _inputY != 0.0f; }
+
+    float _inputX = 0.0f;   // of length 1, or both 0
+    float _inputY = 0.0f;
+    float _facing = 0.0f;
+    bool _facingGiven = false;
 
     uint32 _score = 0;
+    uint32 _kills = 0;
+    uint32 _deaths = 0;
     uint32 _totalCoins;
     uint32 _playTimeMs;
     bool _saveNeeded = false;

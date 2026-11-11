@@ -26,7 +26,7 @@
 | `cmake` | — | **新写**：选项、编译器设置、`CollectAndAddSourceFiles`、配置汇总 |
 | `deps` | — | 每个系统依赖一个子目录，包装成同名 INTERFACE 目标（`boost`、`postgresql`、`fmt`…）；`deps/kcp` 是唯一自带源码的 |
 | `examples` | — | echo_server、http_server、websocket_server、arena_kcp_client、db_query、scheduler_demo + `rooftree.yaml.dist` |
-| `apps/arena` | — | 一个完整的多人网页小游戏，把所有模块串起来，见 [35 · 示例与应用](35-examples-and-apps.md) |
+| `apps/arena` | — | 一个完整的多人网页小游戏，把所有模块串起来；`combat/` 是战斗规则（库 `arena-combat`），`tests/` 是它的测试（`arena-tests`），`tools/` 是机器人（`arena_bots`）和作弊客户端（`arena_rogue`），见 [35 · 示例与应用](35-examples-and-apps.md) |
 | `apps/blog` | — | 中英双语博客：rooftree-server 上的 JSON API + React 预渲染前端 + 部署配置，见 [apps/blog/README.md](../apps/blog/README.md) |
 | `tests` | — | Catch2 测试；`test_Network.cpp` 是 SocketMgr / HttpService / WebSocket 的本机回环测试；`test_Database.cpp` 需要 PostgreSQL；`test_ServerCore`、`test_ServerNetwork`、`test_Console`、`test_Packets`、`test_Kcp`、`test_StaticSite`、`test_Captcha`、`test_HttpRequest` 覆盖服务端的各个模块，一共 119 个用例 |
 

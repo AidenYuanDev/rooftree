@@ -8,10 +8,12 @@
 #include "ArenaSession.h"
 #include "ArenaSocket.h"
 #include "Config.h"
+#include "KcpProtocol.h"
 #include "Log.h"
 #include "Player.h"
 #include "Random.h"
 #include "Transaction.h"
+#include "Unit.h"
 
 namespace
 {
@@ -27,6 +29,10 @@ enum WorldTaskGroups : uint32
 {
     GROUP_COINS = 1,
 };
+
+// The client hears the combat core's numbers as they are
+static_assert(uint8(CombatEventType::Swing) == uint8(Arena::CombatEventType::Swing) && uint8(Arena::CombatEventType::MAX) == uint8(CombatEventType::Swing));
+static_assert(uint8(InterruptReason::OutOfRange) == uint8(Arena::InterruptReason::OutOfRange) && uint8(Arena::InterruptReason::MAX) == uint8(InterruptReason::OutOfRange));
 
 Milliseconds GetDuration(Config const& config, std::string_view path, Milliseconds def)
 {
@@ -46,6 +52,8 @@ void World::LoadConfigSettings(Config const& config)
     settings.Width = config.Get<float>("Arena.World.Width", settings.Width);
     settings.Height = config.Get<float>("Arena.World.Height", settings.Height);
     settings.PlayerSpeed = config.Get<float>("Arena.World.PlayerSpeed", settings.PlayerSpeed);
+    settings.ViewDistance = config.Get<float>("Arena.World.ViewDistance", settings.ViewDistance);
+    settings.MaxVisible = config.Get<uint32>("Arena.World.MaxVisible", settings.MaxVisible);
     settings.MaxCoins = config.Get<uint32>("Arena.Coins.Max", settings.MaxCoins);
     settings.CoinSpawnInterval = GetDuration(config, "Arena.Coins.SpawnInterval", settings.CoinSpawnInterval);
     settings.GoldRushInterval = GetDuration(config, "Arena.GoldRush.Interval", settings.GoldRushInterval);
@@ -55,6 +63,7 @@ void World::LoadConfigSettings(Config const& config)
     settings.IdleTimeout = GetDuration(config, "Arena.IdleTimeout", settings.IdleTimeout);
     settings.MaxChatLength = config.Get<uint32>("Arena.Chat.MaxLength", settings.MaxChatLength);
     settings.ChatInterval = GetDuration(config, "Arena.Chat.Interval", settings.ChatInterval);
+    settings.RespawnTime = GetDuration(config, "Arena.Combat.RespawnTime", settings.RespawnTime);
     settings.Motd = config.Get<std::string>("Arena.Motd", settings.Motd);
 
     // The field can't shrink under the players while they are on it
@@ -91,6 +100,12 @@ void World::SetInitialWorldSettings()
         context.Repeat();
     });
 
+    _scheduler.Schedule(10s, [this](TaskContext context)
+    {
+        LogUpdateStats();
+        context.Repeat();
+    });
+
     _events.ScheduleEvent(EVENT_GOLD_RUSH_START, _settings.GoldRushInterval);
 }
 
@@ -101,6 +116,8 @@ void World::AddSession(std::shared_ptr<ArenaSession> session)
 
 void World::Update(uint32 diff)
 {
+    auto start = std::chrono::steady_clock::now();
+
     // A quiet point: no session or player is being updated, so the settings change all at once
     if (_reloadRequested.exchange(false))
     {
@@ -118,9 +135,29 @@ void World::Update(uint32 diff)
     AddQueuedSessions();
     UpdateSessions(diff);
     UpdatePlayers(diff);
+    UpdateVisibility();
+    UpdateCombat(diff);
     UpdateEvents(diff);
     _scheduler.Update(Milliseconds(diff));
     SendState();
+
+    auto took = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start);
+    ++_updateStats.Updates;
+    _updateStats.Total += took;
+    _updateStats.Max = std::max(_updateStats.Max, took);
+}
+
+void World::LogUpdateStats()
+{
+    UpdateStats stats = std::exchange(_updateStats, {});
+    if (_sessions.empty() || !stats.Updates)
+        return;
+
+    RT_LOG_INFO("arena.world", "{} players, {} updates in 10 s: {} us on average, {} us at most, {} combat events",
+        _sessions.size(), stats.Updates, stats.Total.count() / stats.Updates, stats.Max.count(), stats.CombatEvents);
+    if (stats.States)
+        RT_LOG_INFO("arena.world", "States: {} players and {} bytes in one on average, {}% sent reliably (over a datagram)",
+            stats.StatePlayers / stats.States, stats.StateBytes / stats.States, stats.StatesReliable * 100 / stats.States);
 }
 
 void World::AddQueuedSessions()
@@ -166,6 +203,8 @@ void World::RemoveSession(ArenaSession& session)
     if (Player* player = session.GetPlayer())
     {
         RT_LOG_INFO("arena.world", "{} left with {} coins", session.GetName(), player->GetScore());
+        // A cast at it fails, its auras on others run out
+        _combat.RemoveUnit(*player);
 
         ArenaDatabaseTransaction trans = ArenaDatabase.BeginTransaction();
         player->SaveToDB(trans);
@@ -183,7 +222,9 @@ void World::UpdatePlayers(uint32 diff)
         if (!player)
             continue;
 
-        player->Update(diff, _settings.PlayerSpeed, _settings.Width, _settings.Height);
+        player->UpdateMovement(diff, _settings.PlayerSpeed, _settings.Width, _settings.Height);
+        if (!player->IsAlive())
+            continue;
 
         std::erase_if(_coins, [player](Coin const& coin)
         {
@@ -197,6 +238,96 @@ void World::UpdatePlayers(uint32 diff)
             return true;
         });
     }
+}
+
+void World::UpdateVisibility()
+{
+    std::vector<VisibilityPoint> points;
+    points.reserve(_sessions.size());
+    for (auto& [id, session] : _sessions)
+        if (Player* player = session->GetPlayer())
+            points.push_back({ player->GetId(), player->GetX(), player->GetY() });
+    _visibility.Update(points, _settings.ViewDistance, _settings.MaxVisible);
+}
+
+void World::UpdateCombat(uint32 diff)
+{
+    _combat.Update(diff);
+
+    // What happened since the last update, casts started by this update's messages too
+    std::vector<CombatEvent> events = _combat.TakeEvents();
+    if (events.empty())
+        return;
+    _updateStats.CombatEvents += events.size();
+
+    // To each client the events whose caster or target its player sees, in order: one packet each
+    std::unordered_map<uint32, std::vector<std::size_t>> heard;
+    for (std::size_t i = 0; i < events.size(); ++i)
+        for (uint32 unit : { events[i].Caster, events[i].Target })
+            for (uint32 viewer : _visibility.GetViewers(unit))
+            {
+                std::vector<std::size_t>& indexes = heard[viewer];
+                if (indexes.empty() || indexes.back() != i)
+                    indexes.push_back(i);
+            }
+
+    for (auto& [viewer, indexes] : heard)
+    {
+        auto session = _sessions.find(viewer);
+        if (session == _sessions.end() || session->second->GetStatus() != STATUS_IN_GAME)
+            continue;
+
+        flatbuffers::FlatBufferBuilder builder;
+        std::vector<flatbuffers::Offset<Arena::CombatEvent>> log;
+        log.reserve(indexes.size());
+        for (std::size_t i : indexes)
+        {
+            CombatEvent const& event = events[i];
+            log.push_back(Arena::CreateCombatEvent(builder, Arena::CombatEventType(event.Type), event.Caster, event.Target, event.Spell,
+                event.Amount, event.Duration, event.Crit, event.Periodic, Arena::InterruptReason(event.Reason)));
+        }
+        builder.Finish(Arena::CreateCombatLogDirect(builder, &log));
+        session->second->Send({ Arena::Opcode::CombatLog, builder });
+    }
+
+    // After the log: who killed whom is told once the death is
+    for (CombatEvent const& event : events)
+        if (event.Type == CombatEventType::Death)
+            OnDeath(event.Target, event.Caster);
+}
+
+void World::OnDeath(uint32 victimId, uint32 killerId)
+{
+    auto victim = _sessions.find(victimId);
+    if (victim == _sessions.end() || !victim->second->GetPlayer())
+        return;
+
+    victim->second->GetPlayer()->AddDeath();
+    auto killer = _sessions.find(killerId);
+    if (killer != _sessions.end() && killer->second->GetPlayer())
+    {
+        killer->second->GetPlayer()->AddKill();
+        SendSystemMessage(Rooftree::StringFormat("{} was slain by {}", victim->second->GetName(), killer->second->GetName()));
+    }
+    else
+        SendSystemMessage(Rooftree::StringFormat("{} died", victim->second->GetName()));
+
+    // By account: after a relog it is the new session's
+    _scheduler.Schedule(_settings.RespawnTime, [this, victimId](TaskContext)
+    {
+        Respawn(victimId);
+    });
+}
+
+void World::Respawn(uint32 accountId)
+{
+    auto itr = _sessions.find(accountId);
+    Player* player = itr != _sessions.end() ? itr->second->GetPlayer() : nullptr;
+    if (!player || player->IsAlive())
+        return;
+
+    player->Revive();
+    player->Relocate(frand(Player::Radius, _settings.Width - Player::Radius), frand(Player::Radius, _settings.Height - Player::Radius));
 }
 
 void World::UpdateEvents(uint32 diff)
@@ -300,24 +431,48 @@ void World::SendGlobalMessage(ServerPacket const& packet, bool unreliable /*= fa
 
 void World::SendState()
 {
-    flatbuffers::FlatBufferBuilder builder;
-
+    float const range = _settings.ViewDistance * _settings.ViewDistance;
     std::vector<flatbuffers::Offset<Arena::PlayerState>> players;
-    for (auto& [id, session] : _sessions)
-        if (Player* player = session->GetPlayer())
-            players.push_back(Arena::CreatePlayerStateDirect(builder, player->GetId(), player->GetName().c_str(), player->GetX(), player->GetY(),
-                player->GetScore(), player->GetTotalCoins()));
-
-    if (players.empty())
-        return;
-
     std::vector<flatbuffers::Offset<Arena::CoinState>> coins;
-    coins.reserve(_coins.size());
-    for (Coin const& coin : _coins)
-        coins.push_back(Arena::CreateCoinState(builder, coin.Id, coin.X, coin.Y, coin.Value));
 
-    builder.Finish(Arena::CreateStateDirect(builder, &players, &coins, _goldRush));
+    // Each client its own: what its player sees
+    for (auto& [id, session] : _sessions)
+    {
+        Player* viewer = session->GetPlayer();
+        if (!viewer || session->GetStatus() != STATUS_IN_GAME)
+            continue;
 
-    // Every tick, the next one replaces it: over KCP it may be lost rather than hold up the ones after it
-    SendGlobalMessage({ Arena::Opcode::State, builder }, true);
+        flatbuffers::FlatBufferBuilder builder;
+        players.clear();
+        for (uint32 visibleId : _visibility.GetVisible(viewer->GetId()))
+        {
+            auto other = _sessions.find(visibleId);
+            Player* player = other != _sessions.end() ? other->second->GetPlayer() : nullptr;
+            if (!player)
+                continue;
+            players.push_back(Arena::CreatePlayerStateDirect(builder, player->GetId(), player->GetName().c_str(), player->GetX(), player->GetY(),
+                player->GetScore(), player->GetTotalCoins(), player->GetHealth(), player->GetMaxHealth(), player->GetMana(), player->GetMaxMana(),
+                player->GetTargetId(), player->GetKills(), player->GetDeaths(), player->GetFacing(), player->GetAttackTargetId()));
+        }
+
+        coins.clear();
+        for (Coin const& coin : _coins)
+        {
+            float dx = coin.X - viewer->GetX();
+            float dy = coin.Y - viewer->GetY();
+            if (dx * dx + dy * dy <= range)
+                coins.push_back(Arena::CreateCoinState(builder, coin.Id, coin.X, coin.Y, coin.Value));
+        }
+
+        builder.Finish(Arena::CreateStateDirect(builder, &players, &coins, _goldRush));
+        ServerPacket packet(Arena::Opcode::State, builder);
+        ++_updateStats.States;
+        _updateStats.StateBytes += packet.GetPacket().size();
+        _updateStats.StatePlayers += players.size();
+        if (packet.GetPacket().size() > Rooftree::Net::Kcp::MaxBodySize)
+            ++_updateStats.StatesReliable;
+
+        // Every tick, the next one replaces it: over KCP it may be lost rather than hold up the ones after it
+        session->Send(packet, true);
+    }
 }

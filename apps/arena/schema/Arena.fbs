@@ -13,6 +13,10 @@ enum Opcode : ushort {
   Ping = 0x0001,
   Input = 0x0002,
   Chat = 0x0003,
+  SetTarget = 0x0004,
+  CastSpell = 0x0005,
+  CancelCast = 0x0006,
+  Attack = 0x0007,
 
   // Server to client
   Welcome = 0x0101,
@@ -20,6 +24,54 @@ enum Opcode : ushort {
   State = 0x0103,
   ChatMessage = 0x0104,
   SystemMessage = 0x0105,
+  Spells = 0x0106,
+  CastFailed = 0x0107,
+  CombatLog = 0x0108,
+}
+
+// combat/Unit.h's CastResult, same values
+enum CastError : ubyte {
+  Ok,
+  UnknownSpell,
+  Dead,
+  Casting,
+  Stunned,
+  Moving,
+  NotReady,
+  NoMana,
+  NoTarget,
+  TargetDead,
+  BadTarget,
+  OutOfRange,
+}
+
+// combat/Unit.h's InterruptReason, same values
+enum InterruptReason : ubyte {
+  None,
+  Cancelled,
+  Moved,
+  Stunned,
+  Died,
+  TargetLost,
+  OutOfRange,
+}
+
+// combat/CombatMap.h's CombatEventType, same values
+enum CombatEventType : ubyte {
+  CastStart,
+  SpellGo,
+  CastInterrupted,
+  Damage,
+  Heal,
+  AuraApplied,
+  AuraRemoved,
+  Death,
+  Swing,
+}
+
+enum SpellTargetType : ubyte {
+  Enemy,
+  Self,
 }
 
 // ---- client to server ---------------------------------------------------------------------------
@@ -29,15 +81,43 @@ table Ping {
   t:double;
 }
 
-// In game: where the player walks until the next one, -1, 0 or 1 each (others are clamped)
+// In game: where the player walks until the next one. x, y: any direction, its length doesn't matter;
+// without them (both 0) dx, dy: -1, 0 or 1 each (others are clamped). facing: where the player looks,
+// radians in the field's axes (0 along +x, y down), shown to others; without it the way it walks
 table Input {
   dx:byte;
   dy:byte;
+  x:float;
+  y:float;
+  facing:float = nan;
 }
 
 // In game: a line for everyone, at most Arena.Chat.MaxLength characters and one per Arena.Chat.Interval
 table Chat {
   text:string;
+}
+
+// In game: what the player looks at, shown to everyone; 0 for nothing. An id that isn't a unit is 0
+table SetTarget {
+  id:uint;
+}
+
+// In game: cast a spell of the Spells list at a unit (ignored by spells at the caster itself). A
+// refusal is answered with a CastFailed of the same castId, which is the client's own number
+table CastSpell {
+  spell:uint;
+  target:uint;
+  castId:uint;
+}
+
+// In game: stop the spell being cast, if any
+table CancelCast {
+}
+// In game: attack a unit with weapon swings until told otherwise (0) or it dies: one every few seconds
+// while it is in melee range, none while casting or stunned. A unit that can't be attacked is ignored;
+// PlayerState.attackTarget says what is attacked
+table Attack {
+  target:uint;
 }
 
 // ---- server to client ---------------------------------------------------------------------------
@@ -64,6 +144,15 @@ table PlayerState {
   y:float;
   score:uint;   // this session's coins
   total:uint;   // all time
+  health:uint;  // 0: dead, back in Arena.Combat.RespawnTime
+  maxHealth:uint;
+  mana:uint;
+  maxMana:uint;
+  target:uint;  // SetTarget's
+  kills:uint;   // this session's
+  deaths:uint;
+  facing:float; // radians, see Input
+  attackTarget:uint;  // Attack's, 0 when not attacking
 }
 
 table CoinState {
@@ -85,9 +174,53 @@ table ChatMessage {
   text:string;
 }
 
-// From the server: joins, leaves, gold rush, chat refused
+// From the server: joins, leaves, gold rush, chat refused, who killed whom
 table SystemMessage {
   text:string;
+}
+
+table SpellData {
+  id:uint;
+  name:string;
+  target:SpellTargetType;
+  castTime:uint;    // ms, 0 for an instant
+  cooldown:uint;    // ms, starts when the cast completes
+  gcd:bool;         // starts the global cooldown when the cast starts
+  manaCost:uint;    // spent when the cast completes
+  range:float;      // between the two players' edges: 0 when they touch
+}
+
+// After Welcome: the spells every player has
+table Spells {
+  spells:[SpellData];
+  globalCooldown:uint;  // ms
+}
+
+// To the caster: a CastSpell refused, nothing started
+table CastFailed {
+  castId:uint;
+  spell:uint;
+  error:CastError;
+}
+
+// What one unit did to another, see combat/CombatMap.h's CombatEventType for the fields each type has.
+// Swing: an auto attack's blow, its Damage (spell 0) follows
+table CombatEvent {
+  type:CombatEventType;
+  caster:uint;      // Death: the killer
+  target:uint;
+  spell:uint;       // the aura's id for auras and periodic damage
+  amount:uint;
+  duration:uint;    // ms
+  crit:bool;
+  periodic:bool;
+  reason:InterruptReason;
+}
+
+// Every world tick that had any, to everyone in game, reliably and in order: a lost one would
+// lose a death or a heal
+table CombatLog {
+  events:[CombatEvent];
 }
 
 // Any of the tables would do: flatc embeds a binary schema (Arena_bfbs_generated.h, FlatJsonSchema's)

@@ -39,6 +39,10 @@ constexpr PacketType ClientPackets[] =
     { Arena::Opcode::Ping,  "ping",  "Arena.Ping",  &VerifyTable<Arena::Ping> },
     { Arena::Opcode::Input, "input", "Arena.Input", &VerifyTable<Arena::Input> },
     { Arena::Opcode::Chat,  "chat",  "Arena.Chat",  &VerifyTable<Arena::Chat> },
+    { Arena::Opcode::SetTarget,  "setTarget",  "Arena.SetTarget",  &VerifyTable<Arena::SetTarget> },
+    { Arena::Opcode::CastSpell,  "castSpell",  "Arena.CastSpell",  &VerifyTable<Arena::CastSpell> },
+    { Arena::Opcode::CancelCast, "cancelCast", "Arena.CancelCast", &VerifyTable<Arena::CancelCast> },
+    { Arena::Opcode::Attack,     "attack",     "Arena.Attack",     &VerifyTable<Arena::Attack> },
 };
 
 constexpr PacketType ServerPackets[] =
@@ -48,6 +52,9 @@ constexpr PacketType ServerPackets[] =
     { Arena::Opcode::State,         "state",   "Arena.State",         nullptr },
     { Arena::Opcode::ChatMessage,   "chat",    "Arena.ChatMessage",   nullptr },
     { Arena::Opcode::SystemMessage, "system",  "Arena.SystemMessage", nullptr },
+    { Arena::Opcode::Spells,        "spells",     "Arena.Spells",     nullptr },
+    { Arena::Opcode::CastFailed,    "castFailed", "Arena.CastFailed", nullptr },
+    { Arena::Opcode::CombatLog,     "combat",     "Arena.CombatLog",  nullptr },
 };
 
 template <std::size_t N>
