@@ -145,7 +145,7 @@ void ArenaSession::LoadPlayer()
         }
 
         Field* fields = result->Fetch();
-        OnPlayerLoaded(std::make_unique<Player>(_accountId, _name, fields[0].GetUInt32(), fields[1].GetUInt32()));
+        OnPlayerLoaded(std::make_unique<Player>(_accountId, _name, fields[0].GetUInt32(), fields[1].GetUInt32()), false);
     }));
 
     stmt = ArenaDatabase.GetPreparedStatement(ARENA_UPD_LAST_LOGIN);
@@ -155,7 +155,7 @@ void ArenaSession::LoadPlayer()
 
 void ArenaSession::TakeOverPlayer(std::unique_ptr<Player> player)
 {
-    OnPlayerLoaded(std::move(player));
+    OnPlayerLoaded(std::move(player), true);
 }
 
 std::unique_ptr<Player> ArenaSession::ReleasePlayer()
@@ -163,13 +163,14 @@ std::unique_ptr<Player> ArenaSession::ReleasePlayer()
     return std::move(_player);
 }
 
-void ArenaSession::OnPlayerLoaded(std::unique_ptr<Player> player)
+void ArenaSession::OnPlayerLoaded(std::unique_ptr<Player> player, bool takenOver)
 {
     WorldSettings const& settings = sWorld->GetSettings();
 
     _player = std::move(player);
     _player->SetInput(0, 0);
-    _player->Relocate(frand(Player::Radius, settings.Width - Player::Radius), frand(Player::Radius, settings.Height - Player::Radius));
+    if (!takenOver)
+        _player->Relocate(frand(Player::Radius, settings.Width - Player::Radius), frand(Player::Radius, settings.Height - Player::Radius));
     _status = STATUS_IN_GAME;
     // Taken over on a relog it is in already
     sWorld->GetCombatMap().AddUnit(*_player);

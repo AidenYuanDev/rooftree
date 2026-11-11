@@ -12,6 +12,10 @@
  *      (casts, auras) and send what happened in it, run the TaskScheduler and the EventMap
  *   4. send every client the new state
  *
+ * A player whose connection went stays in the world for Arena.LingerTime, standing, still to be hit: a
+ * login in that time takes it over as it was (hurt, dead, on cooldown), so a relog heals or revives
+ * nothing. After it, it is saved and goes.
+ *
  * A client hears only of what its player sees: the State lists the players within
  * Arena.World.ViewDistance (Arena.World.MaxVisible of them at most, the nearest) and the coins in that
  * distance, the combat log the events whose caster or target it sees. System messages still go to all.
@@ -35,6 +39,7 @@
 
 class ArenaSession;
 class Config;
+class Player;
 class ServerPacket;
 
 // Arena.* of the config, reloadable
@@ -55,6 +60,7 @@ struct WorldSettings
     uint32 MaxChatLength = 200;             // characters
     Milliseconds ChatInterval = 500ms;      // between two lines of one player
     Milliseconds RespawnTime = 5s;
+    Milliseconds LingerTime = 30s;          // a disconnected player stays in the world
     std::string Motd;
 };
 
@@ -100,7 +106,13 @@ private:
 
     void AddQueuedSessions();
     void UpdateSessions(uint32 diff);
+    // Its player, if any, lingers
     void RemoveSession(ArenaSession& session);
+    void UpdateLingering(uint32 diff);
+    // Saved and gone
+    void RemovePlayer(Player& player);
+    // In game or lingering
+    Player* FindPlayer(uint32 id) const;
     void UpdatePlayers(uint32 diff);
     void UpdateVisibility();
     void UpdateCombat(uint32 diff);
@@ -127,6 +139,13 @@ private:
 
     LockedQueue<std::shared_ptr<ArenaSession>> _addSessionQueue;
     std::unordered_map<uint32, std::shared_ptr<ArenaSession>> _sessions;   // by account id
+
+    struct Lingering
+    {
+        std::unique_ptr<Player> Character;
+        Milliseconds Left;
+    };
+    std::unordered_map<uint32, Lingering> _lingering;                       // by account id
 
     std::vector<Coin> _coins;
     uint32 _nextCoinId = 1;

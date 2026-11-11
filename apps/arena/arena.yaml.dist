@@ -126,6 +126,17 @@ Database:
 #        Description: Cost of new password hashes (MemoryCost in KiB). Existing hashes keep the
 #                     cost they were made with.
 #        Default:     2, 19456 - (OWASP's minimum for Argon2id)
+#
+#    Arena.Login.MaxAttemptsPerAddress
+#        Description: Logins and registrations one address may try a minute; more are answered
+#                     429 before any password is hashed. 0 is no limit, as a load test from one
+#                     machine needs (behind a proxy every request has its address).
+#        Default:     30
+#
+#    Arena.Login.MaxFailedLogins, Arena.Login.FailedLoginWindow
+#        Description: An account with this many wrong passwords within the window (seconds) takes
+#                     no login, a right password neither, until the oldest leaves it. 0 is no limit.
+#        Default:     5, 300
 
 Arena:
   Http:
@@ -149,6 +160,10 @@ Arena:
   Argon2:
     Iterations: 2
     MemoryCost: 19456
+  Login:
+    MaxAttemptsPerAddress: 30
+    MaxFailedLogins: 5
+    FailedLoginWindow: 300
 
 #
 ###################################################################################################

@@ -78,7 +78,8 @@ public:
     void HandleAttack(Arena::Attack const& attack);
 
 private:
-    void OnPlayerLoaded(std::unique_ptr<Player> player);
+    // takenOver: from another connection or one that went, where it stands
+    void OnPlayerLoaded(std::unique_ptr<Player> player, bool takenOver);
     void SendSpells();
 
     uint32 _accountId;

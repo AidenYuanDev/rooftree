@@ -64,6 +64,7 @@ void World::LoadConfigSettings(Config const& config)
     settings.MaxChatLength = config.Get<uint32>("Arena.Chat.MaxLength", settings.MaxChatLength);
     settings.ChatInterval = GetDuration(config, "Arena.Chat.Interval", settings.ChatInterval);
     settings.RespawnTime = GetDuration(config, "Arena.Combat.RespawnTime", settings.RespawnTime);
+    settings.LingerTime = GetDuration(config, "Arena.LingerTime", settings.LingerTime);
     settings.Motd = config.Get<std::string>("Arena.Motd", settings.Motd);
 
     // The field can't shrink under the players while they are on it
@@ -134,6 +135,7 @@ void World::Update(uint32 diff)
 
     AddQueuedSessions();
     UpdateSessions(diff);
+    UpdateLingering(diff);
     UpdatePlayers(diff);
     UpdateVisibility();
     UpdateCombat(diff);
@@ -168,7 +170,17 @@ void World::AddQueuedSessions()
         auto [itr, inserted] = _sessions.try_emplace(session->GetAccountId(), session);
         if (inserted)
         {
-            session->LoadPlayer();
+            // Back while its player still lingers: that one, as it is
+            auto lingering = _lingering.find(session->GetAccountId());
+            if (lingering != _lingering.end())
+            {
+                RT_LOG_INFO("arena.world", "{} is back", session->GetName());
+                std::unique_ptr<Player> player = std::move(lingering->second.Character);
+                _lingering.erase(lingering);
+                session->TakeOverPlayer(std::move(player));
+            }
+            else
+                session->LoadPlayer();
             continue;
         }
 
@@ -200,18 +212,54 @@ void World::UpdateSessions(uint32 diff)
 
 void World::RemoveSession(ArenaSession& session)
 {
-    if (Player* player = session.GetPlayer())
+    std::unique_ptr<Player> player = session.ReleasePlayer();
+    if (!player)
+        return;
+
+    // Standing, doing nothing, in the world and the combat map as it was
+    RT_LOG_INFO("arena.world", "{} disconnected, lingering", session.GetName());
+    player->SetInput(0.0f, 0.0f);
+    player->CancelCast();
+    player->StopAttack();
+    _lingering[session.GetAccountId()] = { std::move(player), _settings.LingerTime };
+}
+
+void World::UpdateLingering(uint32 diff)
+{
+    for (auto itr = _lingering.begin(); itr != _lingering.end();)
     {
-        RT_LOG_INFO("arena.world", "{} left with {} coins", session.GetName(), player->GetScore());
-        // A cast at it fails, its auras on others run out
-        _combat.RemoveUnit(*player);
-
-        ArenaDatabaseTransaction trans = ArenaDatabase.BeginTransaction();
-        player->SaveToDB(trans);
-        ArenaDatabase.CommitTransaction(trans);
-
-        SendSystemMessage(Rooftree::StringFormat("{} left", session.GetName()));
+        Lingering& lingering = itr->second;
+        lingering.Left -= std::min(lingering.Left, Milliseconds(diff));
+        if (lingering.Left > 0ms)
+        {
+            ++itr;
+            continue;
+        }
+        RemovePlayer(*lingering.Character);
+        itr = _lingering.erase(itr);
     }
+}
+
+void World::RemovePlayer(Player& player)
+{
+    RT_LOG_INFO("arena.world", "{} left with {} coins", player.GetName(), player.GetScore());
+    // A cast at it fails, its auras on others run out
+    _combat.RemoveUnit(player);
+
+    ArenaDatabaseTransaction trans = ArenaDatabase.BeginTransaction();
+    player.SaveToDB(trans);
+    ArenaDatabase.CommitTransaction(trans);
+
+    SendSystemMessage(Rooftree::StringFormat("{} left", player.GetName()));
+}
+
+Player* World::FindPlayer(uint32 id) const
+{
+    if (auto session = _sessions.find(id); session != _sessions.end())
+        return session->second->GetPlayer();
+    if (auto lingering = _lingering.find(id); lingering != _lingering.end())
+        return lingering->second.Character.get();
+    return nullptr;
 }
 
 void World::UpdatePlayers(uint32 diff)
@@ -243,10 +291,13 @@ void World::UpdatePlayers(uint32 diff)
 void World::UpdateVisibility()
 {
     std::vector<VisibilityPoint> points;
-    points.reserve(_sessions.size());
+    points.reserve(_sessions.size() + _lingering.size());
     for (auto& [id, session] : _sessions)
         if (Player* player = session->GetPlayer())
             points.push_back({ player->GetId(), player->GetX(), player->GetY() });
+    // Seen where they stand; they see nothing, nobody is there to be sent it
+    for (auto& [id, lingering] : _lingering)
+        points.push_back({ lingering.Character->GetId(), lingering.Character->GetX(), lingering.Character->GetY() });
     _visibility.Update(points, _settings.ViewDistance, _settings.MaxVisible);
 }
 
@@ -298,21 +349,20 @@ void World::UpdateCombat(uint32 diff)
 
 void World::OnDeath(uint32 victimId, uint32 killerId)
 {
-    auto victim = _sessions.find(victimId);
-    if (victim == _sessions.end() || !victim->second->GetPlayer())
+    Player* victim = FindPlayer(victimId);
+    if (!victim)
         return;
 
-    victim->second->GetPlayer()->AddDeath();
-    auto killer = _sessions.find(killerId);
-    if (killer != _sessions.end() && killer->second->GetPlayer())
+    victim->AddDeath();
+    if (Player* killer = FindPlayer(killerId))
     {
-        killer->second->GetPlayer()->AddKill();
-        SendSystemMessage(Rooftree::StringFormat("{} was slain by {}", victim->second->GetName(), killer->second->GetName()));
+        killer->AddKill();
+        SendSystemMessage(Rooftree::StringFormat("{} was slain by {}", victim->GetName(), killer->GetName()));
     }
     else
-        SendSystemMessage(Rooftree::StringFormat("{} died", victim->second->GetName()));
+        SendSystemMessage(Rooftree::StringFormat("{} died", victim->GetName()));
 
-    // By account: after a relog it is the new session's
+    // By account: after a relog it is the new session's, while lingering still the old one
     _scheduler.Schedule(_settings.RespawnTime, [this, victimId](TaskContext)
     {
         Respawn(victimId);
@@ -321,8 +371,7 @@ void World::OnDeath(uint32 victimId, uint32 killerId)
 
 void World::Respawn(uint32 accountId)
 {
-    auto itr = _sessions.find(accountId);
-    Player* player = itr != _sessions.end() ? itr->second->GetPlayer() : nullptr;
+    Player* player = FindPlayer(accountId);
     if (!player || player->IsAlive())
         return;
 
@@ -377,6 +426,9 @@ void World::SavePlayers()
     for (auto& [id, session] : _sessions)
         if (Player* player = session->GetPlayer(); player && player->IsSaveNeeded())
             player->SaveToDB(trans);
+    for (auto& [id, lingering] : _lingering)
+        if (lingering.Character->IsSaveNeeded())
+            lingering.Character->SaveToDB(trans);
 
     if (trans->GetSize())
         ArenaDatabase.CommitTransaction(trans);
@@ -388,6 +440,8 @@ void World::SaveAllPlayersDirect()
     for (auto& [id, session] : _sessions)
         if (Player* player = session->GetPlayer())
             player->SaveToDB(trans);
+    for (auto& [id, lingering] : _lingering)
+        lingering.Character->SaveToDB(trans);
 
     if (trans->GetSize())
         ArenaDatabase.DirectCommitTransaction(trans);
@@ -411,6 +465,7 @@ bool World::AreAllSocketsClosed() const
 void World::ClearSessions()
 {
     _sessions.clear();
+    _lingering.clear();
 
     std::shared_ptr<ArenaSession> session;
     while (_addSessionQueue.next(session))
@@ -446,8 +501,7 @@ void World::SendState()
         players.clear();
         for (uint32 visibleId : _visibility.GetVisible(viewer->GetId()))
         {
-            auto other = _sessions.find(visibleId);
-            Player* player = other != _sessions.end() ? other->second->GetPlayer() : nullptr;
+            Player* player = FindPlayer(visibleId);
             if (!player)
                 continue;
             players.push_back(Arena::CreatePlayerStateDirect(builder, player->GetId(), player->GetName().c_str(), player->GetX(), player->GetY(),

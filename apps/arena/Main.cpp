@@ -180,6 +180,9 @@ int main(int argc, char** argv)
     authSettings.KcpPort = kcpEnabled ? kcpPort : 0;
     authSettings.Argon2Iterations = config->Get<uint32>("Arena.Argon2.Iterations", authSettings.Argon2Iterations);
     authSettings.Argon2MemoryCost = config->Get<uint32>("Arena.Argon2.MemoryCost", authSettings.Argon2MemoryCost);
+    authSettings.MaxAttemptsPerAddress = config->Get<uint32>("Arena.Login.MaxAttemptsPerAddress", authSettings.MaxAttemptsPerAddress);
+    authSettings.MaxFailedLogins = config->Get<uint32>("Arena.Login.MaxFailedLogins", authSettings.MaxFailedLogins);
+    authSettings.FailedLoginWindow = Seconds(config->Get<uint32>("Arena.Login.FailedLoginWindow", uint32(authSettings.FailedLoginWindow.count())));
 
     if (!sAuthService.Start(ioContext, httpBindIp, httpPort, config->Get<int32>("Arena.Http.NetworkThreads", 1),
         std::move(authSettings), config->Get<uint32>("Arena.Http.WorkerThreads", 2)))

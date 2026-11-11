@@ -16,6 +16,8 @@
 #include <boost/json/array.hpp>
 #include <boost/json/parse.hpp>
 #include <boost/json/serialize.hpp>
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <sstream>
 
@@ -106,11 +108,15 @@ AuthService::AuthService() : HttpService("arena")
     // Passwords and tickets stay out of the trace log
     RegisterHandler(http::verb::post, "/api/register", [this](std::shared_ptr<ArenaHttpSession> session, RequestContext& context)
     {
+        if (!AllowAddress(*session, context))
+            return RequestHandlerResult::Handled;
         return RunAsync(std::move(session), context, [this](RequestContext& ctx) { HandleRegister(ctx); });
     }, RequestHandlerFlag::DoNotLogRequestContent);
 
     RegisterHandler(http::verb::post, "/api/login", [this](std::shared_ptr<ArenaHttpSession> session, RequestContext& context)
     {
+        if (!AllowAddress(*session, context))
+            return RequestHandlerResult::Handled;
         return RunAsync(std::move(session), context, [this](RequestContext& ctx) { HandleLogin(ctx); });
     }, RequestHandlerFlag::DoNotLogRequestContent | RequestHandlerFlag::DoNotLogResponseContent);
 
@@ -120,10 +126,33 @@ AuthService::AuthService() : HttpService("arena")
     });
 }
 
+bool AuthService::AllowAddress(ArenaHttpSession const& session, RequestContext& context)
+{
+    std::string address = session.GetRemoteIpAddress().to_string();
+    TimePoint now = TimePoint::clock::now();
+    std::lock_guard lock(_limitLock);
+    // Now and then, so addresses and names seen once don't stay
+    if (++_attemptsSinceCleanup >= 1000)
+    {
+        _attemptsSinceCleanup = 0;
+        _attemptsByAddress.Cleanup(now);
+        _failedLogins.Cleanup(now);
+    }
+    if (_attemptsByAddress.Allow(address, now))
+        return true;
+
+    TimePoint retry = _attemptsByAddress.GetRetryTime(address, now);
+    SetError(context, http::status::too_many_requests, Rooftree::StringFormat("too many attempts, try again in {} s",
+        std::chrono::ceil<Seconds>(retry - now).count()));
+    return false;
+}
+
 bool AuthService::Start(Rooftree::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, int32 threadCount,
     AuthSettings settings, std::size_t workerThreads)
 {
     _settings = std::move(settings);
+    _attemptsByAddress.SetLimit(_settings.MaxAttemptsPerAddress, 60s);
+    _failedLogins.SetLimit(_settings.MaxFailedLogins, _settings.FailedLoginWindow);
     _workers = std::make_unique<Rooftree::ThreadPool>(workerThreads);
     return StartNetwork(ioContext, bindIp, port, threadCount);
 }
@@ -224,9 +253,24 @@ void AuthService::HandleLogin(RequestContext& context)
     if (!ReadCredentials(context, username, password))
         return;
 
+    // Keyed as the lookup matches names, ignoring case
+    std::string key = username;
+    std::ranges::transform(key, key.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    TimePoint now = TimePoint::clock::now();
+    {
+        std::lock_guard lock(_limitLock);
+        if (TimePoint retry = _failedLogins.GetRetryTime(key, now); retry > now)
+            return SetError(context, http::status::too_many_requests, Rooftree::StringFormat("too many wrong passwords, try again in {} s",
+                std::chrono::ceil<Seconds>(retry - now).count()));
+    }
+
     Optional<AccountRow> account = IsValidUsername(username) ? FindAccount(username) : Optional<AccountRow>();
     if (!account || !Rooftree::Crypto::Argon2::Verify(password, account->PasswordHash))
+    {
+        std::lock_guard lock(_limitLock);
+        _failedLogins.Allow(key, now);
         return SetError(context, http::status::unauthorized, "wrong username or password");
+    }
 
     LoginTicket loginTicket{ .AccountId = account->Id, .Name = account->Name };
     std::string ticket = sTicketMgr->Create(loginTicket, _settings.TicketLifetime);
