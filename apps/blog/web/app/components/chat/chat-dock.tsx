@@ -227,7 +227,7 @@ function MessageBubble({ msg, isMe, onDelete }: { msg: ChatMessageItem; isMe: bo
         <div
           className={`max-w-full rounded-2xl px-3.5 py-2 text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap select-text ${
             isMe
-              ? 'rounded-tr-sm bg-primary text-primary-foreground shadow-sm'
+              ? 'rounded-tr-sm bg-primary text-primary-foreground shadow-sm selection:bg-primary-foreground selection:text-primary'
               : 'rounded-tl-sm border bg-card text-card-foreground shadow-xs'
           }`}
         >
