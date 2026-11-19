@@ -3,7 +3,8 @@
  *
  * A thread with an io_context of its own and the sockets on it: their reads and writes complete here,
  * and every millisecond Update() calls each socket's Update() (which writes what was queued) and lets
- * go of the closed ones. SocketMgr spreads new connections over several of these.
+ * go of the closed ones. SocketMgr spreads new connections over several of these. The thread, its
+ * io_context and the millisecond are a TickThread's.
  *
  * DerivedThread is the class deriving from it, for SocketAdded and SocketRemoved.
  */
@@ -11,17 +12,13 @@
 #ifndef ROOFTREE_NETWORK_THREAD_H
 #define ROOFTREE_NETWORK_THREAD_H
 
-#include "DeadlineTimer.h"
 #include "Define.h"
-#include "Duration.h"
-#include "Errors.h"
 #include "IoContext.h"
 #include "Log.h"
-#include "Task.h"
+#include "TickThread.h"
 #include <atomic>
 #include <memory>
 #include <mutex>
-#include <thread>
 #include <vector>
 
 namespace Rooftree::Net
@@ -30,39 +27,29 @@ template<typename SocketType, typename DerivedThread>
 class NetworkThread
 {
 public:
-    // One thread runs the io_context: Asio may leave out some locking
-    NetworkThread() : _ioContext(1), _updateTimer(_ioContext) { }
+    NetworkThread() = default;
     NetworkThread(NetworkThread const&) = delete;
     NetworkThread& operator=(NetworkThread const&) = delete;
 
     virtual ~NetworkThread()
     {
         Stop();
-        if (_thread)
+        if (_thread.IsStarted())
             Wait();
     }
 
     bool Start()
     {
-        if (_thread)
+        if (_thread.IsStarted())
             return false;
-        _thread = std::make_unique<std::thread>([this] { Run(); });
-        return true;
+        RT_LOG_DEBUG("network", "Network thread starting");
+        return _thread.Start([this] { Update(); }, [this] { Exit(); });
     }
 
     // Any thread
-    void Stop()
-    {
-        _stopped = true;
-        _ioContext.stop();
-    }
+    void Stop() { _thread.Stop(); }
 
-    void Wait()
-    {
-        ASSERT(_thread);
-        _thread->join();
-        _thread = nullptr;
-    }
+    void Wait() { _thread.Wait(); }
 
     // Any thread, so a little out of date
     int32 GetConnectionCount() const { return _connections; }
@@ -75,35 +62,19 @@ public:
         static_cast<DerivedThread*>(this)->SocketAdded(_incoming.emplace_back(std::move(socket)));
     }
 
-    Asio::IoContext* GetIoContext() { return &_ioContext; }
+    Asio::IoContext* GetIoContext() { return &_thread.GetIoContext(); }
 
 protected:
     virtual void SocketAdded(std::shared_ptr<SocketType> const& /*socket*/) { }
     virtual void SocketRemoved(std::shared_ptr<SocketType> const& /*socket*/) { }
 
 private:
-    void Run()
+    // The thread, once its io_context stopped
+    void Exit()
     {
-        RT_LOG_DEBUG("network", "Network thread starting");
-        UpdateLoop();
-        _ioContext.run();
         RT_LOG_DEBUG("network", "Network thread exits");
         _incoming.clear();
         _sockets.clear();
-    }
-
-    Rooftree::Detached UpdateLoop()
-    {
-        _updateTimer.expires_after(1ms);
-        while (!_stopped)
-        {
-            co_await Rooftree::Await<boost::system::error_code>([this](auto done) { _updateTimer.async_wait(std::move(done)); });
-            if (_stopped)
-                break;
-            // Set before the update: every millisecond however long an update with many sockets takes
-            _updateTimer.expires_after(1ms);
-            Update();
-        }
     }
 
     void Update()
@@ -130,13 +101,10 @@ private:
     }
 
     std::atomic<int32> _connections = 0;
-    std::atomic<bool> _stopped = false;
-    std::unique_ptr<std::thread> _thread;
     std::vector<std::shared_ptr<SocketType>> _sockets;
     std::mutex _incomingMutex;
     std::vector<std::shared_ptr<SocketType>> _incoming;
-    Asio::IoContext _ioContext;
-    Asio::DeadlineTimer _updateTimer;
+    TickThread _thread;     // last: its io_context goes first, after Exit let go of the sockets on it
 };
 }
 

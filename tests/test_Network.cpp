@@ -12,9 +12,11 @@
 #include "IoContext.h"
 #include "Optional.h"
 #include "SocketMgr.h"
+#include "TickThread.h"
 #include "WebSocketFrame.h"
 #include "WebSocketSocket.h"
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/post.hpp>
 #include <boost/asio/read.hpp>
 #include <boost/asio/buffers_iterator.hpp>
 #include <boost/asio/streambuf.hpp>
@@ -115,6 +117,53 @@ Optional<std::chrono::milliseconds> WaitForServerClose(tcp::socket& socket)
         return {};
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
 }
+}
+
+TEST_CASE("TickThread ticks on its own thread until stopped, then exits once", "[network]")
+{
+    Rooftree::Net::TickThread thread;
+    std::atomic<int> ticks = 0;
+    std::atomic<int> exits = 0;
+    std::atomic<bool> ticksOnThread = true;
+    std::atomic<bool> postedRan = false;
+    std::thread::id tickThreadId;
+    std::thread::id exitThreadId;
+
+    // Work given to the io_context before Start runs once it does
+    boost::asio::post(thread.GetIoContext(), [&] { postedRan = true; });
+
+    REQUIRE(thread.Start([&]
+    {
+        if (ticks++ == 0)
+            tickThreadId = std::this_thread::get_id();
+        else if (std::this_thread::get_id() != tickThreadId)
+            ticksOnThread = false;
+    }, [&]
+    {
+        ++exits;
+        exitThreadId = std::this_thread::get_id();
+    }));
+    CHECK_FALSE(thread.Start([] { }));
+
+    // A millisecond each: 5 well within 5 s however loaded the machine is
+    auto deadline = std::chrono::steady_clock::now() + 5s;
+    while (ticks < 5 && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(1ms);
+
+    thread.Stop();
+    thread.Wait();
+    int ticksAtStop = ticks;
+
+    CHECK(ticksAtStop >= 5);
+    CHECK(ticksOnThread);
+    CHECK(postedRan);
+    CHECK(tickThreadId != std::this_thread::get_id());
+    CHECK(exits == 1);
+    CHECK(exitThreadId == tickThreadId);
+    CHECK_FALSE(thread.IsStarted());
+
+    std::this_thread::sleep_for(5ms);
+    CHECK(ticks == ticksAtStop);
 }
 
 TEST_CASE("SocketMgr echoes data over loopback", "[network]")

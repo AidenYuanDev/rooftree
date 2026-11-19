@@ -89,13 +89,13 @@ conv u32 | type u8 | counter u64 | 明文部分 | 正文（加密）| tag 16
 
 ### 3.4 一个服务器线程
 
-和 TCP 的 `NetworkThread` 一样，所有连接都在一个线程上，每 1 ms 更新一次：
+和 TCP 的 `NetworkThread` 一样，所有连接都在一个线程上，每 1 ms 更新一次。线程、io_context 和 1 ms 的 tick 用的是同一个 `TickThread`（[18](18-network-thread-and-socket-mgr.md)），所以周期也一样是"先设定定时器再更新"，连接多时不会拖长：
 
 - 收到数据报：查 conv → 解密、检查重放 → 交给 KCP（`ikcp_input`）→ 把完整的消息取出来交给 `OnMessage`。
 - 每次更新：把各个连接发送队列里的消息交给 KCP，立即 `ikcp_flush`，不等 KCP 的 10 ms 间隔，所以消息在 1 ms 内发出；然后跑 KCP 的重传计时器（`ikcp_check` 决定什么时候需要）；最后检查超时和关闭。
 - 发送：非阻塞的 `send_to`。socket 缓冲区满时这个数据报丢掉，相当于网络上丢了一个包，KCP 会重传。
 
-收和更新各是一个协程（`ReceiveLoop`、`UpdateLoop`，用的是 [Socket](16-socket.md) 的 `Rooftree::Detached` 和 `Await`），在这条线程上运行；客户端也一样，它的两个协程按值持有 `self`，连接关闭后才释放。
+收是一个协程（`ReceiveLoop`，用的是 [Socket](16-socket.md) 的 `Rooftree::Detached` 和 `Await`），在这条线程上运行，更新是 `TickThread` 每 1 ms 调用的 `Update()`。客户端自己有收和更新两个协程，按值持有 `self`，连接关闭后才释放。
 
 一个 UDP socket 一个线程就能处理很多连接，因为每个数据报的工作量很小（一次 AES-GCM 加一次 KCP 输入）。真的不够时，可以开几个 `Server`，各用一个端口，登录时分配。
 

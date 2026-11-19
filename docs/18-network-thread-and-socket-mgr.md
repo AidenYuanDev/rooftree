@@ -3,6 +3,7 @@
 ## 1. 是什么
 
 - **`NetworkThread`**：一个网络线程。它拥有自己的 io_context 和一批 socket，每 1ms 调用一次所有 socket 的 `Update()`。
+- **`TickThread`**：`NetworkThread` 底下那一层，只管"一个线程 + 单线程的 io_context + 每 1ms 一次 tick"，不知道 socket 和协议。KCP 的 `Kcp::Server`（[33](33-kcp.md)）也跑在它上面。
 - **`SocketMgr`**：一个网络服务。它启动 N 个网络线程和一个 acceptor，把每个新连接分给当前连接数最少的线程。
 
 每种服务器的连接管理都是 `SocketMgr` 的子类，比如 [echo_server](../examples/echo_server.cpp) 和 HTTP 的 `HttpService`（[19](19-http.md)）也是。
@@ -43,6 +44,16 @@ class EchoServer final : public SocketMgr<EchoServerTraits> { };
 | `GetConnectionCount()` | 当前连接数 | [NetworkThread.h](../src/common/network/NetworkThread.h) |
 | `virtual SocketAdded` / `SocketRemoved` | 子类可以覆盖的钩子 | [NetworkThread.h](../src/common/network/NetworkThread.h) |
 
+### TickThread
+
+| 接口 | 作用 | 位置 |
+|---|---|---|
+| `Start(tick, onExit)` | 启动线程：每 1ms 在线程上调用 `tick`；io_context 停止后在线程上调用一次 `onExit`。只能启动一次 | [TickThread.h](../src/common/network/TickThread.h) |
+| `Stop()` / `Wait()` | 通知停止（任意线程）/ 等待线程结束 | [TickThread.h](../src/common/network/TickThread.h) |
+| `GetIoContext()` | 线程的 io_context，启动前就可以把 socket、定时器绑到上面 | [TickThread.h](../src/common/network/TickThread.h) |
+
+`Stop()` 不会执行 io_context 上还没完成的工作，挂在上面的协程随 io_context 一起销毁（[16](16-socket.md) 的 `Await`）。拥有者要在线程上收尾的话，先 `post` 过去并等它完成，再 `Stop()`，`Kcp::Server::Stop()` 就是这样做的。
+
 ## 3. 关键实现
 
 ### 3.1 一个新连接的完整旅程
@@ -70,7 +81,7 @@ sequenceDiagram
 
 ### 3.2 每 1ms 一次的 Update
 
-`UpdateLoop` 协程每 1ms 醒一次：
+`TickThread` 的 `TickLoop` 协程每 1ms 醒一次，调用 `NetworkThread` 的 `Update()`：
 
 1. 重新设定 1ms 定时器。**先设定再更新**：更新本身的耗时不计入周期，连接很多时也还是每 1ms 一次。先更新再设定的话，连接越多延迟越高（改成协程时踩过这个坑，压测里 64 个客户端慢了 10%）；
 2. 把 `_incoming` 里的新连接移进 `_sockets`（正在关闭的也一样，见第 5 节）；
@@ -116,7 +127,7 @@ sequenceDiagram
 | `_incoming` | acceptor 线程写入，网络线程读取 | `_incomingMutex` 互斥锁 |
 | `_sockets` | 只有网络线程 | 不需要 |
 | `_connections` | acceptor 线程读取，两边都会修改 | 原子变量 |
-| `_stopped` | 任意线程设置 | 原子变量 |
+| `_stopped`（在 `TickThread` 里） | 任意线程设置 | 原子变量 |
 
 ## 5. 设计取舍
 

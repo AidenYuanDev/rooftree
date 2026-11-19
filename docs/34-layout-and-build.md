@@ -15,7 +15,7 @@
 | `src/common/crypto` | `rooftree-common` | **新写**：SHA-1/SHA-256、Argon2、TOTP、CryptoRandom |
 | `src/common/log` | `rooftree-common` | **新写**：日志：Appender（控制台/文件）、Logger、按层级回退、strand 异步 |
 | `src/common/config` | `rooftree-common` | **新写**：yaml-cpp 实现，不可变快照 + `Get<T>` 结构化读取 + `OnLoaded` 重载通知 |
-| `src/common/network` | `rooftree-network` | **新写**：Socket、AsyncAcceptor、SocketMgr、NetworkThread、SslStream（握手协程 `AcceptTls`）、IpAddress |
+| `src/common/network` | `rooftree-network` | **新写**：Socket、AsyncAcceptor、SocketMgr、NetworkThread、TickThread、SslStream（握手协程 `AcceptTls`）、IpAddress |
 | `src/common/network/http` | `rooftree-network` | 基于 Boost.Beast 的 HTTP 服务（HttpService、HttpSocket、HttpSslSocket）；**新增**路由树和请求工具（HttpRouter、HttpRequestUtils） |
 | `src/common/network/websocket` | `rooftree-network` | **新写**：WebSocket 服务端（RFC 6455），在 `Socket` 之上实现握手与帧，任意线程可发送 |
 | `src/common/network/kcp` | `rooftree-network` | **新写**：UDP 上的游戏连接（Kcp::Server / Kcp::Client）：KCP 可靠消息 + 不可靠消息，AES-GCM 数据报，见 [33](33-kcp.md) |

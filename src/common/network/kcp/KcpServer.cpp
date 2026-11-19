@@ -290,18 +290,18 @@ void Connection::Finish(uint16 code, std::string_view reason, bool sendClose)
     }
 }
 
-Server::Server() : _ioContext(1), _socket(_ioContext), _updateTimer(_ioContext)
+Server::Server() : _socket(_thread.GetIoContext())
 {
 }
 
 Server::~Server()
 {
-    ASSERT(!_thread, "Stop must be called before the Kcp::Server is destroyed");
+    ASSERT(!_thread.IsStarted(), "Stop must be called before the Kcp::Server is destroyed");
 }
 
 bool Server::Start(std::string const& bindIp, uint16 port)
 {
-    ASSERT(!_thread);
+    ASSERT(!_thread.IsStarted());
 
     boost::system::error_code error;
     boost::asio::ip::address address = boost::asio::ip::make_address(bindIp, error);
@@ -335,18 +335,17 @@ bool Server::Start(std::string const& bindIp, uint16 port)
     _port = _socket.local_endpoint(ignored).port();
 
     ReceiveLoop();
-    UpdateLoop();
-    _thread = std::make_unique<std::thread>([this] { _ioContext.run(); });
+    _thread.Start([this] { Update(); });
     return true;
 }
 
 void Server::Stop()
 {
-    if (!_thread)
+    if (!_thread.IsStarted())
         return;
 
     std::promise<void> done;
-    boost::asio::post(_ioContext, [this, &done]
+    boost::asio::post(_thread.GetIoContext(), [this, &done]
     {
         for (auto& [conv, connection] : _connections)
         {
@@ -357,14 +356,12 @@ void Server::Stop()
 
         boost::system::error_code ignored;
         _socket.close(ignored);
-        _updateTimer.cancel();
         done.set_value();
     });
     done.get_future().wait();
 
-    _ioContext.stop();
-    _thread->join();
-    _thread = nullptr;
+    _thread.Stop();
+    _thread.Wait();
 }
 
 Rooftree::Detached Server::ReceiveLoop()
@@ -526,25 +523,17 @@ uint32 Server::NewConv() const
     return conv;
 }
 
-Rooftree::Detached Server::UpdateLoop()
+void Server::Update()
 {
-    for (;;)
+    uint32 now = getMSTime();
+    std::erase_if(_connections, [this, now](auto& entry)
     {
-        _updateTimer.expires_after(1ms);
-        auto [error] = co_await Rooftree::Await<boost::system::error_code>([&](auto done) { _updateTimer.async_wait(std::move(done)); });
-        if (error)
-            break;
+        if (entry.second->Update(now))
+            return false;
 
-        uint32 now = getMSTime();
-        std::erase_if(_connections, [this, now](auto& entry)
-        {
-            if (entry.second->Update(now))
-                return false;
-
-            Remove(*entry.second);
-            return true;
-        });
-    }
+        Remove(*entry.second);
+        return true;
+    });
 }
 
 void Server::Remove(Connection& connection)

@@ -29,9 +29,9 @@
  * A connection follows its client to a new address (a phone switching networks, a NAT that forgot
  * the mapping) when an authenticated datagram newer than any before arrives from there.
  *
- * Threads: the callbacks (OnHello, OnOpen, OnMessage, OnClose) run on the Server's thread; Send,
- * SendUnreliable and Close may be called from any thread (a world thread), they are queued and the
- * thread sends them within a millisecond, like a NetworkThread updates its sockets.
+ * Threads: the callbacks (OnHello, OnOpen, OnMessage, OnClose) run on the Server's thread (a
+ * TickThread, like a NetworkThread's); Send, SendUnreliable and Close may be called from any thread
+ * (a world thread), they are queued and the thread sends them within a millisecond.
  */
 
 #ifndef ROOFTREE_KCP_SERVER_H
@@ -39,15 +39,14 @@
 
 #include "AddressBlocklist.h"
 #include "ConnectionLimiter.h"
-#include "DeadlineTimer.h"
 #include "IoContext.h"
 #include "KcpLink.h"
 #include "MPSCQueue.h"
 #include "Task.h"
+#include "TickThread.h"
 #include <boost/asio/ip/udp.hpp>
 #include <atomic>
 #include <memory>
-#include <thread>
 #include <unordered_map>
 
 namespace Rooftree::Net::Kcp
@@ -186,7 +185,7 @@ private:
     Rooftree::Detached ReceiveLoop();
     void HandleDatagram(std::span<uint8 const> datagram, IoContextUdpSocket::endpoint_type const& from);
     void HandleHello(std::span<uint8 const> datagram, Header const& header, IoContextUdpSocket::endpoint_type const& from);
-    Rooftree::Detached UpdateLoop();
+    void Update();
     void Remove(Connection& connection);
     void SendTo(std::span<uint8 const> datagram, IoContextUdpSocket::endpoint_type const& to);
     uint32 NewConv() const;
@@ -195,10 +194,8 @@ private:
     uint32 _maxConnections = 0;
     ConnectionLimiter _connectionLimiter;
 
-    Asio::IoContext _ioContext;
+    TickThread _thread;     // before the socket: its io_context outlives it
     IoContextUdpSocket _socket;
-    Asio::DeadlineTimer _updateTimer;
-    std::unique_ptr<std::thread> _thread;
     uint16 _port = 0;
 
     std::unordered_map<uint32, std::shared_ptr<Connection>> _connections;   // by conv

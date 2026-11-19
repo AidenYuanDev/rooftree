@@ -59,14 +59,14 @@ using IoContextTcpSocket = boost::asio::basic_stream_socket<boost::asio::ip::tcp
 
 就是一个 Asio 定时器：`expires_after(d)` 设定时间，`async_wait(handler)` 到期后在 io_context 的线程上调用 `handler`。项目里的用法：
 
-- `NetworkThread` 每 1ms 用它触发一次 `Update()`（[18](18-network-thread-and-socket-mgr.md)）；
+- `TickThread` 每 1ms 用它触发一次 tick，`NetworkThread` 和 `Kcp::Server` 的更新都靠它（[18](18-network-thread-and-socket-mgr.md)）；
 - HTTP 的 `SessionService` 每分钟用它清理一次过期会话。
 
 ## 4. 线程与安全
 
 - `io_context::run()` 可以在多个线程中同时调用，Asio 会把就绪的回调分给它们。
 - **同一个 strand 上的回调永远不会并发执行**，这是不加锁就能安全访问共享状态的关键。日志的异步模式正是靠一个 strand 保证写入有序（[08](08-log.md)）。
-- 构造 `IoContext` 时可以传一个 `concurrency_hint`。`NetworkThread` 传了 1，告诉 Asio 只会有一个线程运行它，Asio 可以据此省掉内部的一些锁。
+- 构造 `IoContext` 时可以传一个 `concurrency_hint`。`TickThread`（`NetworkThread` 和 `Kcp::Server` 的线程）传了 1，告诉 Asio 只会有一个线程运行它，Asio 可以据此省掉内部的一些锁。
 
 ## 5. 设计取舍
 
