@@ -737,9 +737,12 @@ struct TestCertificate
         X509_gmtime_adj(X509_getm_notBefore(certificate), 0);
         X509_gmtime_adj(X509_getm_notAfter(certificate), 3600);
         X509_set_pubkey(certificate, key);
-        X509_NAME* name = X509_get_subject_name(certificate);
+        // A name of its own: OpenSSL 4 hands out the certificate's as const
+        X509_NAME* name = X509_NAME_new();
         X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, reinterpret_cast<unsigned char const*>("localhost"), -1, -1, 0);
+        X509_set_subject_name(certificate, name);
         X509_set_issuer_name(certificate, name);
+        X509_NAME_free(name);
         X509_sign(certificate, key, EVP_sha256());
 
         FILE* file = std::fopen(CertificateFile.c_str(), "w");
