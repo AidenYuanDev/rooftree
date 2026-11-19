@@ -57,6 +57,10 @@ struct BlogSettings
     uint32 AvatarChangesPerUser = 10;           // within AvatarWindow
     Seconds AvatarWindow = 1h;
 
+    // Chat: how long after sending its sender may still take a message back, or change its text
+    Seconds ChatRecallWindow = 2min;
+    Seconds ChatEditWindow = 15min;
+
     // Uploads (M4)
     std::string UploadDirectory = "uploads";
     uint32 MaxUploadSize = 10 * 1024 * 1024;

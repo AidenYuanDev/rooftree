@@ -1,4 +1,4 @@
-import { CloudIcon, HardDriveIcon, LogOutIcon, PenLineIcon, SettingsIcon, ShieldIcon, UserIcon } from 'lucide-react'
+import { CloudIcon, HardDriveIcon, LogOutIcon, MessageCircleIcon, PenLineIcon, SettingsIcon, ShieldIcon, UserIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -80,6 +80,12 @@ export function UserMenu() {
             </Link>
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem asChild>
+          <Link to={localePath(lang, '/chat')}>
+            <MessageCircleIcon />
+            {t('nav.chat')}
+          </Link>
+        </DropdownMenuItem>
         {user.drive && (
           <DropdownMenuItem asChild>
             <Link to={localePath(lang, '/drive')}>

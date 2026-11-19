@@ -23,6 +23,7 @@ const staticPages = [
   '/account',
   '/status',
   '/drive',
+  '/chat',
   '/subscribe/confirm',
   '/unsubscribe',
 ]

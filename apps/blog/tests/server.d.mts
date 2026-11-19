@@ -11,6 +11,7 @@ export interface TestServer {
   adminTotpSecret: string
   log: string[]
   outbox: string
+  uploadsDir: string
   rebuildsFile: string
   console(...lines: string[]): string
   stop(): Promise<void>

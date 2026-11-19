@@ -80,6 +80,42 @@ JsonRequest UploadFromMultipart(std::string_view contentType, std::string_view b
     return { .Request = std::string(reinterpret_cast<char const*>(builder.GetBufferPointer()), builder.GetSize()) };
 }
 
+// A file sent in a chat: the multipart's file (and its name), content and replyToId, the chat from the path
+JsonRequest ChatFileFromMultipart(std::string_view contentType, std::string_view body, std::vector<std::pair<std::string, std::string>> const& path)
+{
+    Optional<std::vector<Rooftree::Net::Http::MultipartPart>> parts = Rooftree::Net::Http::ParseMultipartFormData(contentType, body);
+    if (!parts)
+        return { .Status = http::status::bad_request, .Code = "invalid_upload" };
+
+    auto part = [&](std::string_view name) -> Rooftree::Net::Http::MultipartPart const*
+    {
+        auto found = std::ranges::find(*parts, name, &Rooftree::Net::Http::MultipartPart::Name);
+        return found != parts->end() ? &*found : nullptr;
+    };
+
+    flatbuffers::FlatBufferBuilder builder;
+    std::string channelId;
+    for (auto const& [key, value] : path)
+        if (key == "channelId")
+            channelId = value;
+    auto channel = builder.CreateString(channelId);
+    Rooftree::Net::Http::MultipartPart const* file = part("file");
+    auto name = file && file->FileName ? builder.CreateString(*file->FileName) : 0;
+    auto data = file ? builder.CreateVector(reinterpret_cast<uint8 const*>(file->Data.data()), file->Data.size()) : 0;
+    Rooftree::Net::Http::MultipartPart const* text = part("content");
+    auto content = text ? builder.CreateString(text->Data) : 0;
+    flatbuffers::Optional<uint64> replyTo;
+    if (Rooftree::Net::Http::MultipartPart const* reply = part("replyToId"); reply && !reply->Data.empty())
+    {
+        Optional<uint64> id = Rooftree::StringTo<uint64>(reply->Data);
+        if (!id)
+            return { .Status = http::status::bad_request, .Code = "invalid_upload" };
+        replyTo = *id;
+    }
+    builder.Finish(Reader::CreateChatFileSendRequest(builder, channel, name, data, content, replyTo));
+    return { .Request = std::string(reinterpret_cast<char const*>(builder.GetBufferPointer()), builder.GetSize()) };
+}
+
 // An account's picture: the multipart's file
 JsonRequest AvatarFromMultipart(std::string_view contentType, std::string_view body)
 {
@@ -115,6 +151,8 @@ JsonRequest RequestFromJson(ApiOperation const& operation, std::string_view body
         return UploadFromMultipart(contentType, body, path);
     if (operation.Opcode.Value == uint16(Reader::Opcode::AvatarUpload))
         return AvatarFromMultipart(contentType, body);
+    if (operation.Opcode.Value == uint16(Reader::Opcode::ChatFileSend))
+        return ChatFileFromMultipart(contentType, body, path);
 
     FlatJsonSchema const& schema = GetApiSchema();
     reflection::Object const& table = *schema.Find(operation.Request);

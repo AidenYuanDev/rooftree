@@ -14,6 +14,7 @@
 
 #include "Accounts.h"
 #include "AdminUsers.h"
+#include "Avatar.h"
 #include "BlogDatabase.h"
 #include "BlogSession.h"
 #include "BlogWorld.h"
@@ -76,30 +77,6 @@ Optional<SystemTimePoint> ReadBanEnd(TableFields& fields, flatbuffers::Optional<
     return SystemTimePoint::clock::now() + std::chrono::days(*days);
 }
 
-struct ImageType
-{
-    std::string_view Mime;
-    std::string_view Extension;
-};
-
-// By content: what the file is, whatever it is called
-Optional<ImageType> DetectImage(std::string_view data)
-{
-    auto startsWith = [&](std::string_view magic, std::size_t offset = 0)
-    {
-        return data.size() >= offset + magic.size() && data.substr(offset, magic.size()) == magic;
-    };
-
-    if (startsWith("\xFF\xD8\xFF"))
-        return ImageType{ "image/jpeg", "jpg" };
-    if (startsWith("\x89PNG\r\n\x1A\n"))
-        return ImageType{ "image/png", "png" };
-    if (startsWith("GIF87a") || startsWith("GIF89a"))
-        return ImageType{ "image/gif", "gif" };
-    if (startsWith("RIFF") && startsWith("WEBP", 8))
-        return ImageType{ "image/webp", "webp" };
-    return {};
-}
 }
 
 std::vector<IpBan> LoadIpBansDirect()

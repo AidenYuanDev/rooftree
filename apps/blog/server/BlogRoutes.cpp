@@ -45,6 +45,7 @@ void RegisterRoutes(Rooftree::Server::WorldHttpService& service)
     service.Route(verb::get, "/api/shares/{token}/files/{id}", "drive.share", &BlogSession::HandleShareDownload, binary);
     service.Route(verb::get, "/api/shares/{token}/zip", "drive.share", &BlogSession::HandleShareZip, binary);
     service.Route(verb::get, "/api/shares/{token}/files/{id}/thumb", "drive.share", &BlogSession::HandleShareThumb, binary);
+    service.Route(verb::get, "/api/chat/files/{id}", "chat", &BlogSession::HandleChatFile, binary);
 
     // The operations', the readers' and the admin's
     for (ApiOperation const& operation : GetApiOperations())

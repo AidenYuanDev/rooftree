@@ -67,6 +67,7 @@ import {
   ChatMessagesList,
   ChatMessageItem,
   ChatRemoved,
+  ChatSearchResult,
   ChatUnreadCount,
   ChatGroupMembersList,
   type Role,
@@ -978,19 +979,19 @@ export function useRemoveFriend() {
   })
 }
 
-// Chat system (Square & Direct Friend chats)
+// Chat (ChatHandlers.cpp): the square, groups and direct chats. Kept current by the WebSocket
+// (components/live.tsx); the polling only catches what a reconnect missed
 
 export function useChatChannels(enabled = true) {
   return useQuery({
     queryKey: ['chat', 'channels'],
     queryFn: () => api('/api/chat/channels', ChatChannelsList),
     enabled,
-    // The WebSocket tells about new messages and channels, this only catches what a reconnect missed
     refetchInterval: 30_000,
   })
 }
 
-// The latest messages of a channel, kept current by the WebSocket (components/live.tsx)
+// The latest messages of a channel
 export function useChatMessages(channelId: string | null, enabled = true) {
   return useQuery({
     queryKey: ['chat', 'messages', channelId, undefined],
@@ -999,20 +1000,83 @@ export function useChatMessages(channelId: string | null, enabled = true) {
   })
 }
 
-// Older ones, for "load older": kept while the channel is open (gone with it), under the channel's key
-// so that a moderator's removal reaches them too (components/live.tsx)
+// Older ones, for "load older" and for going back to a message a search found: kept while the channel
+// is open (gone with it), under the channel's key so that removals and changes reach them too
 export function useOlderChatMessages(channelId: string) {
   const queryClient = useQueryClient()
   const queryKey = ['chat', 'messages', channelId, 'older']
   const query = useQuery<ChatMessagesList | null>({ queryKey, queryFn: () => null, enabled: false, initialData: null, gcTime: 0 })
-  const load = async (before: number) => {
-    const page = await api(`/api/chat/channels/${encodeURIComponent(channelId)}/messages?before=${before}`, ChatMessagesList)
-    queryClient.setQueryData<ChatMessagesList | null>(queryKey, (old) => ({
+  // The page before a message; the server takes up to 200 at once
+  const load = async (before: number, limit = 50) => {
+    const page = await api(`/api/chat/channels/${encodeURIComponent(channelId)}/messages?before=${before}&limit=${limit}`, ChatMessagesList)
+    const merged = queryClient.setQueryData<ChatMessagesList | null>(queryKey, (old) => ({
       messages: [...page.messages, ...(old?.messages ?? [])],
       hasMore: page.hasMore,
     }))
+    return merged!
   }
   return { older: query.data, load }
+}
+
+// Every cached page of a message's channel, changed by change (null: the message goes)
+function updateChatMessages(queryClient: QueryClient, channelId: string, change: (messages: ChatMessageItem[]) => ChatMessageItem[]) {
+  queryClient.setQueriesData<ChatMessagesList | null>({ queryKey: ['chat', 'messages', channelId] }, (old) =>
+    old ? { ...old, messages: change(old.messages) } : old,
+  )
+}
+
+// A message edited or taken back: itself, the replies quoting it, the channel's last message
+export function replaceChatMessage(queryClient: QueryClient, message: ChatMessageItem) {
+  updateChatMessages(queryClient, message.channelId, (messages) =>
+    messages.map((m) => {
+      if (m.id === message.id) return message
+      if (m.replyTo?.id === message.id)
+        return {
+          ...m,
+          replyTo: {
+            ...m.replyTo,
+            content: message.recalled ? '' : message.content.slice(0, 100),
+            hasFile: !!message.file,
+            recalled: message.recalled,
+          },
+        }
+      return m
+    }),
+  )
+  queryClient.setQueryData<ChatChannelsList>(['chat', 'channels'], (old) =>
+    old
+      ? {
+          ...old,
+          channels: old.channels.map((ch) => (ch.lastMessage?.id === message.id ? { ...ch, lastMessage: message } : ch)),
+        }
+      : old,
+  )
+}
+
+// A message that arrived (the answer to sending it, or the WebSocket's): into the latest page, in
+// place of its optimistic copy, and as its channel's last message
+export function addChatMessage(queryClient: QueryClient, message: ChatMessageItem, tempId?: number) {
+  queryClient.setQueryData<ChatMessagesList>(['chat', 'messages', message.channelId, undefined], (old) => {
+    if (!old || old.messages.some((m) => m.id === message.id && tempId === undefined)) return old
+    // Our own message coming back before the answer to sending it replaces its optimistic copy
+    const pending =
+      tempId !== undefined
+        ? old.messages.find((m) => m.id === tempId)
+        : old.messages.find(
+            (m) => m.id < 0 && m.senderId === message.senderId && m.content === message.content && !!m.file === !!message.file,
+          )
+    const others = old.messages.filter((m) => m !== pending && m.id !== message.id)
+    return { ...old, messages: [...others, message].sort(sortChatMessages) }
+  })
+  queryClient.setQueryData<ChatChannelsList>(['chat', 'channels'], (old) => {
+    if (!old) return old
+    return {
+      ...old,
+      channels: old.channels.map((ch) =>
+        ch.id === message.channelId && (!ch.lastMessage || ch.lastMessage.id < message.id) ? { ...ch, lastMessage: message } : ch,
+      ),
+    }
+  })
 }
 
 // Messages a moderator removed: one, or the channel's all, from every page of it held
@@ -1055,54 +1119,86 @@ export function useDissolveChatGroup() {
 // server's copy when the answer or the WebSocket's chat_message comes, whichever is first
 let optimisticId = 0
 
+function optimisticMessage(
+  queryClient: QueryClient,
+  channelId: string,
+  content: string,
+  replyTo: ChatMessageItem | null,
+  file: File | null,
+): ChatMessageItem | null {
+  const user = queryClient.getQueryData<Me>(queryKeys.me)?.user
+  if (!user) return null
+  return {
+    id: --optimisticId,
+    channelId,
+    senderId: user.id,
+    senderName: user.displayName,
+    senderAvatar: user.avatar ?? null,
+    content,
+    createdAt: new Date().toISOString(),
+    replyTo: replyTo
+      ? {
+          id: replyTo.id,
+          senderId: replyTo.senderId,
+          senderName: replyTo.senderName,
+          content: replyTo.content.slice(0, 100),
+          hasFile: !!replyTo.file,
+          recalled: replyTo.recalled,
+        }
+      : null,
+    // Shown from memory until the server has it
+    file: file
+      ? { name: file.name, mime: file.type, size: file.size, image: file.type.startsWith('image/'), url: URL.createObjectURL(file) }
+      : null,
+    editedAt: null,
+    recalled: false,
+    mentions: [],
+  }
+}
+
+export interface SendChatInput {
+  channelId: string
+  content: string
+  replyTo?: ChatMessageItem | null
+  // Sent as a file message, content its caption
+  file?: File | null
+}
+
 export function useSendChatMessage() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ channelId, content }: { channelId: string; content: string }) =>
-      api(`/api/chat/channels/${encodeURIComponent(channelId)}/messages`, ChatMessageItem, {
-        method: 'POST',
-        body: { channelId, content },
-      }),
-    onMutate: async ({ channelId, content }) => {
-      await queryClient.cancelQueries({ queryKey: ['chat', 'messages', channelId] })
-      const user = queryClient.getQueryData<Me>(queryKeys.me)?.user
-      if (!user) return { tempId: 0 }
-      const optimisticMsg: ChatMessageItem = {
-        id: --optimisticId,
-        channelId,
-        senderId: user.id,
-        senderName: user.displayName,
-        senderAvatar: user.avatar ?? null,
-        content,
-        createdAt: new Date().toISOString(),
+    mutationFn: ({ channelId, content, replyTo, file }: SendChatInput) => {
+      const path = `/api/chat/channels/${encodeURIComponent(channelId)}`
+      if (file) {
+        const form = new FormData()
+        form.append('file', file, file.name)
+        form.append('content', content)
+        if (replyTo) form.append('replyToId', String(replyTo.id))
+        return api(`${path}/files`, ChatMessageItem, { method: 'POST', body: form })
       }
-      queryClient.setQueryData<ChatMessagesList>(['chat', 'messages', channelId, undefined], (old) => {
-        if (!old) return old
-        return { ...old, messages: [...old.messages, optimisticMsg] }
-      })
-      return { tempId: optimisticMsg.id }
-    },
-    onSuccess: (realMsg, { channelId }, context) => {
-      queryClient.setQueryData<ChatMessagesList>(['chat', 'messages', channelId, undefined], (old) => {
-        if (!old) return old
-        const others = old.messages.filter((m) => m.id !== realMsg.id && m.id !== context?.tempId)
-        return { ...old, messages: [...others, realMsg].sort(sortChatMessages) }
-      })
-      queryClient.setQueryData<ChatChannelsList>(['chat', 'channels'], (old) => {
-        if (!old) return old
-        return {
-          ...old,
-          channels: old.channels.map((ch) =>
-            ch.id === channelId && (!ch.lastMessage || ch.lastMessage.id < realMsg.id) ? { ...ch, lastMessage: realMsg } : ch,
-          ),
-        }
+      return api(`${path}/messages`, ChatMessageItem, {
+        method: 'POST',
+        body: { channelId, content, ...(replyTo ? { replyToId: replyTo.id } : {}) },
       })
     },
+    onMutate: async ({ channelId, content, replyTo, file }) => {
+      await queryClient.cancelQueries({ queryKey: ['chat', 'messages', channelId] })
+      const optimistic = optimisticMessage(queryClient, channelId, content, replyTo ?? null, file ?? null)
+      if (!optimistic) return { tempId: 0 }
+      queryClient.setQueryData<ChatMessagesList>(['chat', 'messages', channelId, undefined], (old) =>
+        old ? { ...old, messages: [...old.messages, optimistic] } : old,
+      )
+      return { tempId: optimistic.id, blobUrl: optimistic.file?.url }
+    },
+    onSuccess: (realMsg, _input, context) => addChatMessage(queryClient, realMsg, context?.tempId),
     onError: (_err, { channelId }, context) => {
       // Only the failed message goes, not what arrived meanwhile
       queryClient.setQueryData<ChatMessagesList>(['chat', 'messages', channelId, undefined], (old) =>
         old ? { ...old, messages: old.messages.filter((m) => m.id !== context?.tempId) } : old,
       )
+    },
+    onSettled: (_data, _error, _input, context) => {
+      if (context?.blobUrl) URL.revokeObjectURL(context.blobUrl)
     },
   })
 }
@@ -1113,6 +1209,42 @@ export function sortChatMessages(a: ChatMessageItem, b: ChatMessageItem) {
   if (a.id > 0) return -1
   if (b.id > 0) return 1
   return b.id - a.id
+}
+
+// Its sender's, within Blog.Chat.EditWindow / RecallWindow
+export function useEditChatMessage() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, content }: { id: number; content: string }) =>
+      api(`/api/chat/messages/${id}`, ChatMessageItem, { method: 'PATCH', body: { content } }),
+    onSuccess: (message) => replaceChatMessage(queryClient, message),
+  })
+}
+
+export function useRecallChatMessage() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api(`/api/chat/messages/${id}/recall`, ChatMessageItem, { method: 'POST' }),
+    onSuccess: (message) => replaceChatMessage(queryClient, message),
+  })
+}
+
+// Messages with q in their text or file name, newest first: in one chat, or in all of mine
+export function useChatSearch(q: string, channelId: string | null) {
+  const query = q.trim()
+  return useInfiniteQuery({
+    queryKey: ['chat', 'search', channelId ?? '', query],
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ q: query })
+      if (channelId) params.set('channelId', channelId)
+      if (pageParam) params.set('before', String(pageParam))
+      return api(`/api/chat/search?${params.toString()}`, ChatSearchResult)
+    },
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.hasMore ? last.messages.at(-1)?.id : undefined),
+    enabled: query.length > 0,
+    staleTime: 10_000,
+  })
 }
 
 export function useMarkChatRead() {
@@ -1136,6 +1268,24 @@ export function useChatUnreadCount(enabled = true) {
     queryFn: () => api('/api/chat/unread', ChatUnreadCount),
     enabled,
     refetchInterval: 30_000,
+  })
+}
+
+// Pinned, muted: shown at once, the server's list after
+export function useSetChatPref() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ channelId, ...pref }: { channelId: string; pinned?: boolean; muted?: boolean }) =>
+      api(`/api/chat/channels/${encodeURIComponent(channelId)}/prefs`, Ok, { method: 'PUT', body: { channelId, ...pref } }),
+    onMutate: ({ channelId, ...pref }) => {
+      queryClient.setQueryData<ChatChannelsList>(['chat', 'channels'], (old) =>
+        old ? { ...old, channels: old.channels.map((ch) => (ch.id === channelId ? { ...ch, ...pref } : ch)) } : old,
+      )
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['chat', 'channels'] })
+      void queryClient.invalidateQueries({ queryKey: ['chat', 'unread'] })
+    },
   })
 }
 
@@ -1172,6 +1322,42 @@ export function useLeaveChatGroup() {
       void queryClient.invalidateQueries({ queryKey: ['chat', 'channels'] })
     },
   })
+}
+
+// The owner's: name, members in and out, the group handed over. The lists refresh after
+function useChatGroupChange<T>(request: (input: T) => Promise<unknown>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: request,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['chat', 'channels'] })
+      void queryClient.invalidateQueries({ queryKey: ['chat', 'groups'] })
+    },
+  })
+}
+
+export function useRenameChatGroup() {
+  return useChatGroupChange(({ groupId, name }: { groupId: number; name: string }) =>
+    api(`/api/chat/groups/${groupId}`, Ok, { method: 'PATCH', body: { name } }),
+  )
+}
+
+export function useAddChatGroupMembers() {
+  return useChatGroupChange(({ groupId, memberIds }: { groupId: number; memberIds: number[] }) =>
+    api(`/api/chat/groups/${groupId}/members`, Ok, { method: 'POST', body: { memberIds } }),
+  )
+}
+
+export function useRemoveChatGroupMember() {
+  return useChatGroupChange(({ groupId, userId }: { groupId: number; userId: number }) =>
+    api(`/api/chat/groups/${groupId}/members/${userId}`, Ok, { method: 'DELETE' }),
+  )
+}
+
+export function useTransferChatGroup() {
+  return useChatGroupChange(({ groupId, userId }: { groupId: number; userId: number }) =>
+    api(`/api/chat/groups/${groupId}/owner`, Ok, { method: 'POST', body: { userId } }),
+  )
 }
 
 export function useSetUserDrive(id: number) {

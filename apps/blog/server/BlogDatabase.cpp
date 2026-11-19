@@ -32,6 +32,14 @@ BlogDatabaseConnection::BlogDatabaseConnection(DatabaseConnectionInfo const& inf
 
 BlogDatabaseConnection::~BlogDatabaseConnection() = default;
 
+// A chat message as ChatHandlers.cpp's FetchMessageRow reads it: itself, what it quotes, whom it mentions
+#define BLOG_CHAT_MESSAGE_SELECT "SELECT m.id, m.channel_id, m.sender_id, u.display_name, u.avatar, m.content, m.created_at, " \
+    "m.edited_at, m.recalled, m.file_name, m.file_mime, m.file_size, m.reply_to_id, r.sender_id, ru.display_name, LEFT(r.content, 100), " \
+    "r.recalled, r.file_name IS NOT NULL, " \
+    "(SELECT string_agg(cm.user_id::text, ',' ORDER BY cm.user_id) FROM chat_mention cm WHERE cm.message_id = m.id) " \
+    "FROM chat_message m JOIN users u ON u.id = m.sender_id " \
+    "LEFT JOIN chat_message r ON r.id = m.reply_to_id LEFT JOIN users ru ON ru.id = r.sender_id "
+
 void BlogDatabaseConnection::DoPrepareStatements()
 {
 
@@ -525,19 +533,12 @@ void BlogDatabaseConnection::DoPrepareStatements()
         "WHERE id = ? AND deleted_at IS NULL AND (banned_until IS NULL OR banned_until < utc_now())");
 
     // Chat
-    PrepareStatement(BLOG_SEL_CHAT_MESSAGES_INITIAL, "SELECT m.id, m.channel_id, m.sender_id, u.display_name, u.avatar, m.content, m.created_at "
-        "FROM chat_message m JOIN users u ON u.id = m.sender_id "
-        "WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ?");
-    PrepareStatement(BLOG_SEL_CHAT_MESSAGES_BEFORE, "SELECT m.id, m.channel_id, m.sender_id, u.display_name, u.avatar, m.content, m.created_at "
-        "FROM chat_message m JOIN users u ON u.id = m.sender_id "
-        "WHERE m.channel_id = ? AND m.id < ? ORDER BY m.id DESC LIMIT ?");
-    PrepareStatement(BLOG_INS_CHAT_MESSAGE, "INSERT INTO chat_message (channel_id, sender_id, content, created_at) "
-        "VALUES (?, ?, ?, utc_now())");
-    PrepareStatement(BLOG_SEL_CHAT_MESSAGE, "SELECT m.id, m.channel_id, m.sender_id, u.display_name, u.avatar, m.content, m.created_at "
-        "FROM chat_message m JOIN users u ON u.id = m.sender_id WHERE m.id = ?");
-    PrepareStatement(BLOG_SEL_CHAT_LAST_MESSAGE, "SELECT m.id, m.channel_id, m.sender_id, u.display_name, u.avatar, m.content, m.created_at "
-        "FROM chat_message m JOIN users u ON u.id = m.sender_id "
-        "WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT 1");
+    PrepareStatement(BLOG_SEL_CHAT_MESSAGES_INITIAL, BLOG_CHAT_MESSAGE_SELECT "WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ?");
+    PrepareStatement(BLOG_SEL_CHAT_MESSAGES_BEFORE, BLOG_CHAT_MESSAGE_SELECT "WHERE m.channel_id = ? AND m.id < ? ORDER BY m.id DESC LIMIT ?");
+    PrepareStatement(BLOG_INS_CHAT_MESSAGE, "INSERT INTO chat_message (channel_id, sender_id, content, reply_to_id, file_name, file_mime, file_size, "
+        "file_stored, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, utc_now())");
+    PrepareStatement(BLOG_SEL_CHAT_MESSAGE, BLOG_CHAT_MESSAGE_SELECT "WHERE m.id = ?");
+    PrepareStatement(BLOG_SEL_CHAT_LAST_MESSAGE, BLOG_CHAT_MESSAGE_SELECT "WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT 1");
     PrepareStatement(BLOG_UPS_CHAT_READ, "INSERT INTO chat_read (user_id, channel_id, last_read_id, read_at) "
         "VALUES (?, ?, LEAST(?, (SELECT COALESCE(MAX(id), 0) FROM chat_message WHERE channel_id = ?)), utc_now()) "
         "ON CONFLICT (user_id, channel_id) DO UPDATE SET last_read_id = GREATEST(chat_read.last_read_id, EXCLUDED.last_read_id), read_at = utc_now()");
@@ -577,6 +578,44 @@ void BlogDatabaseConnection::DoPrepareStatements()
     PrepareStatement(BLOG_SEL_ADMIN_CHAT_MESSAGES, "SELECT m.id, m.channel_id, m.sender_id, u.username, u.display_name, m.content, m.created_at "
         "FROM chat_message m JOIN users u ON u.id = m.sender_id "
         "WHERE m.channel_id = ? AND m.id < ? ORDER BY m.id DESC LIMIT 51");
+
+    // The chat page
+    PrepareStatement(BLOG_SEL_CHAT_MESSAGE_META, "SELECT channel_id, sender_id, created_at, recalled, file_stored, file_name, file_mime, file_size "
+        "FROM chat_message WHERE id = ?");
+    PrepareStatement(BLOG_UPD_CHAT_MESSAGE_EDIT, "UPDATE chat_message SET content = ?, edited_at = utc_now() WHERE id = ?");
+    PrepareStatement(BLOG_UPD_CHAT_MESSAGE_RECALL, "UPDATE chat_message SET recalled = true, content = '', edited_at = NULL, file_name = NULL, "
+        "file_mime = NULL, file_size = NULL, file_stored = NULL WHERE id = ?");
+    PrepareStatement(BLOG_DEL_CHAT_MESSAGE_MENTIONS, "DELETE FROM chat_mention WHERE message_id = ?");
+    PrepareStatement(BLOG_INS_CHAT_MENTION, "INSERT INTO chat_mention (message_id, user_id, channel_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING");
+    PrepareStatement(BLOG_SEL_CHAT_MENTION_UNREAD, "SELECT COUNT(*) FROM chat_mention WHERE user_id = ? AND channel_id = ? "
+        "AND message_id > COALESCE((SELECT last_read_id FROM chat_read WHERE user_id = ? AND channel_id = ?), 0)");
+    PrepareStatement(BLOG_SEL_CHAT_MENTION_USER, "SELECT id FROM users WHERE lower(username) = lower(?) AND deleted_at IS NULL");
+    PrepareStatement(BLOG_SEL_CHAT_PREFS, "SELECT channel_id, pinned_at IS NOT NULL, muted FROM chat_channel_pref WHERE user_id = ?");
+    PrepareStatement(BLOG_SEL_CHAT_PREF, "SELECT pinned_at IS NOT NULL, muted FROM chat_channel_pref WHERE user_id = ? AND channel_id = ?");
+    // Pinned keeps when it was first pinned (the list's order among the pinned)
+    PrepareStatement(BLOG_UPS_CHAT_PREF, "INSERT INTO chat_channel_pref (user_id, channel_id, pinned_at, muted) "
+        "VALUES (?, ?, CASE WHEN ? THEN utc_now() END, ?) ON CONFLICT (user_id, channel_id) DO UPDATE SET "
+        "pinned_at = CASE WHEN EXCLUDED.pinned_at IS NULL THEN NULL ELSE COALESCE(chat_channel_pref.pinned_at, EXCLUDED.pinned_at) END, "
+        "muted = EXCLUDED.muted");
+    PrepareStatement(BLOG_DEL_CHAT_CHANNEL_PREFS, "DELETE FROM chat_channel_pref WHERE channel_id = ?");
+    PrepareStatement(BLOG_DEL_CHAT_USER_PREF, "DELETE FROM chat_channel_pref WHERE user_id = ? AND channel_id = ?");
+    // Files on the disk, before their rows go
+    PrepareStatement(BLOG_SEL_CHAT_FILES_FIFO, "SELECT file_stored FROM chat_message WHERE channel_id = ? AND id <= ? AND file_stored IS NOT NULL");
+    PrepareStatement(BLOG_SEL_CHAT_CHANNEL_FILES, "SELECT file_stored FROM chat_message WHERE channel_id = ? AND file_stored IS NOT NULL");
+    PrepareStatement(BLOG_SEL_CHAT_USER_FILES, "SELECT file_stored FROM chat_message WHERE sender_id = ? AND file_stored IS NOT NULL");
+    // q twice (text, file name), before, the chat ('' for all) twice, the caller twice: only chats it may read
+    PrepareStatement(BLOG_SEL_CHAT_SEARCH, BLOG_CHAT_MESSAGE_SELECT
+        "WHERE NOT m.recalled AND (m.content ILIKE ? ESCAPE '\\' OR m.file_name ILIKE ? ESCAPE '\\') AND m.id < ? "
+        "AND (? = '' OR m.channel_id = ?) "
+        "AND (m.channel_id = 'square' "
+        "OR m.channel_id IN (SELECT 'group:' || gm.group_id FROM chat_group_member gm WHERE gm.user_id = ?) "
+        "OR m.channel_id IN (SELECT 'dm:' || LEAST(uf.user_id, uf.friend_id) || ':' || GREATEST(uf.user_id, uf.friend_id) "
+        "FROM user_friend uf WHERE uf.user_id = ?)) "
+        "ORDER BY m.id DESC LIMIT 51");
+    PrepareStatement(BLOG_SEL_CHAT_GROUP, "SELECT name, owner_id FROM chat_group WHERE id = ?");
+    PrepareStatement(BLOG_UPD_CHAT_GROUP_NAME, "UPDATE chat_group SET name = ? WHERE id = ?");
+    PrepareStatement(BLOG_UPD_CHAT_GROUP_OWNER, "UPDATE chat_group SET owner_id = ? WHERE id = ?");
+    PrepareStatement(BLOG_UPD_CHAT_GROUP_MEMBER_ROLE, "UPDATE chat_group_member SET role = ? WHERE group_id = ? AND user_id = ?");
 }
 
 template class DatabaseWorkerPool<BlogDatabaseConnection>;

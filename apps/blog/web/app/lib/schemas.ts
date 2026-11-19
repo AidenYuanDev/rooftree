@@ -721,6 +721,27 @@ export type UserFriendshipStatus = z.infer<typeof UserFriendshipStatus>
 
 // Chat system (Square & Direct Friend chats)
 
+// The message a reply quotes (ChatHandlers.cpp): a little of it, or that it was taken back
+export const ChatReplyItem = z.object({
+  id: z.number(),
+  senderId: z.number(),
+  senderName: z.string(),
+  content: z.string(),
+  hasFile: z.boolean().default(false),
+  recalled: z.boolean().default(false),
+})
+export type ChatReplyItem = z.infer<typeof ChatReplyItem>
+
+// A file sent in a chat; url answers only those who may read the chat. image: shown, the rest downloaded
+export const ChatFileItem = z.object({
+  name: z.string(),
+  mime: z.string(),
+  size: z.number(),
+  image: z.boolean().default(false),
+  url: z.string(),
+})
+export type ChatFileItem = z.infer<typeof ChatFileItem>
+
 export const ChatMessageItem = z.object({
   id: z.number(),
   channelId: z.string(),
@@ -729,6 +750,16 @@ export const ChatMessageItem = z.object({
   senderAvatar: z.string().nullable(),
   content: z.string(),
   createdAt: z.string(),
+  replyTo: ChatReplyItem.nullish().transform((v) => v ?? null),
+  file: ChatFileItem.nullish().transform((v) => v ?? null),
+  editedAt: z
+    .string()
+    .nullish()
+    .transform((v) => v ?? null),
+  // Taken back by its sender: no content, no file
+  recalled: z.boolean().default(false),
+  // The accounts it @mentioned
+  mentions: z.array(z.number()).default([]),
 })
 export type ChatMessageItem = z.infer<typeof ChatMessageItem>
 
@@ -750,8 +781,21 @@ export const ChatChannelItem = z.object({
   lastMessage: ChatMessageItem.nullable(),
   unreadCount: z.number(),
   memberCount: z.number().default(0),
+  // Unread messages that @mentioned me
+  mentionCount: z.number().default(0),
+  pinned: z.boolean().default(false),
+  // Its unread aren't in the total, its mentions are
+  muted: z.boolean().default(false),
+  // A group's owner
+  ownerId: z.number().default(0),
 })
 export type ChatChannelItem = z.infer<typeof ChatChannelItem>
+
+export const ChatSearchResult = z.object({
+  messages: z.array(ChatMessageItem),
+  hasMore: z.boolean(),
+})
+export type ChatSearchResult = z.infer<typeof ChatSearchResult>
 
 export const ChatChannelsList = z.object({
   channels: z.array(ChatChannelItem),

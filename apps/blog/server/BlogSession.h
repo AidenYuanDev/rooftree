@@ -97,6 +97,8 @@ public:
 
     // the drive's files and pieces of uploads (DriveHandlers.cpp)
     Rooftree::Task<void> HandleDriveDownload(Request request);
+    // ChatHandlers.cpp: a chat message's file
+    Rooftree::Task<void> HandleChatFile(Request request);
     Rooftree::Task<void> HandleDriveZip(Request request);
     Rooftree::Task<void> HandleDriveThumb(Request request);
     Rooftree::Task<void> HandleDriveSetThumb(Request request);

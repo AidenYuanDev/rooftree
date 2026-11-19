@@ -23,6 +23,16 @@ namespace Blog
 {
 inline constexpr std::size_t MaxAvatarSize = 512 * 1024;
 
+struct ImageType
+{
+    std::string_view Mime;
+    std::string_view Extension;
+};
+
+// By content: a picture a page may show (JPEG, PNG, GIF, WebP), whatever the file is called. Posts'
+// uploads and chat files
+Optional<ImageType> DetectImage(std::string_view data);
+
 // "png", "jpg" or "webp" by the content, empty for anything else (GIFs included: no animations)
 std::string_view AvatarExtension(std::string_view data);
 

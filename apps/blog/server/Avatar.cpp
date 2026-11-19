@@ -50,6 +50,24 @@ std::string SizedAvatarUrl(std::string_view provider, std::string url)
 }
 }
 
+Optional<ImageType> DetectImage(std::string_view data)
+{
+    auto startsWith = [&](std::string_view magic, std::size_t offset = 0)
+    {
+        return data.size() >= offset + magic.size() && data.substr(offset, magic.size()) == magic;
+    };
+
+    if (startsWith("\xFF\xD8\xFF"))
+        return ImageType{ "image/jpeg", "jpg" };
+    if (startsWith("\x89PNG\r\n\x1A\n"))
+        return ImageType{ "image/png", "png" };
+    if (startsWith("GIF87a") || startsWith("GIF89a"))
+        return ImageType{ "image/gif", "gif" };
+    if (startsWith("RIFF") && startsWith("WEBP", 8))
+        return ImageType{ "image/webp", "webp" };
+    return {};
+}
+
 std::string_view AvatarExtension(std::string_view data)
 {
     if (data.starts_with("\xFF\xD8\xFF"))

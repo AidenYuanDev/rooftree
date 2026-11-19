@@ -154,6 +154,8 @@ export async function startServer({ origins = [origin], captcha = false, mailInt
     log,
     outbox: join(dir, 'outbox'),
     rebuildsFile: join(dir, 'rebuilds'),
+    // Blog.Uploads.Directory: chat files are in its chat/
+    uploadsDir: join(dir, 'uploads'),
     // The console's output for lines of commands, as from a pipe
     console(...lines) {
       return execFileSync(blogBin, ['--config', configFile, '--console', '--socket', join(dir, 'console.sock')],

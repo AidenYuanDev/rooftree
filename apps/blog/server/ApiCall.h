@@ -182,6 +182,15 @@ Rooftree::Task<void> GetChatUnreadCount(Rooftree::Server::Session& session, ApiR
 Rooftree::Task<void> CreateChatGroup(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> ListChatGroupMembers(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> LeaveChatGroup(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> SendChatFile(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> EditChatMessage(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> RecallChatMessage(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> SearchChat(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> SetChatChannelPref(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> RenameChatGroup(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> AddChatGroupMembers(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> RemoveChatGroupMember(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> TransferChatGroup(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> AdminListChatGroups(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> AdminListChatMessages(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> AdminDeleteChatMessage(Rooftree::Server::Session& session, ApiRequest request);

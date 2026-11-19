@@ -92,6 +92,15 @@ enum Opcode : ushort {
   ChatGroupCreate = 0x02B5,
   ChatGroupMembers = 0x02B6,
   ChatGroupLeave = 0x02B7,
+  ChatFileSend = 0x02B8,
+  ChatMessageEdit = 0x02B9,
+  ChatMessageRecall = 0x02BA,
+  ChatSearch = 0x02BB,
+  ChatChannelPrefSet = 0x02BC,
+  ChatGroupRename = 0x02BD,
+  ChatGroupAddMembers = 0x02BE,
+  ChatGroupRemoveMember = 0x02BF,
+  ChatGroupTransfer = 0x02C0,
 }
 
 table EmptyRequest {
@@ -839,6 +848,25 @@ table UserFriendshipStatus {
 
 // Chat system (Square & Direct Friend chats)
 
+// The message a reply quotes: a little of it, gone (recalled) or not
+table ChatReplyItem {
+  id:ulong;
+  senderId:uint;
+  senderName:string;
+  content:string;           // its first 100 characters
+  hasFile:bool;
+  recalled:bool;
+}
+
+// A file sent in a chat, read from url (GET /api/chat/files/{message id}) by those who may read the chat
+table ChatFileItem {
+  name:string;
+  mime:string;
+  size:ulong;
+  image:bool;               // a picture the page shows (PNG, JPEG, GIF, WebP)
+  url:string;
+}
+
 table ChatMessageItem {
   id:ulong;
   channelId:string;
@@ -847,6 +875,11 @@ table ChatMessageItem {
   senderAvatar:string (json_null);
   content:string;
   createdAt:string;
+  replyTo:ChatReplyItem (json_null);  // none: not a reply, or what it quoted is gone
+  file:ChatFileItem (json_null);
+  editedAt:string (json_null);
+  recalled:bool;                      // taken back by its sender: no content, no file
+  mentions:[uint];                    // the accounts it @mentioned
 }
 
 table ChatMessagesList {
@@ -863,6 +896,10 @@ table ChatChannelItem {
   lastMessage:ChatMessageItem (json_null);
   unreadCount:uint;
   memberCount:uint;
+  mentionCount:uint;        // unread messages that @mentioned the caller
+  pinned:bool;
+  muted:bool;               // its unread aren't in the total (ChatUnreadCount), its mentions are
+  ownerId:uint;             // a group's owner
 }
 
 table ChatChannelsList {
@@ -878,6 +915,58 @@ table ChatMessagesListRequest {
 table ChatMessageSendRequest {
   channelId:string;
   content:string;
+  replyToId:ulong = null;   // a message of the same chat it answers
+}
+
+// multipart/form-data: file (with its name), content (a caption, may be empty), replyToId
+table ChatFileSendRequest {
+  channelId:string;
+  name:string;
+  file:[ubyte];
+  content:string;
+  replyToId:ulong = null;
+}
+
+table ChatMessageEditRequest {
+  id:ulong;
+  content:string;
+}
+
+table ChatMessageRequest {
+  id:ulong;
+}
+
+// Messages whose text or file name has q, newest first; in one chat, or in all the caller's
+table ChatSearchRequest {
+  q:string;
+  channelId:string;
+  before:ulong = null;
+}
+
+table ChatSearchResult {
+  messages:[ChatMessageItem];
+  hasMore:bool;
+}
+
+table ChatChannelPrefRequest {
+  channelId:string;
+  pinned:bool = null;       // left out: unchanged
+  muted:bool = null;
+}
+
+table ChatGroupRenameRequest {
+  id:uint;
+  name:string;
+}
+
+table ChatGroupMembersRequest {
+  id:uint;
+  memberIds:[uint];
+}
+
+table ChatGroupMemberRequest {
+  id:uint;
+  userId:uint;
 }
 
 table ChatMarkReadRequest {

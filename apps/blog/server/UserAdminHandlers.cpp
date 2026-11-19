@@ -22,6 +22,7 @@
 #include "BlogDatabase.h"
 #include "BlogSession.h"
 #include "BlogWorld.h"
+#include "Chat.h"
 #include "Drive.h"
 #include "Field.h"
 #include "HttpRequestUtils.h"
@@ -503,8 +504,9 @@ Rooftree::Task<void> AdminDeleteUser(Session& session, ApiRequest request)
                 return result;
             }
 
-            // Its drive and links first, while its rows say which files are its
+            // Its drive and links first, while its rows say which files are its; the files it sent in chats
             Drive::WorkerDeleteAccountDrive(id, driveDirectory);
+            WorkerDeleteUserChatFiles(id, directory);
             stmt = BlogDatabase.GetPreparedStatement(BLOG_DEL_USER);
             stmt->setUInt32(0, id);
             BlogDatabase.DirectExecute(stmt);

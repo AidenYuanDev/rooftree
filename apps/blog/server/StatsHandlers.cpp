@@ -30,7 +30,7 @@ constexpr std::size_t MaxPathLength = 255;
 constexpr uint32 MaxStatsDays = 366;
 
 // Pages of one reader, never counted
-constexpr std::string_view PrivatePages[] = { "admin", "drive", "s", "account", "login", "register", "forgot-password",
+constexpr std::string_view PrivatePages[] = { "admin", "drive", "chat", "s", "account", "login", "register", "forgot-password",
     "reset-password", "verify-email", "subscribe-confirm", "unsubscribe" };
 
 // What a browser sends of a crawler, a preview or a script, lowercase

@@ -29,6 +29,7 @@ export default [
     route('account', 'routes/account.tsx'),
     route('status', 'routes/status.tsx'),
     route('drive', 'routes/drive.tsx'),
+    route('chat', 'routes/chat.tsx'),
     route('s/:token', 'routes/share.tsx'),
     route('u/:username', 'routes/person.tsx'),
     route('write', 'routes/write/layout.tsx', [

@@ -68,6 +68,9 @@ bool BlogSettings::LoadFromConfig(Config const& config)
     settings.AvatarChangesPerUser = config.Get<uint32>("Blog.Avatars.PerUser.MaxCount", settings.AvatarChangesPerUser);
     settings.AvatarWindow = Seconds(config.Get<uint32>("Blog.Avatars.PerUser.Window", uint32(settings.AvatarWindow.count())));
 
+    settings.ChatRecallWindow = Seconds(config.Get<uint32>("Blog.Chat.RecallWindow", uint32(settings.ChatRecallWindow.count())));
+    settings.ChatEditWindow = Seconds(config.Get<uint32>("Blog.Chat.EditWindow", uint32(settings.ChatEditWindow.count())));
+
     settings.UploadDirectory = config.Get<std::string>("Blog.Uploads.Directory", settings.UploadDirectory);
     settings.MaxUploadSize = config.Get<uint32>("Blog.Uploads.MaxSize", settings.MaxUploadSize);
 

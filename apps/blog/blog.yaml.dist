@@ -506,6 +506,11 @@ Blog:
 #                     address: many readers share one.
 #        Default:     { Window: 3600, MaxCount: 10 }
 #
+#    Blog.Chat.RecallWindow, Blog.Chat.EditWindow
+#        Description: Seconds after sending during which its sender may still take a chat message back
+#                     (it shows as taken back, its file is deleted), or change its text.
+#        Default:     120, 900
+#
 #    Blog.Uploads.Directory, Blog.Uploads.MaxSize
 #        Description: Where uploaded images are stored, the largest size in bytes. The server answers
 #                     /uploads/<name> from Directory itself; the address is fixed, posts link to it.
@@ -582,6 +587,10 @@ Blog:
 
   Avatars:
     PerUser: { Window: 3600, MaxCount: 10 }
+
+  Chat:
+    RecallWindow: 120
+    EditWindow: 900
 
   Uploads:
     Directory: "uploads"

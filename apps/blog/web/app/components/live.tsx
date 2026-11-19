@@ -5,8 +5,9 @@ import { Link, useLocation } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { localePath, useLang } from '~/lib/lang'
-import { queryKeys, removeChatMessages, sortChatMessages, useMe } from '~/lib/queries'
-import { type ChatChannelsList, ChatMessageItem, type ChatMessagesList } from '~/lib/schemas'
+import { addChatMessage, queryKeys, removeChatMessages, replaceChatMessage, useMe } from '~/lib/queries'
+import { type ChatChannelsList, ChatMessageItem } from '~/lib/schemas'
+import { useChatStore } from '~/stores/chat'
 import { useLiveStore } from '~/stores/live'
 
 // The page's WebSocket (/ws, BlogWebSocket.h on the server): tells it which page is open, on every
@@ -42,9 +43,9 @@ export function Live() {
   const watchStore = useLiveStore((state) => state.watch)
   useEffect(() => (watchUser ? watchStore(watchUser) : undefined), [watchStore, watchUser])
   // The latest ones for the socket's handlers, which outlive renders
-  const latest = useRef({ t, lang })
+  const latest = useRef({ t, lang, userId })
   useEffect(() => {
-    latest.current = { t, lang }
+    latest.current = { t, lang, userId }
   })
 
   useEffect(() => {
@@ -100,28 +101,32 @@ export function Live() {
             }
           }
         } else if (message.type === 'chat_message') {
-          // Checked like an answer of the API: a message that isn't one is left out
+          // Checked like an answer of the API: a message that isn't one is left out. A channel not
+          // loaded yet is read whole when opened, not started from this one message
           const parsed = ChatMessageItem.safeParse(message)
           if (parsed.success) {
             const msg = parsed.data
-            // A channel not loaded yet is read whole when opened, not started from this one message
-            queryClient.setQueryData<ChatMessagesList>(['chat', 'messages', msg.channelId, undefined], (old) => {
-              if (!old || old.messages.some((m) => m.id === msg.id)) return old
-              // Our own message coming back before the answer to sending it replaces its optimistic copy
-              const pending = old.messages.find((m) => m.id < 0 && m.senderId === msg.senderId && m.content === msg.content)
-              const others = old.messages.filter((m) => m !== pending)
-              return { ...old, messages: [...others, msg].sort(sortChatMessages) }
-            })
-            queryClient.setQueryData<ChatChannelsList>(['chat', 'channels'], (old) => {
-              if (!old) return old
-              return {
-                ...old,
-                channels: old.channels.map((ch) =>
-                  ch.id === msg.channelId && (!ch.lastMessage || ch.lastMessage.id < msg.id) ? { ...ch, lastMessage: msg } : ch,
+            addChatMessage(queryClient, msg)
+            // Someone @mentioned me in a chat I'm not looking at, muted or not
+            const { t: translate, lang: current, userId: me } = latest.current
+            if (me && msg.senderId !== me && msg.mentions.includes(me) && useChatStore.getState().viewingChannelId !== msg.channelId) {
+              const channel = queryClient.getQueryData<ChatChannelsList>(['chat', 'channels'])?.channels.find((c) => c.id === msg.channelId)
+              toast(translate('chat.mentionedYou', { name: msg.senderName }), {
+                description: msg.content.slice(0, 120),
+                action: (
+                  <Link to={localePath(current, `/chat?c=${encodeURIComponent(msg.channelId)}`)}>
+                    {channel?.type === 'square' ? translate('chat.squareTitle') : (channel?.name ?? translate('chat.open'))}
+                  </Link>
                 ),
-              }
-            })
+                duration: 10_000,
+              })
+            }
           }
+          void queryClient.invalidateQueries({ queryKey: ['chat', 'unread'] })
+        } else if (message.type === 'chat_updated') {
+          // Edited or taken back by its sender
+          const parsed = ChatMessageItem.safeParse(message)
+          if (parsed.success) replaceChatMessage(queryClient, parsed.data)
           void queryClient.invalidateQueries({ queryKey: ['chat', 'unread'] })
         } else if (message.type === 'chat_removed') {
           const removed = ChatRemovedPush.safeParse(message)
