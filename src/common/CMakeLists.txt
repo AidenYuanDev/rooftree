@@ -16,8 +16,7 @@ target_link_libraries(rooftree-common
     yamlcpp
     threads
     boost
-    openssl
-    fmt)
+    openssl)
 
 # Every executable links rooftree-common, so this swaps the allocator for all of them
 if(TARGET jemalloc)

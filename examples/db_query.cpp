@@ -28,7 +28,7 @@
 #include "QueryCallback.h"
 #include "QueryResult.h"
 #include "Transaction.h"
-#include <fmt/std.h>
+#include <print>
 #include <optional>
 #include <thread>
 
@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     std::string configFile = argc > 1 ? argv[1] : "rooftree.yaml";
     std::string configError;
     if (!sConfigMgr->LoadFile(configFile, configError))
-        fmt::print(stderr, "Could not load {} ({}), using defaults\n", configFile, configError);
+        std::print(stderr, "Could not load {} ({}), using defaults\n", configFile, configError);
 
     sLog->LoadFromConfig();
 

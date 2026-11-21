@@ -26,6 +26,7 @@
 #include "Log.h"
 #include "Timer.h"
 #include "World.h"
+#include <print>
 #include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <fstream>
@@ -140,7 +141,7 @@ int main(int argc, char** argv)
     std::string configError;
     if (!sConfigMgr->LoadFile(configFile, configError))
     {
-        fmt::print(stderr, "Could not load {}: {}\n", configFile, configError);
+        std::print(stderr, "Could not load {}: {}\n", configFile, configError);
         return 1;
     }
 

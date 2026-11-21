@@ -20,7 +20,7 @@
 #include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/json.hpp>
-#include <fmt/core.h>
+#include <print>
 #include <atomic>
 #include <thread>
 
@@ -63,7 +63,7 @@ public:
 protected:
     void OnOpen() override
     {
-        fmt::print("connected, conv {}\n", GetConv());
+        std::print("connected, conv {}\n", GetConv());
     }
 
     void OnMessage(std::string&& packet, bool reliable) override
@@ -85,7 +85,7 @@ protected:
                 if (!verifier.VerifyBuffer<Arena::Welcome>(nullptr))
                     break;
                 Arena::Welcome const* welcome = flatbuffers::GetRoot<Arena::Welcome>(payload.data());
-                fmt::print("{} Welcome {} (id {}), field {}x{}, {} coins so far\n", tag, Str(welcome->name()), welcome->id(),
+                std::print("{} Welcome {} (id {}), field {}x{}, {} coins so far\n", tag, Str(welcome->name()), welcome->id(),
                     welcome->width(), welcome->height(), welcome->totalCoins());
 
                 // In game: the server ignores inputs and chat before
@@ -108,27 +108,27 @@ protected:
                 if (!verifier.VerifyBuffer<Arena::State>(nullptr) || States++ % 20)
                     break;
                 Arena::State const* state = flatbuffers::GetRoot<Arena::State>(payload.data());
-                fmt::print("{} State, {} bytes:", tag, packet.size());
+                std::print("{} State, {} bytes:", tag, packet.size());
                 if (state->players())
                     for (Arena::PlayerState const* player : *state->players())
-                        fmt::print(" {} at ({:.0f}, {:.0f})", Str(player->name()), player->x(), player->y());
-                fmt::print(", {} coins{}\n", state->coins() ? state->coins()->size() : 0, state->goldRush() ? ", gold rush" : "");
+                        std::print(" {} at ({:.0f}, {:.0f})", Str(player->name()), player->x(), player->y());
+                std::print(", {} coins{}\n", state->coins() ? state->coins()->size() : 0, state->goldRush() ? ", gold rush" : "");
                 break;
             }
             case Arena::Opcode::ChatMessage:
                 if (verifier.VerifyBuffer<Arena::ChatMessage>(nullptr))
                 {
                     Arena::ChatMessage const* chat = flatbuffers::GetRoot<Arena::ChatMessage>(payload.data());
-                    fmt::print("{} ChatMessage {}: {}\n", tag, Str(chat->from()), Str(chat->text()));
+                    std::print("{} ChatMessage {}: {}\n", tag, Str(chat->from()), Str(chat->text()));
                 }
                 break;
             case Arena::Opcode::SystemMessage:
                 if (verifier.VerifyBuffer<Arena::SystemMessage>(nullptr))
-                    fmt::print("{} SystemMessage {}\n", tag, Str(flatbuffers::GetRoot<Arena::SystemMessage>(payload.data())->text()));
+                    std::print("{} SystemMessage {}\n", tag, Str(flatbuffers::GetRoot<Arena::SystemMessage>(payload.data())->text()));
                 break;
             case Arena::Opcode::Pong:
                 if (verifier.VerifyBuffer<Arena::Pong>(nullptr))
-                    fmt::print("{} Pong, {:.1f} ms\n", tag, Now() - flatbuffers::GetRoot<Arena::Pong>(payload.data())->t());
+                    std::print("{} Pong, {:.1f} ms\n", tag, Now() - flatbuffers::GetRoot<Arena::Pong>(payload.data())->t());
                 break;
             default:
                 // A newer server's: ignored
@@ -138,7 +138,7 @@ protected:
 
     void OnClose(uint16 code, std::string_view reason) override
     {
-        fmt::print("closed: {} {}\n", code, reason);
+        std::print("closed: {} {}\n", code, reason);
         Done = true;
     }
 };
@@ -148,7 +148,7 @@ int main(int argc, char** argv)
 {
     if (argc < 3)
     {
-        fmt::print(stderr, "Usage: {} <username> <password> [host] [http port] [seconds]\n", argv[0]);
+        std::print(stderr, "Usage: {} <username> <password> [host] [http port] [seconds]\n", argv[0]);
         return 1;
     }
 
@@ -178,19 +178,19 @@ int main(int argc, char** argv)
         login = boost::json::parse(response.body()).as_object();
         if (response.result() != http::status::ok)
         {
-            fmt::print(stderr, "login failed: {}\n", response.body());
+            std::print(stderr, "login failed: {}\n", response.body());
             return 1;
         }
     }
     catch (std::exception const& e)
     {
-        fmt::print(stderr, "login failed: {}\n", e.what());
+        std::print(stderr, "login failed: {}\n", e.what());
         return 1;
     }
 
     if (!login.contains("kcpPort"))
     {
-        fmt::print(stderr, "the server has KCP off (Arena.Kcp.Enabled)\n");
+        std::print(stderr, "the server has KCP off (Arena.Kcp.Enabled)\n");
         return 1;
     }
 
@@ -199,7 +199,7 @@ int main(int argc, char** argv)
     Kcp::Key key;
     if (keyBytes.size() != key.size())
     {
-        fmt::print(stderr, "unexpected key size {}\n", keyBytes.size());
+        std::print(stderr, "unexpected key size {}\n", keyBytes.size());
         return 1;
     }
     std::copy(keyBytes.begin(), keyBytes.end(), key.begin());
@@ -223,7 +223,7 @@ int main(int argc, char** argv)
 
     if (!client->Done)
     {
-        fmt::print("round trip {} ms, {} states received, leaving\n", client->GetRoundTripTime(), uint32(client->States));
+        std::print("round trip {} ms, {} states received, leaving\n", client->GetRoundTripTime(), uint32(client->States));
         client->Close();
         while (!client->Done)
             std::this_thread::sleep_for(10ms);

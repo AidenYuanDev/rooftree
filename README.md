@@ -9,7 +9,7 @@
 
 ## 快速开始
 
-依赖都用系统的包，Arch 上：`yay -S boost openssl postgresql-libs fmt yaml-cpp catch2 argon2 utf8cpp curl readline jemalloc flatbuffers qrencode`。
+依赖都用系统的包，Arch 上：`yay -S boost openssl postgresql-libs yaml-cpp catch2 argon2 utf8cpp curl readline jemalloc flatbuffers qrencode`。
 
 ```sh
 cmake -S . -B build -G Ninja

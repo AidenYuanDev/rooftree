@@ -9,7 +9,7 @@
 #include "QueryResult.h"
 #include "Transaction.h"
 #include <libpq-fe.h>
-#include <fmt/format.h>
+#include <format>
 #include <array>
 #include <charconv>
 #include <cstring>

@@ -10,11 +10,11 @@ std::string StringVFormat(FormatStringView format, FormatArgs args) noexcept
 {
     try
     {
-        return fmt::vformat(format, args);
+        return std::vformat(format, args);
     }
     catch (std::exception const& error)
     {
-        return fmt::format("(cannot format \"{}\": {})", format, error.what());
+        return std::format("(cannot format \"{}\": {})", format, error.what());
     }
 }
 }

@@ -17,14 +17,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
       libboost-dev libboost-filesystem-dev libboost-json-dev libboost-url-dev libssl-dev libpq-dev \
       libyaml-cpp-dev libutfcpp-dev catch2 libargon2-dev libqrencode-dev libreadline-dev libcurl4-openssl-dev libjemalloc-dev \
     && rm -rf /var/lib/apt/lists/*
-# The framework is written against fmt 12 (StringFormatFwd.h names its v12 namespace), Ubuntu has 10:
-# a static one in /usr/local, found before the system's
-ADD https://github.com/fmtlib/fmt/archive/refs/tags/12.2.0.tar.gz /tmp/fmt.tar.gz
-RUN tar -xzf /tmp/fmt.tar.gz -C /tmp \
-    && cmake -S /tmp/fmt-12.2.0 -B /tmp/fmt-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-         -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DFMT_TEST=OFF -DFMT_DOC=OFF \
-    && cmake --build /tmp/fmt-build --target install \
-    && rm -rf /tmp/fmt*
 # FlatBuffers (flatc and the static library), the version Arch has: Ubuntu's 23.5 is older
 ADD https://github.com/google/flatbuffers/archive/refs/tags/v25.12.19.tar.gz /tmp/flatbuffers.tar.gz
 RUN tar -xzf /tmp/flatbuffers.tar.gz -C /tmp \

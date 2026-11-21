@@ -24,7 +24,7 @@
 | `contrib/valgrind` | — | helgrind 屏蔽规则（`helgrind.supp`） |
 | `docs` | — | 各基础组件的学习文档，按学习顺序编号，从 [docs/00-overview.md](00-overview.md) 开始 |
 | `cmake` | — | **新写**：选项、编译器设置、`CollectAndAddSourceFiles`、配置汇总 |
-| `deps` | — | 每个系统依赖一个子目录，包装成同名 INTERFACE 目标（`boost`、`postgresql`、`fmt`…）；`deps/kcp` 是唯一自带源码的 |
+| `deps` | — | 每个系统依赖一个子目录，包装成同名 INTERFACE 目标（`boost`、`postgresql`、`yamlcpp`…）；`deps/kcp` 是唯一自带源码的 |
 | `examples` | — | echo_server、http_server、websocket_server、arena_kcp_client、db_query、scheduler_demo + `rooftree.yaml.dist` |
 | `apps/arena` | — | 一个完整的多人网页小游戏，把所有模块串起来；`combat/` 是战斗规则（库 `arena-combat`），`tests/` 是它的测试（`arena-tests`），`tools/` 是机器人（`arena_bots`）和作弊客户端（`arena_rogue`），见 [35 · 示例与应用](35-examples-and-apps.md) |
 | `apps/blog` | — | 中英双语博客：rooftree-server 上的 JSON API + React 预渲染前端 + 部署配置，见 [apps/blog/README.md](../apps/blog/README.md) |
@@ -36,7 +36,7 @@
 
 ## 2. 构建
 
-依赖：Boost ≥ 1.83（用到 Boost.JSON、Boost.URL）、OpenSSL ≥ 3.2、libpq ≥ 14（PostgreSQL 的客户端库）、fmt、yaml-cpp、Catch2、libargon2、utf8cpp 4、libcurl、readline、jemalloc、FlatBuffers（库和 flatc，构建时生成包的代码，见 [32](32-packets.md)），博客（`APPS`）另需 libqrencode（Arch：`yay -S boost openssl postgresql-libs fmt yaml-cpp catch2 argon2 utf8cpp curl readline jemalloc flatbuffers qrencode`）。
+依赖：Boost ≥ 1.83（用到 Boost.JSON、Boost.URL）、OpenSSL ≥ 3.2、libpq ≥ 14（PostgreSQL 的客户端库）、yaml-cpp、Catch2、libargon2、utf8cpp 4、libcurl、readline、jemalloc、FlatBuffers（库和 flatc，构建时生成包的代码，见 [32](32-packets.md)），博客（`APPS`）另需 libqrencode（Arch：`yay -S boost openssl postgresql-libs yaml-cpp catch2 argon2 utf8cpp curl readline jemalloc flatbuffers qrencode`）。
 除 KCP 外全部使用系统包，不会在构建时下载任何东西。KCP 只有一个 C 文件，没有发行版的包，原样放在 `deps/kcp`（1.7.1，MIT）。
 
 每个依赖在 `deps/<名字>/` 里 `find_package` 后包装成同名 INTERFACE 目标，库只链接 `boost`、`openssl`、`postgresql` 这类名字。和某个依赖相关的编译宏也放在它自己的目录里，例如 `BOOST_ASIO_NO_DEPRECATED` 在 `deps/boost`，`FLATBUFFERS_*` 在 `deps/flatbuffers`。以后换掉某个依赖的来源（系统包、自带源码、FetchContent），只需要改它自己的目录。

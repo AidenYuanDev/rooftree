@@ -6,7 +6,7 @@
 #include "Field.h"
 #include <boost/json/array.hpp>
 #include <chrono>
-#include <fmt/chrono.h>
+#include <format>
 
 namespace Blog
 {
@@ -45,7 +45,7 @@ UserRow UserRow::FromFields(Field const* fields)
 
 std::string FormatTime(SystemTimePoint time)
 {
-    return fmt::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::time_point_cast<std::chrono::seconds>(time));
+    return std::format("{:%Y-%m-%dT%H:%M:%SZ}", std::chrono::time_point_cast<std::chrono::seconds>(time));
 }
 
 boost::json::value FormatTime(Optional<SystemTimePoint> time)

@@ -21,7 +21,7 @@
 #include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/json.hpp>
-#include <fmt/core.h>
+#include <print>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -131,7 +131,7 @@ protected:
     {
         ++stats.Closed;
         if (code != Kcp::CloseCode::Normal)
-            fmt::print(stderr, "bot {} closed: {} {}\n", _id, code, reason);
+            std::print(stderr, "bot {} closed: {} {}\n", _id, code, reason);
     }
 
 private:
@@ -351,7 +351,7 @@ Optional<Login> LogIn(std::string const& host, std::string const& port, std::str
         auto [registered, registerAnswer] = Post(host, port, "/api/register", credentials);
         if (registered != http::status::ok && registered != http::status::conflict)
         {
-            fmt::print(stderr, "{}: register failed: {}\n", name, boost::json::serialize(registerAnswer));
+            std::print(stderr, "{}: register failed: {}\n", name, boost::json::serialize(registerAnswer));
             return {};
         }
 
@@ -359,7 +359,7 @@ Optional<Login> LogIn(std::string const& host, std::string const& port, std::str
         boost::json::object const* login = answer.if_object();
         if (status != http::status::ok || !login || !login->contains("kcpPort"))
         {
-            fmt::print(stderr, "{}: login failed ({}), or the server has KCP off\n", name, boost::json::serialize(answer));
+            std::print(stderr, "{}: login failed ({}), or the server has KCP off\n", name, boost::json::serialize(answer));
             return {};
         }
 
@@ -374,7 +374,7 @@ Optional<Login> LogIn(std::string const& host, std::string const& port, std::str
     }
     catch (std::exception const& e)
     {
-        fmt::print(stderr, "{}: {}\n", name, e.what());
+        std::print(stderr, "{}: {}\n", name, e.what());
         return {};
     }
 }
@@ -390,22 +390,22 @@ void PrintStats(char const* title, double seconds, uint32 bots)
     static_assert(std::size(EventTypes) == std::tuple_size_v<decltype(stats.Events)>);
     static_assert(std::size(Reasons) == std::tuple_size_v<decltype(stats.Interrupts)>);
 
-    fmt::print("---- {} after {:.0f} s: {} of {} bots connected, {} closed\n", title, seconds, uint32(stats.Open), bots, uint32(stats.Closed));
-    fmt::print("casts sent {}, refused:", uint64(stats.CastsSent));
+    std::print("---- {} after {:.0f} s: {} of {} bots connected, {} closed\n", title, seconds, uint32(stats.Open), bots, uint32(stats.Closed));
+    std::print("casts sent {}, refused:", uint64(stats.CastsSent));
     for (std::size_t i = 1; i < std::size(CastErrors); ++i)
         if (uint64 count = stats.CastFailed[i])
-            fmt::print(" {} {}", CastErrors[i], count);
-    fmt::print("\nevents by their casters:");
+            std::print(" {} {}", CastErrors[i], count);
+    std::print("\nevents by their casters:");
     for (std::size_t i = 0; i < std::size(EventTypes); ++i)
-        fmt::print(" {} {}", EventTypes[i], uint64(stats.Events[i]));
-    fmt::print("\ninterrupted:");
+        std::print(" {} {}", EventTypes[i], uint64(stats.Events[i]));
+    std::print("\ninterrupted:");
     for (std::size_t i = 1; i < std::size(Reasons); ++i)
         if (uint64 count = stats.Interrupts[i])
-            fmt::print(" {} {}", Reasons[i], count);
-    fmt::print("\ndamage done {}, combat logs {}\n", uint64(stats.Damage), uint64(stats.CombatLogs));
+            std::print(" {} {}", Reasons[i], count);
+    std::print("\ndamage done {}, combat logs {}\n", uint64(stats.Damage), uint64(stats.CombatLogs));
 
     double perBot = bots && seconds > 0 ? 1.0 / (bots * seconds) : 0.0;
-    fmt::print("per bot per second: {:.1f} KB reliable (combat, chat), {:.1f} KB unreliable (state), {:.1f} packets\n",
+    std::print("per bot per second: {:.1f} KB reliable (combat, chat), {:.1f} KB unreliable (state), {:.1f} packets\n",
         stats.ReliableBytes * perBot / 1024, stats.UnreliableBytes * perBot / 1024, stats.Packets * perBot);
     std::fflush(stdout);
 }
@@ -415,7 +415,7 @@ int main(int argc, char** argv)
 {
     if (argc < 2)
     {
-        fmt::print(stderr, "Usage: {} <count> [host] [http port] [seconds] [prefix]\n", argv[0]);
+        std::print(stderr, "Usage: {} <count> [host] [http port] [seconds] [prefix]\n", argv[0]);
         return 1;
     }
 
@@ -464,7 +464,7 @@ int main(int argc, char** argv)
         bot->Connect(server, logins[n]->Ticket, logins[n]->Key);
         bots.push_back(std::move(bot));
     }
-    fmt::print("{} bots logged in, {} threads\n", bots.size(), threadCount);
+    std::print("{} bots logged in, {} threads\n", bots.size(), threadCount);
 
     std::vector<std::thread> threads;
     for (auto& context : contexts)

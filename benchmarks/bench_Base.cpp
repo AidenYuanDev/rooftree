@@ -11,7 +11,7 @@
 #include "StringConvert.h"
 #include "StringFormat.h"
 #include "Util.h"
-#include <fmt/format.h>
+#include <format>
 #include <cstdio>
 #include <map>
 
@@ -49,9 +49,9 @@ TEST_CASE("String formatting", "[base]")
         return Rooftree::StringFormat("Player {} (guid {}) ratio {:.2f}", name, guid, ratio);
     };
 
-    BENCHMARK("fmt::format")
+    BENCHMARK("std::format")
     {
-        return fmt::format("Player {} (guid {}) ratio {:.2f}", name, guid, ratio);
+        return std::format("Player {} (guid {}) ratio {:.2f}", name, guid, ratio);
     };
 
     BENCHMARK("snprintf")

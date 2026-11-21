@@ -34,7 +34,6 @@
 #include "Transaction.h"
 #include "Validation.h"
 #include <boost/json/array.hpp>
-#include <fmt/chrono.h>
 #include <array>
 #include <map>
 #include <set>

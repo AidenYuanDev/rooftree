@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <charconv>
 #include <chrono>
-#include <fmt/format.h>
+#include <format>
 #include <limits>
 
 PreparedStatementBase::PreparedStatementBase(uint32 index, uint8 parameterCount) : _index(index), _parameters(parameterCount)
@@ -35,15 +35,15 @@ void PreparedStatementBase::setInt8(uint8 index, int8 value) { At(index) = { std
 void PreparedStatementBase::setInt16(uint8 index, int16 value) { At(index) = { std::to_string(value) }; }
 void PreparedStatementBase::setInt32(uint8 index, int32 value) { At(index) = { std::to_string(value) }; }
 void PreparedStatementBase::setInt64(uint8 index, int64 value) { At(index) = { std::to_string(value) }; }
-void PreparedStatementBase::setFloat(uint8 index, float value) { At(index) = { fmt::to_string(value) }; }
-void PreparedStatementBase::setDouble(uint8 index, double value) { At(index) = { fmt::to_string(value) }; }
+void PreparedStatementBase::setFloat(uint8 index, float value) { At(index) = { std::format("{}", value) }; }
+void PreparedStatementBase::setDouble(uint8 index, double value) { At(index) = { std::format("{}", value) }; }
 
 void PreparedStatementBase::setDate(uint8 index, SystemTimePoint value)
 {
     std::chrono::sys_days const day = std::chrono::floor<std::chrono::days>(value);
     std::chrono::year_month_day const date(day);
     std::chrono::hh_mm_ss const time(std::chrono::floor<std::chrono::seconds>(value - day));
-    At(index) = { fmt::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", int(date.year()), unsigned(date.month()), unsigned(date.day()),
+    At(index) = { std::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", int(date.year()), unsigned(date.month()), unsigned(date.day()),
         time.hours().count(), time.minutes().count(), time.seconds().count()) };
 }
 

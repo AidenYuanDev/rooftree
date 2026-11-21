@@ -14,6 +14,7 @@
 #include "TOTP.h"
 #include "TotpSetup.h"
 #include "Validation.h"
+#include <print>
 #include <iostream>
 #include <termios.h>
 #include <unistd.h>
@@ -52,14 +53,14 @@ int CreateAdmin(CreateAdminArguments const& arguments, BlogSettings const& setti
     if (!IsValidUsername(arguments.Username) || !IsValidEmail(arguments.Email)
         || displayName.empty() || CountCharacters(displayName) > 40)
     {
-        fmt::print(stderr, "--username needs 3 to 20 letters, digits or _, --email an address, --display-name at most 40 characters\n");
+        std::print(stderr, "--username needs 3 to 20 letters, digits or _, --email an address, --display-name at most 40 characters\n");
         return 1;
     }
 
     PreparedQueryResult admins = BlogDatabase.Query(BlogDatabase.GetPreparedStatement(BLOG_SEL_ADMIN_EXISTS));
     if (admins && admins->Fetch()[0].GetInt64() > 0)
     {
-        fmt::print(stderr, "There is an admin already, the blog has a single author. Its password and two-step login are set on the\n"
+        std::print(stderr, "There is an admin already, the blog has a single author. Its password and two-step login are set on the\n"
             "server's console: account set password, account set 2fa\n");
         return 1;
     }
@@ -72,20 +73,20 @@ int CreateAdmin(CreateAdminArguments const& arguments, BlogSettings const& setti
         password = ReadPassword("Password: ");
         if (ReadPassword("Again: ") != password)
         {
-            fmt::print(stderr, "The passwords differ\n");
+            std::print(stderr, "The passwords differ\n");
             return 1;
         }
     }
 
     if (CountCharacters(password) < 12 || password.size() > 128)
     {
-        fmt::print(stderr, "The admin password needs 12 to 128 characters\n");
+        std::print(stderr, "The admin password needs 12 to 128 characters\n");
         return 1;
     }
     Optional<std::string> hash = Rooftree::Crypto::Argon2::Hash(password, settings.Argon2Iterations, settings.Argon2MemoryCost);
     if (!hash)
     {
-        fmt::print(stderr, "Hashing the password failed\n");
+        std::print(stderr, "Hashing the password failed\n");
         return 1;
     }
 
@@ -116,13 +117,13 @@ int CreateAdmin(CreateAdminArguments const& arguments, BlogSettings const& setti
     PreparedQueryResult created = BlogDatabase.Query(stmt);
     if (!created || created->Fetch()[1].GetString() != *hash)
     {
-        fmt::print(stderr, "The user name or the address is taken\n");
+        std::print(stderr, "The user name or the address is taken\n");
         return 1;
     }
 
-    fmt::print("Created admin {} ({}).\n", arguments.Username, created->Fetch()[0].GetUInt32());
+    std::print("Created admin {} ({}).\n", arguments.Username, created->Fetch()[0].GetUInt32());
     if (arguments.Totp)
-        fmt::print("\n{}\n", FormatTotpSetup(settings.TotpIssuer, arguments.Username, secret, isatty(STDOUT_FILENO)));
+        std::print("\n{}\n", FormatTotpSetup(settings.TotpIssuer, arguments.Username, secret, isatty(STDOUT_FILENO)));
     return 0;
 }
 }

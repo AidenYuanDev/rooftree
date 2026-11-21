@@ -13,7 +13,7 @@ graph TD
     NET["rooftree-network<br/>Socket · NetworkThread · SocketMgr · HTTP · WebSocket · KCP"]
     DB["rooftree-database<br/>连接池 · PreparedStatement · 事务 · 异步回调 · AppenderDB"]
     COMMON["rooftree-common<br/>base · asio · thread · sched · crypto · log · config"]
-    DEPS["deps/<br/>Boost · OpenSSL · fmt · yaml-cpp · libpq · argon2 · utf8cpp · jemalloc · libcurl · readline · FlatBuffers · KCP"]
+    DEPS["deps/<br/>Boost · OpenSSL · yaml-cpp · libpq · argon2 · utf8cpp · jemalloc · libcurl · readline · FlatBuffers · KCP"]
     APP --> SRV
     SRV --> NET
     SRV --> DB
@@ -65,7 +65,7 @@ graph LR
 | 0 | — | 前置知识：C++20（chrono、智能指针、移动语义、模板/CRTP/concepts）、Boost.Asio 基础 | — |
 | 1 基础工具 | [01-define-errors](01-define-errors.md) | 整数类型、`ASSERT` 和 `ABORT` | 90 行 |
 | | [02-time](02-time.md) | `Milliseconds`、`TimePoint`、`getMSTime` 和回绕 | 50 行 |
-| | [03-string](03-string.md) | `StringFormat`（fmt）、`StringTo`、切分、十六进制、UTF-8、时长 | 350 行 |
+| | [03-string](03-string.md) | `StringFormat`（std::format）、`StringTo`、切分、十六进制、UTF-8、时长 | 350 行 |
 | | [04-random](04-random.md) | `urand`、`frand`：每个线程一个生成器 | 70 行 |
 | 2 字节缓冲 | [05-message-buffer](05-message-buffer.md) | 网络收发用的读写指针缓冲区 | 80 行 |
 | 3 配置与日志 | [07-config](07-config.md) | YAML 配置、不可变快照、结构化读取、重载通知 | 420 行 |

@@ -14,6 +14,7 @@
 #include "EventMap.h"
 #include "Log.h"
 #include "TaskScheduler.h"
+#include <print>
 #include <thread>
 
 using namespace std::chrono_literals;
@@ -29,7 +30,7 @@ int main(int argc, char** argv)
     std::string configFile = argc > 1 ? argv[1] : "rooftree.yaml";
     std::string configError;
     if (!sConfigMgr->LoadFile(configFile, configError))
-        fmt::print(stderr, "Could not load {} ({}), using defaults\n", configFile, configError);
+        std::print(stderr, "Could not load {} ({}), using defaults\n", configFile, configError);
 
     sLog->LoadFromConfig();
 

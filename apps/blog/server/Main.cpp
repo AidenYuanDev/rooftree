@@ -34,6 +34,7 @@
 #include "Log.h"
 #include "UpdateLoop.h"
 #include "WorldHttpService.h"
+#include <print>
 #include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <atomic>
@@ -91,7 +92,7 @@ Optional<Arguments> ParseArguments(int argc, char** argv)
             arguments.Admin.DisplayName = *v;
         else
         {
-            fmt::print(stderr, "Unknown or incomplete argument {}\n", arg);
+            std::print(stderr, "Unknown or incomplete argument {}\n", arg);
             return {};
         }
     }
@@ -463,7 +464,7 @@ int main(int argc, char** argv)
     std::string configError;
     if (!sConfigMgr->LoadFile(arguments->ConfigFile, configError))
     {
-        fmt::print(stderr, "Could not load {}: {}\n", arguments->ConfigFile, configError);
+        std::print(stderr, "Could not load {}: {}\n", arguments->ConfigFile, configError);
         return 1;
     }
 

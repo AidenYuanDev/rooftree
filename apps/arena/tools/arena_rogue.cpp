@@ -21,7 +21,8 @@
 #include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/json.hpp>
-#include <fmt/format.h>
+#include <format>
+#include <print>
 #include <atomic>
 #include <cmath>
 #include <condition_variable>
@@ -348,7 +349,7 @@ struct Rogue
 
     void Check(std::string_view name, bool ok, std::string const& detail)
     {
-        fmt::print("{} {:<44} {}\n", ok ? "PASS" : "FAIL", name, detail);
+        std::print("{} {:<44} {}\n", ok ? "PASS" : "FAIL", name, detail);
         std::fflush(stdout);
         ++(ok ? Passed : FailedChecks);
     }
@@ -481,8 +482,8 @@ struct Rogue
     static std::string Describe(CloseResult const& result)
     {
         if (!result.Closed)
-            return fmt::format("stayed open, {} pongs", result.Pongs);
-        return fmt::format("closed {} \"{}\"", result.Code, result.Reason);
+            return std::format("stayed open, {} pongs", result.Pongs);
+        return std::format("closed {} \"{}\"", result.Code, result.Reason);
     }
 
     void PacketChecks();
@@ -532,7 +533,7 @@ void Rogue::PacketChecks()
             SendPing(probe);
     }, 3s);
     Check("1000 pings at once get the client kicked", flood.Closed && flood.Code == Kcp::CloseCode::PolicyViolation,
-        fmt::format("{}, {} pongs before", Describe(flood), flood.Pongs));
+        std::format("{}, {} pongs before", Describe(flood), flood.Pongs));
 
     // Everything a player sends, before the server has loaded the player
     CloseResult early;
@@ -564,7 +565,7 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     for (uint32 spell : { 0u, 6u, 0xFFFFFFFFu })
     {
         Optional<Arena::CastError> error = WaitFailed(rogue, SendCast(rogue, spell, v));
-        Check(fmt::format("spell id {} is UnknownSpell", spell), error == Arena::CastError::UnknownSpell, ErrorName(error));
+        Check(std::format("spell id {} is UnknownSpell", spell), error == Arena::CastError::UnknownSpell, ErrorName(error));
     }
 
     Optional<Arena::CastError> self = WaitFailed(rogue, SendCast(rogue, SPELL_STRIKE, r));
@@ -581,14 +582,14 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     if (apart > 10.0f)
     {
         Optional<Arena::CastError> far = WaitFailed(rogue, SendCast(rogue, SPELL_STRIKE, v));
-        Check("Strike from afar is OutOfRange", far == Arena::CastError::OutOfRange, fmt::format("{} at {:.0f}", ErrorName(far), apart));
+        Check("Strike from afar is OutOfRange", far == Arena::CastError::OutOfRange, std::format("{} at {:.0f}", ErrorName(far), apart));
     }
 
     SendSetTarget(rogue, 4000000000u);
     rogue.WaitState();
     rogue.WaitState();
     Optional<Probe::Seen> seen = rogue.Get(r);
-    Check("SetTarget at a unit that isn't there is no target", seen && seen->Target == 0, fmt::format("target {}", seen ? seen->Target : 0));
+    Check("SetTarget at a unit that isn't there is no target", seen && seen->Target == 0, std::format("target {}", seen ? seen->Target : 0));
 
     // Walking: a cast with a cast time is refused, one started is broken off by a step
     SendInput(rogue, 1, 0);
@@ -616,7 +617,7 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     bool interrupted = std::ranges::any_of(events, [&](Probe::Event const& e) { return e.Type == Arena::CombatEventType::CastInterrupted && e.Caster == r && e.Reason == Arena::InterruptReason::Moved; });
     bool landed = std::ranges::any_of(events, [&](Probe::Event const& e) { return e.Type == Arena::CombatEventType::Damage && e.Caster == r && e.Spell == SPELL_FIREBALL; });
     Check("a step breaks off Fireball, no damage", started && interrupted && !landed,
-        fmt::format("started {}, interrupted {}, landed {}, refused {}", started, interrupted, landed, ErrorName(WaitFailed(rogue, fireball, 0ms))));
+        std::format("started {}, interrupted {}, landed {}, refused {}", started, interrupted, landed, ErrorName(WaitFailed(rogue, fireball, 0ms))));
 
     // Heal is on yourself whatever the packet says
     start = rogue.EventCount();
@@ -625,7 +626,7 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     events = rogue.EventsSince(start);
     bool healedVictim = std::ranges::any_of(events, [&](Probe::Event const& e) { return e.Caster == r && e.Spell == SPELL_HEAL && e.Target == v; });
     bool healedSelf = std::ranges::any_of(events, [&](Probe::Event const& e) { return e.Type == Arena::CombatEventType::SpellGo && e.Spell == SPELL_HEAL && e.Target == r; });
-    Check("Heal at the enemy heals yourself", !heal && healedSelf && !healedVictim, fmt::format("{}, on self {}, on victim {}", ErrorName(heal), healedSelf, healedVictim));
+    Check("Heal at the enemy heals yourself", !heal && healedSelf && !healedVictim, std::format("{}, on self {}, on victim {}", ErrorName(heal), healedSelf, healedVictim));
 
     // Melee
     if (!WalkTo(rogue, v, 2.0f))
@@ -643,7 +644,7 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     std::size_t notReady = 0;
     for (uint32 castId : strikes)
         notReady += WaitFailed(rogue, castId, 0ms) == Arena::CastError::NotReady;
-    Check("20 Strikes at once: 1 lands, 19 NotReady", hits == 1 && notReady == 19, fmt::format("{} landed, {} NotReady", hits, notReady));
+    Check("20 Strikes at once: 1 lands, 19 NotReady", hits == 1 && notReady == 19, std::format("{} landed, {} NotReady", hits, notReady));
 
     // Hammer: the stun holds the victim and its casts, its own cooldown refuses the next
     std::this_thread::sleep_for(1100ms);
@@ -657,7 +658,7 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     Optional<Probe::Seen> during = victim.Get(v);
     bool held = before && during && std::hypot(during->X - before->X, during->Y - before->Y) < 1.0f;
     Check("Hammer lands", !hammer, ErrorName(hammer));
-    Check("a stunned victim can't walk", held, before && during ? fmt::format("moved {:.1f}", std::hypot(during->X - before->X, during->Y - before->Y)) : "no state");
+    Check("a stunned victim can't walk", held, before && during ? std::format("moved {:.1f}", std::hypot(during->X - before->X, during->Y - before->Y)) : "no state");
     Check("a stunned victim can't cast", stunnedCast == Arena::CastError::Stunned, ErrorName(stunnedCast));
     SendInput(victim, 0, 0);
 
@@ -688,7 +689,7 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     rogue.WaitState();
     Optional<Probe::Seen> drained = rogue.Get(r);
     Check("Poison until NoMana, mana never below 0", poison == Arena::CastError::NoMana && drained && drained->Mana < 15 && drained->Mana <= drained->MaxMana,
-        fmt::format("{} after {} casts, mana {}", ErrorName(poison), poisons, drained ? drained->Mana : 0));
+        std::format("{} after {} casts, mana {}", ErrorName(poison), poisons, drained ? drained->Mana : 0));
 
     // Strike until the victim dies
     bool dead = false;
@@ -716,7 +717,7 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     during = victim.Get(v);
     SendInput(victim, 0, 0);
     Check("a dead victim can't walk", before && during && std::hypot(during->X - before->X, during->Y - before->Y) < 1.0f,
-        before && during ? fmt::format("moved {:.1f}", std::hypot(during->X - before->X, during->Y - before->Y)) : "no state");
+        before && during ? std::format("moved {:.1f}", std::hypot(during->X - before->X, during->Y - before->Y)) : "no state");
 }
 
 void Rogue::SessionChecks(std::shared_ptr<Probe>& rogue, std::shared_ptr<Probe>& victim)
@@ -734,19 +735,19 @@ void Rogue::SessionChecks(std::shared_ptr<Probe>& rogue, std::shared_ptr<Probe>&
     victim = Join(Prefix + "_v");
     Optional<Probe::Seen> revived = victim ? victim->Get(victim->Id) : Optional<Probe::Seen>();
     Check("a dead player logging in again is still dead", corpse && !corpse->Health && revived && !revived->Health,
-        revived ? fmt::format("health {} -> {} at once", corpse ? corpse->Health : 0, revived->Health) : "could not join");
+        revived ? std::format("health {} -> {} at once", corpse ? corpse->Health : 0, revived->Health) : "could not join");
 
     rogue = Join(Prefix + "_r");
     Optional<Probe::Seen> healed = rogue ? rogue->Get(rogue->Id) : Optional<Probe::Seen>();
     Check("a hurt player logging in again is still hurt", hurt && healed && hurt->Health < hurt->MaxHealth && healed->Health == hurt->Health,
-        hurt && healed ? fmt::format("health {} -> {}, mana {} -> {}", hurt->Health, healed->Health, hurt->Mana, healed->Mana) : "no state");
+        hurt && healed ? std::format("health {} -> {}, mana {} -> {}", hurt->Health, healed->Health, hurt->Mana, healed->Mana) : "no state");
 
     if (rogue && victim && WalkTo(*rogue, victim->Id, 2.0f))
     {
         // The rogue's Hammer was cast less than a minute ago, its cooldown is 15 s: wait out the
         // global cooldown only. A relog that keeps cooldowns refuses it if under 15 s have passed
         Optional<Arena::CastError> hammer = WaitFailed(*rogue, SendCast(*rogue, SPELL_HAMMER, victim->Id));
-        fmt::print("     (Hammer right after the relog: {}; the last one was cast about 30 s ago, so this says little)\n", ErrorName(hammer));
+        std::print("     (Hammer right after the relog: {}; the last one was cast about 30 s ago, so this says little)\n", ErrorName(hammer));
     }
 
     // A ticket is good for one connection
@@ -757,7 +758,7 @@ void Rogue::SessionChecks(std::shared_ptr<Probe>& rogue, std::shared_ptr<Probe>&
         std::shared_ptr<Probe> second = Connect(*login);
         bool secondIn = second->Wait([&] { return second->Opened || second->Closed; }, 6s) && second->Opened;
         Check("a ticket used twice opens one connection", firstIn && !secondIn,
-            fmt::format("first {}, second {} ({} {})", firstIn, secondIn, second->CloseCode, second->CloseReason));
+            std::format("first {}, second {} ({} {})", firstIn, secondIn, second->CloseCode, second->CloseReason));
         first->Close();
         second->Close();
         std::this_thread::sleep_for(200ms);
@@ -769,7 +770,7 @@ void Rogue::SessionChecks(std::shared_ptr<Probe>& rogue, std::shared_ptr<Probe>&
         std::shared_ptr<Probe> second = first ? Join(Prefix + "_x") : nullptr;
         bool kicked = first && first->Wait([&] { return first->Closed; }, 2s);
         Check("logging in again elsewhere kicks the first", kicked && second,
-            first ? fmt::format("first closed {} \"{}\"", first->CloseCode, first->CloseReason) : "could not join");
+            first ? std::format("first closed {} \"{}\"", first->CloseCode, first->CloseReason) : "could not join");
         if (second)
             second->Close();
     }
@@ -782,20 +783,20 @@ void Rogue::SessionChecks(std::shared_ptr<Probe>& rogue, std::shared_ptr<Probe>&
         std::size_t start = chats().size();
         SendChat(*rogue, std::string_view("\xff\xfe\xfd", 3));
         std::this_thread::sleep_for(600ms);
-        Check("chat that isn't UTF-8 is dropped", chats().size() == start, fmt::format("{} lines", chats().size() - start));
+        Check("chat that isn't UTF-8 is dropped", chats().size() == start, std::format("{} lines", chats().size() - start));
 
         SendChat(*rogue, std::string(3000, 'w'));
         victim->Wait([&] { return victim->Chats.size() > start; }, 1s);
         std::vector<std::string> lines = chats();
         Check("3000 character chat is cut to 200", lines.size() == start + 1 && lines.back().size() <= 200,
-            lines.size() > start ? fmt::format("{} characters", lines.back().size()) : "nothing");
+            lines.size() > start ? std::format("{} characters", lines.back().size()) : "nothing");
 
         std::this_thread::sleep_for(600ms);
         start = chats().size();
         for (int i = 0; i < 10; ++i)
-            SendChat(*rogue, fmt::format("spam {}", i));
+            SendChat(*rogue, std::format("spam {}", i));
         std::this_thread::sleep_for(800ms);
-        Check("10 chat lines at once: 1 goes out", chats().size() - start == 1, fmt::format("{} went out", chats().size() - start));
+        Check("10 chat lines at once: 1 goes out", chats().size() - start == 1, std::format("{} went out", chats().size() - start));
     }
 
     // Input past -1..1 walks at the normal speed: 220 a second, diagonally too
@@ -813,7 +814,7 @@ void Rogue::SessionChecks(std::shared_ptr<Probe>& rogue, std::shared_ptr<Probe>&
             double seconds = std::chrono::duration<double>(Clock::now() - begin).count();
             SendInput(*rogue, 0, 0);
             double speed = to ? std::hypot(to->X - from->X, to->Y - from->Y) / seconds : 0.0;
-            Check("Input of 127/-128 walks at the normal speed", speed > 150.0 && speed < 260.0, fmt::format("{:.0f} a second", speed));
+            Check("Input of 127/-128 walks at the normal speed", speed > 150.0 && speed < 260.0, std::format("{:.0f} a second", speed));
         }
     }
 }
@@ -832,7 +833,7 @@ void Rogue::HttpChecks()
         other += status != http::status::unauthorized && status != http::status::too_many_requests;
     }
     double ms = std::chrono::duration<double, std::milli>(Clock::now() - begin).count() / 30;
-    Check("30 wrong passwords in a row get rate limited", limited > 0, fmt::format("{} refused, {} limited, {} other, {:.0f} ms each", refused, limited, other, ms));
+    Check("30 wrong passwords in a row get rate limited", limited > 0, std::format("{} refused, {} limited, {} other, {:.0f} ms each", refused, limited, other, ms));
 }
 }
 
@@ -848,7 +849,7 @@ int main(int argc, char** argv)
 
     try
     {
-        fmt::print("-- packets\n");
+        std::print("-- packets\n");
         rogue.PacketChecks();
 
         std::shared_ptr<Probe> attacker = rogue.Join(rogue.Prefix + "_r");
@@ -859,13 +860,13 @@ int main(int argc, char** argv)
         {
             // A victim from an earlier run may still be dead
             victim->Wait([&] { Probe::Seen const* s = victim->Find(victim->Id); return s && s->Health; }, 6s);
-            fmt::print("-- rules\n");
+            std::print("-- rules\n");
             rogue.RuleChecks(*attacker, *victim);
-            fmt::print("-- sessions\n");
+            std::print("-- sessions\n");
             rogue.SessionChecks(attacker, victim);
         }
 
-        fmt::print("-- http\n");
+        std::print("-- http\n");
         rogue.HttpChecks();
 
         if (attacker)
@@ -876,11 +877,11 @@ int main(int argc, char** argv)
     }
     catch (std::exception const& e)
     {
-        fmt::print("error: {}\n", e.what());
+        std::print("error: {}\n", e.what());
         ++rogue.FailedChecks;
     }
 
-    fmt::print("-- {} passed, {} failed\n", rogue.Passed, rogue.FailedChecks);
+    std::print("-- {} passed, {} failed\n", rogue.Passed, rogue.FailedChecks);
     work.reset();
     rogue.Context.stop();
     thread.join();

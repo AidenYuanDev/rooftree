@@ -2,7 +2,7 @@
 
 ## 1. 是什么
 
-- **`StringFormat.h`**：[{fmt}](https://github.com/fmtlib/fmt) 的薄封装。日志（`RT_LOG_*`）、控制台输出、错误信息，所有拼字符串的地方都用它。
+- **`StringFormat.h`**：C++20 `std::format` 的薄封装。日志（`RT_LOG_*`）、控制台输出、错误信息，所有拼字符串的地方都用它。
 - **`StringConvert.h`**：`Rooftree::StringTo<T>(text)`，把整段文本读成一个数或 bool，读不了就返回空。用来解析配置值、URL 参数、命令参数。
 - **`Util.h`**：几个小工具：按分隔符切分、十六进制、UTF-8 长度和截断、"1d12h" 这样的时长。
 
@@ -14,10 +14,10 @@
 |---|---|
 | `Rooftree::StringFormat(format, args...)` | 格式化，返回 `std::string` |
 | `Rooftree::StringFormatTo(out, format, args...)` | 写到输出迭代器，不产生中间字符串 |
-| `Rooftree::FormatString<Args...>` | 即 `fmt::format_string`：格式串和参数在**编译期**检查 |
+| `Rooftree::FormatString<Args...>` | 即 `std::format_string`：格式串和参数在**编译期**检查 |
 | `Rooftree::StringVFormat(format, args)` | 参数已经打包成 `FormatArgs` 时用（日志的实现），格式不对时返回说明文字而不是抛异常 |
-| `fmt::formatter<Optional<T>>` | `Optional` 直接格式化，空值输出 `(none)` |
-| `format_as(enum)` | 枚举按底层整数格式化 |
+| `Rooftree::OrNone(optional)` | 格式化 `Optional`：有值输出值（格式说明只作用于值），空值输出 `(none)`。标准不允许为 `std::optional<int>` 这种标准类型特化 `std::formatter`，所以要显式包一层 |
+| `std::to_underlying(enum)` | 枚举没有默认格式，按底层整数输出时显式转换 |
 
 ```cpp
 std::string s = Rooftree::StringFormat("{} has {} hp ({:.1f}%)", name, hp, hp * 100.0 / maxHp);
@@ -88,7 +88,7 @@ StringTo<bool>("yes") / ("on") / ("1") == true    // 也接受 true、y，大小
 
 - [tests/test_StringConvert.cpp](../tests/test_StringConvert.cpp)：`StringTo` 的整数、进制、范围、浮点数、bool。
 - [tests/test_Framework.cpp](../tests/test_Framework.cpp)：`"UTF-8 is counted and cut by code point"`、`"Text helpers: split, hex, case, durations"`。
-- [benchmarks/bench_Base.cpp](../benchmarks/bench_Base.cpp)：`StringFormat` 对 `fmt::format` 和 `snprintf`，`StringTo`，UTF-8。
+- [benchmarks/bench_Base.cpp](../benchmarks/bench_Base.cpp)：`StringFormat` 对 `std::format` 和 `snprintf`，`StringTo`，UTF-8。
 
 ## 8. 思考题
 
