@@ -80,7 +80,7 @@ build/bin/benchmarks --benchmark-samples 10   # 快速过一遍
 所有可执行文件都输出到 `build/bin/`。`cmake/` 下四个文件：
 
 - `Options.cmake`：下表的选项
-- `Compiler.cmake`：GCC 12 / Clang 16 以上、C++20、输出目录、链接器；警告和 sanitizer 都挂在 INTERFACE 目标 `rooftree-core-interface` 上，我们自己的每个目标都链接它，系统的库不受影响
+- `Compiler.cmake`：GCC 14 / Clang 18 以上、C++23、输出目录、链接器；警告和 sanitizer 都挂在 INTERFACE 目标 `rooftree-core-interface` 上，我们自己的每个目标都链接它，系统的库不受影响
 - `SourceFiles.cmake`：`CollectAndAddSourceFiles`，把一个目录下的源文件和头文件（含子目录）加进目标
 - `Summary.cmake`：配置时打印一份选项汇总
 

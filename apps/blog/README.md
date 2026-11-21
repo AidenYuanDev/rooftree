@@ -37,7 +37,7 @@
 
 | 目录 | 内容 |
 |---|---|
-| `server/` | API 服务器（C++20）。请求在主线程上按客户端地址分会话处理，见 [docs/29](../../docs/29-server-core.md) |
+| `server/` | API 服务器（C++23）。请求在主线程上按客户端地址分会话处理，见 [docs/29](../../docs/29-server-core.md) |
 | `db/migrations/` | 表结构，用 [dbmate](https://github.com/amacneil/dbmate) 执行 |
 | `web/` | 前端：React 19、React Router 8（框架模式，`ssr: false` + 预渲染）、TanStack Query、Tailwind v4 + shadcn/ui |
 | `tests/` | API 测试，连真实的服务器和数据库 |

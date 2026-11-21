@@ -5,7 +5,7 @@
 它分成 `rooftree-common` / `rooftree-network` / `rooftree-database` 三个静态库，再加上 `rooftree-server`。
 
 - 许可证：GPL-3.0 或更新版本（见 `COPYING`）；第三方组件见 `NOTICE`
-- 网络和数据库核心用 C++20 协程，配置用 yaml-cpp，数据库用 PostgreSQL
+- C++23；网络和数据库核心用协程，配置用 yaml-cpp，数据库用 PostgreSQL
 
 ## 快速开始
 

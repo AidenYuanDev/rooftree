@@ -1,27 +1,27 @@
 # This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
 #
-# GCC or Clang on a Unix: C++20, the warnings, the sanitizers. rooftree-core-interface carries them,
+# GCC or Clang on a Unix: C++23, the warnings, the sanitizers. rooftree-core-interface carries them,
 # every target of ours links it
 
 if(NOT UNIX)
   message(FATAL_ERROR "Rooftree builds on Unix-like systems only")
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(ROOFTREE_GCC ON)
-  set(minimum 12.0)
+  set(minimum 14.0)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(ROOFTREE_CLANG ON)
-  set(minimum 16.0)
+  set(minimum 18.0)
 else()
   message(FATAL_ERROR "${CMAKE_CXX_COMPILER_ID} isn't supported, use GCC or Clang")
 endif()
 if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS minimum)
-  message(FATAL_ERROR "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}: Rooftree needs ${minimum} or later (C++20 coroutines)")
+  message(FATAL_ERROR "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}: Rooftree needs ${minimum} or later (C++23: <print>, <expected>, <stacktrace>)")
 endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
