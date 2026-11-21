@@ -322,16 +322,15 @@ TEST_CASE("The console socket runs a client's commands", "[server][console]")
     auto workGuard = boost::asio::make_work_guard(ioContext);
     std::thread ioThread([&] { ioContext.run(); });
     ConsoleSocketServer server(mgr, table, "> ");
-    std::string error;
-    REQUIRE(server.Start(ioContext, path, error));
+    REQUIRE(server.Start(ioContext, path));
     // Only for its owner
     CHECK((std::filesystem::status(path).permissions() & std::filesystem::perms::all) == (std::filesystem::perms::owner_read | std::filesystem::perms::owner_write));
     // A second server on the same socket is refused
     {
         ConsoleSocketServer second(mgr, table);
-        std::string secondError;
-        CHECK_FALSE(second.Start(ioContext, path, secondError));
-        CHECK(secondError.find("another server") != std::string::npos);
+        Rooftree::Result<> started = second.Start(ioContext, path);
+        REQUIRE_FALSE(started);
+        CHECK(started.error().find("another server") != std::string::npos);
     }
 
     boost::asio::io_context clientContext;

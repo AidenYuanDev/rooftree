@@ -105,11 +105,10 @@ TEST_CASE("Config lookups", "[config]")
 {
     // Every Get copies the node out of the shared tree before decoding it, settings are meant to be
     // read on load (OnLoaded) and cached, not looked up on hot paths
-    std::string error;
     std::string yaml = "Server:\n  Name: rooftree\n  Port: 8085\n  Ratio: 1.5\n  Enabled: true\nRates:\n";
     for (int i = 0; i < 200; ++i)
         yaml += "  Rate" + std::to_string(i) + ": " + std::to_string(i) + "\n";
-    REQUIRE(sConfigMgr->LoadString(yaml, error));
+    REQUIRE(sConfigMgr->LoadString(yaml));
     std::shared_ptr<Config const> config = sConfigMgr->GetConfig();
 
     BENCHMARK("GetConfig") { return sConfigMgr->GetConfig(); };
@@ -124,7 +123,6 @@ TEST_CASE("Config lookups", "[config]")
     BENCHMARK("Get<std::map> of a 200 key table") { return config->Get<std::map<std::string, int>>("Rates", {}).size(); };
     BENCHMARK("LoadString (205 keys)")
     {
-        std::string loadError;
-        return sConfigMgr->LoadString(yaml, loadError);
+        return sConfigMgr->LoadString(yaml).has_value();
     };
 }

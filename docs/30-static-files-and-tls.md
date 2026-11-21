@@ -14,7 +14,7 @@
 | 类 / 函数 | 作用 | 位置 |
 |---|---|---|
 | `StaticSite` | 一个目录里的所有文件，按 URL 路径（`/zh/index.html`）存在内存里 | [StaticSite.h](../src/server/shared/http/StaticSite.h) |
-| `StaticSite::Load(directory, error)` | 读目录（本身可以是指向某个版本的符号链接），`name.gz` 当作 `name` 的 gzip 版本 | [StaticSite.cpp:89](../src/server/shared/http/StaticSite.cpp#L89) |
+| `StaticSite::Load(directory)` | 读目录（本身可以是指向某个版本的符号链接），`name.gz` 当作 `name` 的 gzip 版本 | [StaticSite.cpp:89](../src/server/shared/http/StaticSite.cpp#L89) |
 | `StaticSiteHolder` | 当前在用的站点，任意线程读，整体替换 | [:163](../src/server/shared/http/StaticSite.cpp#L163) |
 | `GetRequestPath(request)` | 请求目标的路径，百分号解码、去掉查询，和路由用同一套检查 | [:173](../src/server/shared/http/StaticSite.cpp#L173) |
 | `SetStaticResponse(context, file, cacheControl)` | 设置 Content-Type、ETag（命中 `If-None-Match` 回 304）、客户端接受时回 gzip | [:237](../src/server/shared/http/StaticSite.cpp#L237) |
@@ -22,9 +22,9 @@
 | `DispatcherService::SetFallbackHandler` | 没有路由匹配时调用它，而不是直接 404 | [HttpService.h](../src/common/network/http/HttpService.h) |
 | `DispatcherService::SetDefaultHeaders` | 每个响应都带上的头（安全响应头） | [HttpService.h](../src/common/network/http/HttpService.h) |
 | `OptionalSslStream<Wrapped>` | 运行时决定是 TLS 还是明文的流，接受连接时选 | [OptionalSslStream.h:23](../src/common/network/OptionalSslStream.h#L23) |
-| `CreateServerSslContext(chain, key, error)` | 从 certbot 的 PEM 文件建 TLS context：只开 TLS 1.2/1.3、前向安全的 AEAD 套件 | [SslContext.cpp:34](../src/common/network/SslContext.cpp#L34) |
+| `CreateServerSslContext(chain, key)` | 从 certbot 的 PEM 文件建 TLS context：只开 TLS 1.2/1.3、前向安全的 AEAD 套件 | [SslContext.cpp:33](../src/common/network/SslContext.cpp#L33) |
 | `WorldHttpSettings::SslCertificateFile` / `SslPrivateKeyFile` | 设了就是 TLS 服务 | [WorldHttpService.h:143](../src/server/shared/http/WorldHttpService.h#L143) |
-| `WorldHttpService::LoadSslContext(error)` | 读证书；`StartNetwork` 之前调用，续期后再调用 | [WorldHttpService.cpp:278](../src/server/shared/http/WorldHttpService.cpp#L278) |
+| `WorldHttpService::LoadSslContext()` | 读证书；`StartNetwork` 之前调用，续期后再调用 | [WorldHttpService.cpp:278](../src/server/shared/http/WorldHttpService.cpp#L278) |
 | `WorldHttpSettings::RedirectToOrigin` / `RedirectExempt` | 明文服务把请求 301 到 TLS 地址，ACME 和豁免地址除外 | [WorldHttpService.h:148](../src/server/shared/http/WorldHttpService.h#L148) |
 
 ## 3. 关键实现
@@ -81,7 +81,7 @@
 
 ### 3.6 TLS context
 
-`CreateServerSslContext`（[SslContext.cpp:34](../src/common/network/SslContext.cpp#L34)）按 Mozilla 的 "intermediate" 配置：
+`CreateServerSslContext`（[SslContext.cpp:33](../src/common/network/SslContext.cpp#L33)）按 Mozilla 的 "intermediate" 配置：
 
 - 只开 TLS 1.2 和 1.3（`SSL_CTX_set_min_proto_version`，再加上 `no_tlsv1`、`no_tlsv1_1`）；
 - TLS 1.2 只用 ECDHE + AES-GCM / ChaCha20-Poly1305（[:16](../src/common/network/SslContext.cpp#L16)），去掉了需要 DH 参数文件的 DHE 套件；TLS 1.3 的套件 OpenSSL 默认就都是安全的；

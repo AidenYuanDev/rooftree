@@ -56,23 +56,17 @@ bool GetBool(boost::json::object const& object, std::string_view key)
 }
 
 // GET url with the token, a JSON body back
-Optional<boost::json::value> FetchJson(std::string const& url, std::string const& accessToken, std::string& error)
+Rooftree::Result<boost::json::value> FetchJson(std::string const& url, std::string const& accessToken)
 {
     Rooftree::Server::HttpClientResponse response = Rooftree::Server::HttpFetch({ .Url = url,
         .Headers = { { "Authorization", "Bearer " + accessToken }, { "Accept", "application/json" } } });
     if (response.Status != 200)
-    {
-        error = response.Status ? Rooftree::StringFormat("{} answered {}", url, response.Status) : response.Error;
-        return {};
-    }
+        return std::unexpected(response.Status ? Rooftree::StringFormat("{} answered {}", url, response.Status) : response.Error);
 
     boost::system::error_code parseError;
     boost::json::value value = boost::json::parse(response.Body, parseError);
     if (parseError)
-    {
-        error = url + " didn't answer JSON";
-        return {};
-    }
+        return std::unexpected(url + " didn't answer JSON");
     return value;
 }
 }
@@ -121,8 +115,8 @@ std::string BuildOAuthAuthorizeUrl(OAuthProvider const& provider, std::string_vi
     return provider.AuthorizeUrl + (provider.AuthorizeUrl.find('?') != std::string::npos ? '&' : '?') + Rooftree::Server::FormUrlEncode(query);
 }
 
-Optional<OAuthIdentity> WorkerFetchOAuthIdentity(OAuthProvider const& provider, std::string const& redirectUri, std::string const& code,
-    std::string const& codeVerifier, std::string& error)
+Rooftree::Result<OAuthIdentity> WorkerFetchOAuthIdentity(OAuthProvider const& provider, std::string const& redirectUri, std::string const& code,
+    std::string const& codeVerifier)
 {
     Rooftree::Server::HttpClientResponse tokenResponse = Rooftree::Server::HttpFetch({ .Method = "POST", .Url = provider.TokenUrl,
         .Headers = { { "Accept", "application/json" }, { "Content-Type", "application/x-www-form-urlencoded" } },
@@ -135,27 +129,19 @@ Optional<OAuthIdentity> WorkerFetchOAuthIdentity(OAuthProvider const& provider, 
             { "code_verifier", codeVerifier },
         }) });
     if (tokenResponse.Status != 200)
-    {
-        error = tokenResponse.Status ? Rooftree::StringFormat("the token endpoint answered {}", tokenResponse.Status) : tokenResponse.Error;
-        return {};
-    }
+        return std::unexpected(tokenResponse.Status ? Rooftree::StringFormat("the token endpoint answered {}", tokenResponse.Status) : tokenResponse.Error);
 
     // GitHub answers 200 with {"error": ...} for a bad code
     Optional<boost::json::object> token = ParseObject(tokenResponse.Body);
     std::string accessToken = token ? GetString(*token, "access_token") : "";
     if (accessToken.empty())
-    {
-        error = token ? "no token: " + GetString(*token, "error") : "the token endpoint didn't answer JSON";
-        return {};
-    }
+        return std::unexpected(token ? "no token: " + GetString(*token, "error") : "the token endpoint didn't answer JSON");
 
-    Optional<boost::json::value> userValue = FetchJson(provider.UserUrl, accessToken, error);
-    if (!userValue || !userValue->is_object())
-    {
-        if (error.empty())
-            error = "the user isn't an object";
-        return {};
-    }
+    Rooftree::Result<boost::json::value> userValue = FetchJson(provider.UserUrl, accessToken);
+    if (!userValue)
+        return std::unexpected(std::move(userValue.error()));
+    if (!userValue->is_object())
+        return std::unexpected("the user isn't an object");
 
     boost::json::object const& user = userValue->as_object();
     OAuthIdentity identity;
@@ -175,8 +161,8 @@ Optional<OAuthIdentity> WorkerFetchOAuthIdentity(OAuthProvider const& provider, 
         identity.Name = GetString(user, "name");
         identity.AvatarUrl = GetString(user, "avatar_url");
 
-        // The primary address if verified, else any verified one
-        Optional<boost::json::value> emails = FetchJson(provider.EmailsUrl, accessToken, error);
+        // The primary address if verified, else any verified one; none when they don't come
+        Rooftree::Result<boost::json::value> emails = FetchJson(provider.EmailsUrl, accessToken);
         if (emails && emails->is_array())
         {
             for (boost::json::value const& entry : emails->as_array())
@@ -187,14 +173,10 @@ Optional<OAuthIdentity> WorkerFetchOAuthIdentity(OAuthProvider const& provider, 
                     identity.Email = GetString(entry.as_object(), "email");
             }
         }
-        error.clear();
     }
 
     if (identity.ProviderUserId.empty())
-    {
-        error = "the user has no id";
-        return {};
-    }
+        return std::unexpected("the user has no id");
 
     // The server downloads it later: an https:// address only, plain http only from the tests' fake
     // provider (its endpoints are plain http too)

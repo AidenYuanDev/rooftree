@@ -138,10 +138,9 @@ void WaitForReloadSignal(SignalSet& signals)
 int main(int argc, char** argv)
 {
     std::string configFile = argc > 1 ? argv[1] : "arena.yaml";
-    std::string configError;
-    if (!sConfigMgr->LoadFile(configFile, configError))
+    if (Rooftree::Result<> loaded = sConfigMgr->LoadFile(configFile); !loaded)
     {
-        std::print(stderr, "Could not load {}: {}\n", configFile, configError);
+        std::print(stderr, "Could not load {}: {}\n", configFile, loaded.error());
         return 1;
     }
 

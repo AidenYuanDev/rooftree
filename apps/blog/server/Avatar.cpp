@@ -114,19 +114,13 @@ void RemoveAvatarFile(std::string const& directory, std::string_view name)
     std::filesystem::remove(directory + "/" + std::string(name), error);
 }
 
-Optional<std::string> WorkerFetchProviderAvatar(std::string_view provider, std::string const& url, std::string& error)
+Rooftree::Result<std::string> WorkerFetchProviderAvatar(std::string_view provider, std::string const& url)
 {
     Rooftree::Server::HttpClientResponse response = Rooftree::Server::HttpFetch({ .Url = SizedAvatarUrl(provider, url), .Timeout = 10s });
     if (response.Status != 200)
-    {
-        error = response.Status ? Rooftree::StringFormat("the picture's address answered {}", response.Status) : response.Error;
-        return {};
-    }
+        return std::unexpected(response.Status ? Rooftree::StringFormat("the picture's address answered {}", response.Status) : response.Error);
     if (response.Body.size() > MaxAvatarSize || AvatarExtension(response.Body).empty())
-    {
-        error = "not a JPEG, PNG or WebP picture of at most 512 KiB";
-        return {};
-    }
+        return std::unexpected("not a JPEG, PNG or WebP picture of at most 512 KiB");
     return std::move(response.Body);
 }
 }

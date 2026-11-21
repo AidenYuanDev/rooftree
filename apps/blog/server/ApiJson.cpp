@@ -136,9 +136,8 @@ FlatJsonSchema const& GetApiSchema()
     static FlatJsonSchema const schema = []
     {
         FlatJsonSchema loaded(ApiBinarySchema::data());
-        std::string error;
-        bool ok = loaded.Load(error);
-        ASSERT(ok, "Api.fbs: %s", error.c_str());
+        Rooftree::Result<> ok = loaded.Load();
+        ASSERT(ok, "Api.fbs: %s", ok ? "" : ok.error().c_str());
         return loaded;
     }();
     return schema;

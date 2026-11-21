@@ -14,6 +14,7 @@
 #define ROOFTREE_SSL_CONTEXT_H
 
 #include "Define.h"
+#include "Result.h"
 #include <boost/asio/ssl/context.hpp>
 #include <memory>
 #include <string>
@@ -21,9 +22,9 @@
 namespace Rooftree::Net
 {
 // certificateChainFile: the certificate followed by the intermediates (certbot's fullchain.pem).
-// Null, with error set, if a file can't be read or the key doesn't belong to the certificate
-std::shared_ptr<boost::asio::ssl::context> CreateServerSslContext(std::string const& certificateChainFile,
-    std::string const& privateKeyFile, std::string& error);
+// The error says why if a file can't be read or the key doesn't belong to the certificate
+Result<std::shared_ptr<boost::asio::ssl::context>> CreateServerSslContext(std::string const& certificateChainFile,
+    std::string const& privateKeyFile);
 }
 
 #endif // ROOFTREE_SSL_CONTEXT_H

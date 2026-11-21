@@ -173,8 +173,7 @@ struct Schema
 {
     Schema()
     {
-        std::string error;
-        REQUIRE(Flat.Load(error));
+        REQUIRE(Flat.Load());
         Post = Flat.Find("BenchPackets.Post");
         Input = Flat.Find("BenchPackets.PostInput");
         List = Flat.Find("BenchPackets.PostsList");

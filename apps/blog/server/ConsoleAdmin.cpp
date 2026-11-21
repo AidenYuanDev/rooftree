@@ -190,9 +190,13 @@ Rooftree::Task<void> PrepareAndCall(CommandHandler& handler, std::vector<std::st
 
         for (std::string const& path : files)
         {
-            std::string& data = prepared.Files.emplace_back();
-            if (!ReadConsoleFile(path, data, prepared.Error))
+            Rooftree::Result<std::string> data = ReadConsoleFile(path);
+            if (!data)
+            {
+                prepared.Error = std::move(data.error());
                 return prepared;
+            }
+            prepared.Files.push_back(std::move(*data));
         }
 
         for (Lookup const& lookup : lookups)
@@ -1465,29 +1469,20 @@ Rooftree::Server::Command Cmd(std::string name, std::string help, Rooftree::Serv
 }
 }
 
-bool ReadConsoleFile(std::string const& path, std::string& data, std::string& error)
+Rooftree::Result<std::string> ReadConsoleFile(std::string const& path)
 {
     std::error_code code;
     std::uintmax_t size = std::filesystem::file_size(path, code);
     if (code)
-    {
-        error = Rooftree::StringFormat("{}: {}", path, code.message());
-        return false;
-    }
+        return std::unexpected(Rooftree::StringFormat("{}: {}", path, code.message()));
     if (size > MaxConsoleFile)
-    {
-        error = Rooftree::StringFormat("{}: larger than {} MB", path, MaxConsoleFile / 1024 / 1024);
-        return false;
-    }
+        return std::unexpected(Rooftree::StringFormat("{}: larger than {} MB", path, MaxConsoleFile / 1024 / 1024));
 
     std::ifstream file(path, std::ios::binary);
-    data.resize(size);
+    std::string data(size, '\0');
     if (!file || !file.read(data.data(), std::streamsize(size)))
-    {
-        error = Rooftree::StringFormat("{}: can't be read", path);
-        return false;
-    }
-    return true;
+        return std::unexpected(Rooftree::StringFormat("{}: can't be read", path));
+    return data;
 }
 
 std::vector<Rooftree::Server::Command> GetConsoleAdminCommands()

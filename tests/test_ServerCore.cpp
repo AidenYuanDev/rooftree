@@ -178,8 +178,7 @@ private:
 
     static void LoadLogConfig(std::string const& config)
     {
-        std::string error;
-        REQUIRE(sConfigMgr->LoadString(config, error));
+        REQUIRE(sConfigMgr->LoadString(config));
         sLog->LoadFromConfig();
     }
 };

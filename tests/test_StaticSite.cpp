@@ -66,10 +66,9 @@ TEST_CASE("StaticSite loads a directory into memory", "[server][static]")
     directory.Write("assets/app-1a2b.js.gz", "gzipped bytes");
     directory.Write("orphan.txt.gz", "no plain twin");
 
-    std::string error;
-    std::shared_ptr<StaticSite const> site = StaticSite::Load(directory.Path(), error);
-    REQUIRE(site);
-    CHECK(error.empty());
+    Rooftree::Result<std::shared_ptr<StaticSite const>> loaded = StaticSite::Load(directory.Path());
+    REQUIRE(loaded);
+    std::shared_ptr<StaticSite const> site = *loaded;
     CHECK(site->GetFileCount() == 4);
 
     StaticFile const* home = site->Find("/index.html");
@@ -97,7 +96,7 @@ TEST_CASE("StaticSite loads a directory into memory", "[server][static]")
     {
         std::filesystem::path link = directory.Path().parent_path() / (directory.Path().filename().string() + "-current");
         std::filesystem::create_directory_symlink(directory.Path(), link);
-        std::shared_ptr<StaticSite const> linked = StaticSite::Load(link, error);
+        std::shared_ptr<StaticSite const> linked = StaticSite::Load(link).value_or(nullptr);
         std::filesystem::remove(link);
         REQUIRE(linked);
         CHECK(linked->Find("/zh/index.html"));
@@ -105,8 +104,9 @@ TEST_CASE("StaticSite loads a directory into memory", "[server][static]")
 
     SECTION("a missing directory")
     {
-        CHECK_FALSE(StaticSite::Load(directory.Path() / "nope", error));
-        CHECK_FALSE(error.empty());
+        Rooftree::Result<std::shared_ptr<StaticSite const>> missing = StaticSite::Load(directory.Path() / "nope");
+        REQUIRE_FALSE(missing);
+        CHECK(missing.error().find("is not a directory") != std::string::npos);
     }
 
     SECTION("the holder swaps sites as a whole")

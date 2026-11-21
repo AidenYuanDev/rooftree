@@ -799,9 +799,8 @@ TEST_CASE("WorldHttpService over TLS", "[server][http][tls]")
     WorldHttpService service("test.tls", sessions);
     service.SetSettings({ .SslCertificateFile = certificate.CertificateFile, .SslPrivateKeyFile = certificate.KeyFile });
     service.Route(http::verb::get, "/hello/{name}", "test.hello", &TestServerSession::HandleHello);
-    std::string error;
     REQUIRE(service.IsSsl());
-    REQUIRE(service.LoadSslContext(error));
+    REQUIRE(service.LoadSslContext());
 
     MainLoop mainLoop(sessions);
     REQUIRE(service.StartNetwork(context.Get(), "127.0.0.1", port, 1));
@@ -845,7 +844,7 @@ TEST_CASE("WorldHttpService over TLS", "[server][http][tls]")
     {
         std::string oldFingerprint = PeerFingerprint(*first);
         certificate.Renew();
-        REQUIRE(service.LoadSslContext(error));
+        REQUIRE(service.LoadSslContext());
 
         std::unique_ptr<TlsClient> second = ConnectTls(clientIo, clientContext, port);
         CHECK(PeerFingerprint(*second) != oldFingerprint);
@@ -858,8 +857,9 @@ TEST_CASE("WorldHttpService over TLS", "[server][http][tls]")
         std::filesystem::copy_file(certificate.KeyFile, otherKey);
         certificate.Renew();
         std::filesystem::copy_file(otherKey, certificate.KeyFile, std::filesystem::copy_options::overwrite_existing);
-        CHECK_FALSE(service.LoadSslContext(error));
-        CHECK_THAT(error, Catch::Matchers::ContainsSubstring("privkey.pem"));
+        Rooftree::Result<> wrongKey = service.LoadSslContext();
+        REQUIRE_FALSE(wrongKey);
+        CHECK_THAT(wrongKey.error(), Catch::Matchers::ContainsSubstring("privkey.pem"));
         std::unique_ptr<TlsClient> third = ConnectTls(clientIo, clientContext, port);
         CHECK(PeerFingerprint(*third) == newFingerprint);
     }
@@ -908,9 +908,9 @@ TEST_CASE("WorldHttpService refuses certificates it can't use", "[server][http][
     TestServerSessionMgr sessions;
     WorldHttpService service("test.tls", sessions);
     service.SetSettings({ .SslCertificateFile = "/nonexistent/fullchain.pem", .SslPrivateKeyFile = "/nonexistent/privkey.pem" });
-    std::string error;
-    CHECK_FALSE(service.LoadSslContext(error));
-    CHECK_THAT(error, Catch::Matchers::ContainsSubstring("/nonexistent/fullchain.pem"));
+    Rooftree::Result<> loaded = service.LoadSslContext();
+    REQUIRE_FALSE(loaded);
+    CHECK_THAT(loaded.error(), Catch::Matchers::ContainsSubstring("/nonexistent/fullchain.pem"));
 }
 
 TEST_CASE("WebSocketRoute over TLS, closed when silent", "[server][websocket][tls]")
@@ -929,8 +929,7 @@ TEST_CASE("WebSocketRoute over TLS, closed when silent", "[server][websocket][tl
     {
         return MakeUserWebSocket(router, request, response, client);
     });
-    std::string error;
-    REQUIRE(service.LoadSslContext(error));
+    REQUIRE(service.LoadSslContext());
 
     MainLoop mainLoop(sessions);
     REQUIRE(service.StartNetwork(context.Get(), "127.0.0.1", port, 1));

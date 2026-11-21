@@ -158,43 +158,38 @@ ConfigMgr* ConfigMgr::instance()
     return &instance;
 }
 
-bool ConfigMgr::LoadFile(std::string const& file, std::string& error)
+Rooftree::Result<> ConfigMgr::LoadFile(std::string const& file)
 {
     try
     {
         Publish(Config::Parse(YAML::LoadFile(file), file));
-        return true;
+        return {};
     }
     catch (YAML::Exception const& e)
     {
-        error = file + ": " + ErrorMessage(e);
-        return false;
+        return std::unexpected(file + ": " + ErrorMessage(e));
     }
 }
 
-bool ConfigMgr::LoadString(std::string_view content, std::string& error)
+Rooftree::Result<> ConfigMgr::LoadString(std::string_view content)
 {
     try
     {
         Publish(Config::Parse(YAML::Load(std::string(content)), ""));
-        return true;
+        return {};
     }
     catch (YAML::Exception const& e)
     {
-        error = ErrorMessage(e);
-        return false;
+        return std::unexpected(ErrorMessage(e));
     }
 }
 
-bool ConfigMgr::Reload(std::string& error)
+Rooftree::Result<> ConfigMgr::Reload()
 {
     std::string file = GetConfig()->GetFilename();
     if (file.empty())
-    {
-        error = "no file loaded";
-        return false;
-    }
-    return LoadFile(file, error);
+        return std::unexpected("no file loaded");
+    return LoadFile(file);
 }
 
 std::shared_ptr<Config const> ConfigMgr::GetConfig() const

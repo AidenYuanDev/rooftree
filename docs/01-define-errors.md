@@ -1,9 +1,10 @@
-# 01 · Define.h 与 Errors.h：基础类型和断言
+# 01 · Define.h、Errors.h 与 Result.h：基础类型、断言和可预期的错误
 
 ## 1. 是什么
 
 - **`Define.h`**：最底层的头文件，几乎每个文件都间接包含它。它只定义两样东西：整数类型的短名字（`uint32` 等），以及让编译器检查 printf 格式的 `ROOFTREE_PRINTF`。
 - **`Errors.h`**：`ASSERT` 和 `ABORT`。遇到不该发生的状态时立刻终止进程，并留下 core dump，而不是带着错乱的状态继续运行、悄悄破坏数据。
+- **`Result.h`**：`Rooftree::Result<T>`，即 `std::expected<T, std::string>`。给**可预期**的失败用（文件不存在、配置写错、证书读不了）：返回值，或者一段说明原因的文字。和 `ASSERT` 正好相反，见 6。
 
 两个文件里没有平台宏、字节序、动态链接导出宏、helgrind 注解这些东西：Rooftree 只在 Linux 上静态链接，用不上。
 
@@ -15,10 +16,16 @@
 | `ROOFTREE_PRINTF(格式参数序号, 第一个参数序号)` | [Define.h](../src/common/base/Define.h) | 标在接受 printf 格式的函数上，GCC 和 Clang 都会检查调用处的参数类型 |
 | `ASSERT(cond)` / `ASSERT(cond, "格式", 参数...)` | [Errors.h](../src/common/base/Errors.h) | 条件不成立时把位置、条件、消息写到 stderr，然后 `abort()` |
 | `ABORT()` / `ABORT_MSG("格式", 参数...)` | [Errors.h](../src/common/base/Errors.h) | 无条件终止，比如卡死检测发现主线程不动了 |
+| `Result<T>` / `Result<>` | [Result.h](../src/common/base/Result.h) | 成功时是 `T`（`Result<>` 什么都不带），失败时 `error()` 是原因。失败写 `return std::unexpected("原因");` |
 
 ```cpp
 ASSERT(index < _parameters.size(), "Statement %u has %zu parameters, set one at %u", _index, _parameters.size(), index);
+
+if (Rooftree::Result<> loaded = sConfigMgr->LoadFile(file); !loaded)
+    RT_LOG_ERROR("server", "{}", loaded.error());
 ```
+
+C++23 的 `and_then`、`transform`、`or_else` 可以把几步串起来，比如 `LoadSslContext` 把新的 context 换上去：`CreateServerSslContext(...).transform([this](auto context) { ... })`，失败时原因原样传出去。
 
 ## 3. 关键实现
 
@@ -33,7 +40,9 @@ ASSERT(index < _parameters.size(), "Statement %u has %zu parameters, set one at 
 
 ### 3.2 输出到 stderr，然后 abort
 
-[Errors.cpp](../src/common/base/Errors.cpp) 直接 `fprintf(stderr, ...)`、`fflush`、`std::abort()`，不经过日志系统：日志可能是异步的，进程马上就要结束，排在队列里的行可能来不及写出去。`abort()` 发出 SIGABRT，systemd 或 Docker 记下退出原因，内核按配置写 core dump，然后服务被重新拉起。
+[Errors.cpp](../src/common/base/Errors.cpp) 直接 `fprintf(stderr, ...)`，接着打印 C++23 的 `std::stacktrace`（从调用 `ASSERT` 的函数开始），然后 `fflush`、`std::abort()`，不经过日志系统：日志可能是异步的，进程马上就要结束，排在队列里的行可能来不及写出去。`abort()` 发出 SIGABRT，systemd 或 Docker 记下退出原因，内核按配置写 core dump，然后服务被重新拉起。
+
+调用栈来自 libstdc++ 的 `libstdc++exp`（GCC 和用 libstdc++ 的 Clang 都要链接它，`cmake/Compiler.cmake` 统一加上）。Release 构建带 `-g1`（只有行号表和函数名，调试段压缩），所以线上二进制的调用栈也有文件和行号。卡死检测的 `ABORT` 发生在 io 线程上，打印的是 io 线程的栈；主线程卡在哪里要看 core dump。
 
 ### 3.3 发布版本里也检查
 
@@ -55,11 +64,12 @@ ASSERT(index < _parameters.size(), "Statement %u has %zu parameters, set one at 
 ## 6. 常见的坑
 
 - **把用户输入的校验写成 `ASSERT`**：客户端发来的非法数据不是"不可能发生"的状态，写成 `ASSERT` 等于给攻击者一个让服务器重启的按钮。网络数据要校验，不合法就回错误或断开连接。
+- **`ASSERT` 和 `Result` 的分界**：程序自己的不变量被破坏（下标越界、状态机走到不可能的状态）用 `ASSERT`；外界可能给错的东西（文件、配置、证书、对方服务器的回答）返回 `Result`，由调用方决定是记日志、换个值还是退出。
 - **格式串和参数对不上**：现在编译器会检查，警告不要忽略。`std::size_t` 用 `%zu`，`std::string` 要 `.c_str()`。
 
 ## 7. 测试与示例
 
-断言失败会结束进程，所以没有单元测试直接触发它。可以在任意测试里临时加一行 `ASSERT(false, "test %d", 42);`，运行后看 stderr 的输出和退出码（134 = 128 + SIGABRT）。
+断言失败会结束进程，所以 [tests/test_Errors.cpp](../tests/test_Errors.cpp) 在 fork 出的子进程里触发它：子进程的 stderr 接到管道上，检查它被 SIGABRT 结束、输出里有条件、消息，以及调用栈里有触发断言的函数。
 
 ## 8. 思考题
 

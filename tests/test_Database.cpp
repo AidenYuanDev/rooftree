@@ -160,7 +160,6 @@ private:
 
 TEST_CASE("Database settings are read from a YAML mapping", "[database][config]")
 {
-    std::string error;
     ::setenv("ROOFTREE_DATABASE_SECRET_PASSWORD", "from env", 1);
     REQUIRE(sConfigMgr->LoadString(R"(
         Database:
@@ -171,7 +170,7 @@ TEST_CASE("Database settings are read from a YAML mapping", "[database][config]"
           NoName: { Host: 127.0.0.1, User: root }
           BadPort: { Host: 127.0.0.1, Port: abc, User: root, Name: world }
           BadThreads: { Host: 127.0.0.1, User: root, Name: world, SynchThreads: 300 }
-    )", error));
+    )"));
     ::unsetenv("ROOFTREE_DATABASE_SECRET_PASSWORD");
     std::shared_ptr<Config const> config = sConfigMgr->GetConfig();
 
@@ -412,14 +411,13 @@ TEST_CASE_METHOD(DatabaseFixture, "AppenderDB stores log messages in the databas
     static std::once_flag registered;
     std::call_once(registered, [] { sLog->RegisterAppender<TestAppenderDB>(); });
 
-    std::string error;
     REQUIRE(sConfigMgr->LoadString(R"(
         Appender:
           DB: "3,2,0"
         Logger:
           root: "3,DB"
           sql: "2,DB"
-    )", error));
+    )"));
     sLog->LoadFromConfig();
     sLog->SetRealmId(7); // the appender only writes once a realm id is set
 
@@ -437,7 +435,7 @@ TEST_CASE_METHOD(DatabaseFixture, "AppenderDB stores log messages in the databas
     REQUIRE(sConfigMgr->LoadString(R"(
         Logger:
           root: "3,"
-    )", error));
+    )"));
     sLog->LoadFromConfig();
     TestAppenderDB::SetDatabase(nullptr, TEST_INS_LOG);
 

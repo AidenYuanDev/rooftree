@@ -1112,10 +1112,11 @@ Rooftree::Task<void> BlogSession::HandleOAuthCallback(Request request)
         uploadDirectory]
     {
         Result result;
-        Optional<OAuthIdentity> identity = WorkerFetchOAuthIdentity(provider, redirectUri, code, flow.CodeVerifier, result.Detail);
+        Rooftree::Result<OAuthIdentity> identity = WorkerFetchOAuthIdentity(provider, redirectUri, code, flow.CodeVerifier);
         if (!identity)
         {
             result.Error = "oauth_failed";
+            result.Detail = std::move(identity.error());
             return result;
         }
         result.Identity = *identity;
@@ -1152,10 +1153,11 @@ Rooftree::Task<void> BlogSession::HandleOAuthCallback(Request request)
             result.Created = true;
 
             // A new account starts with the provider's picture; without one if it doesn't come
-            std::string error;
-            if (Optional<std::string> picture = identity->AvatarUrl.empty() ? Optional<std::string>()
-                : WorkerFetchProviderAvatar(provider.Name, identity->AvatarUrl, error))
-                owner->Avatar = WorkerSaveAvatar(owner->Id, *picture, uploadDirectory);
+            if (!identity->AvatarUrl.empty())
+            {
+                if (Rooftree::Result<std::string> picture = WorkerFetchProviderAvatar(provider.Name, identity->AvatarUrl))
+                    owner->Avatar = WorkerSaveAvatar(owner->Id, *picture, uploadDirectory);
+            }
         }
 
         if (owner->IsBanned())
@@ -1426,9 +1428,12 @@ Rooftree::Task<void> UseProviderAvatar(Rooftree::Server::Session& session, ApiRe
             return result;
         }
 
-        Optional<std::string> picture = WorkerFetchProviderAvatar(provider, url, result.Detail);
+        Rooftree::Result<std::string> picture = WorkerFetchProviderAvatar(provider, url);
         if (!picture)
+        {
             result.Error = "avatar_unavailable";
+            result.Detail = std::move(picture.error());
+        }
         else if (WorkerSaveAvatar(userId, *picture, directory).empty())
             result.Error = "internal";
         else

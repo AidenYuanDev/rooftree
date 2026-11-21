@@ -20,10 +20,10 @@ auto realms = config->Get<std::vector<RealmInfo>>("Realms", {});
 
 | 接口 | 作用 | 位置 |
 |---|---|---|
-| `LoadFile(path, error)` / `LoadString(text, error)` | 解析并发布一个新快照；失败时返回 `false`，当前快照保持不变 | [Config.cpp:169](../src/common/config/Config.cpp#L169)、[:183](../src/common/config/Config.cpp#L183) |
-| `Reload(error)` | 重新读取当前快照来自的文件 | [Config.cpp:197](../src/common/config/Config.cpp#L197) |
-| `GetConfig()` | 当前快照，永远不为空（加载前是空配置），任意线程可调用 | [Config.cpp:208](../src/common/config/Config.cpp#L208) |
-| `Get<T>(path, def)` | 只读一个值时的简写，等于 `GetConfig()->Get<T>(path, def)` | [Config.h:134](../src/common/config/Config.h#L134) |
+| `LoadFile(path)` / `LoadString(text)` | 解析并发布一个新快照；返回 `Rooftree::Result<>`，失败时 `error()` 说明原因，当前快照保持不变 | [Config.cpp:161](../src/common/config/Config.cpp#L161)、[:174](../src/common/config/Config.cpp#L174) |
+| `Reload()` | 重新读取当前快照来自的文件 | [Config.cpp:187](../src/common/config/Config.cpp#L187) |
+| `GetConfig()` | 当前快照，永远不为空（加载前是空配置），任意线程可调用 | [Config.cpp:195](../src/common/config/Config.cpp#L195) |
+| `Get<T>(path, def)` | 只读一个值时的简写，等于 `GetConfig()->Get<T>(path, def)` | [Config.h:135](../src/common/config/Config.h#L135) |
 | `OnLoaded(callback)` | 订阅加载：已加载时立即调用一次，之后每次加载成功都会调用；返回的 `Subscription` 析构时自动取消订阅 | [Config.cpp:227](../src/common/config/Config.cpp#L227) |
 
 ### Config：一个快照

@@ -34,6 +34,7 @@
 #include "HttpService.h"
 #include "JsonHttp.h"
 #include "OptionalSslStream.h"
+#include "Result.h"
 #include "ServerMessage.h"
 #include "Task.h"
 #include <concepts>
@@ -168,9 +169,9 @@ public:
     WorldHttpSettings const& GetSettings() const { return _settings; }
 
     // Reads the certificate and key of the settings, before StartNetwork and again when they were
-    // renewed (any thread). New connections get the new context, open ones keep theirs. False, with
-    // error set and the current context kept, if they can't be used. True without TLS settings
-    bool LoadSslContext(std::string& error);
+    // renewed (any thread). New connections get the new context, open ones keep theirs. If they can't
+    // be used the current context stays and the error says why. Nothing to do without TLS settings
+    Rooftree::Result<> LoadSslContext();
     bool IsSsl() const { return !_settings.SslCertificateFile.empty(); }
 
     // Before StartNetwork. messageType names the route for AntiDOS limits and logs

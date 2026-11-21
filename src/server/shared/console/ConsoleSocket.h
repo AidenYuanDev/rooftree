@@ -23,6 +23,7 @@
 #define ROOFTREE_CONSOLE_SOCKET_H
 
 #include "Console.h"
+#include "Result.h"
 #include "Task.h"
 #include <boost/asio/local/stream_protocol.hpp>
 #include <mutex>
@@ -45,7 +46,7 @@ public:
 
     // Listens on path. A socket file left over from before is replaced, one another server listens on
     // is an error
-    bool Start(Asio::IoContext& ioContext, std::string const& path, std::string& error);
+    Rooftree::Result<> Start(Asio::IoContext& ioContext, std::string const& path);
     // Once the io context stopped running: closes the clients and removes the file
     void Stop();
 

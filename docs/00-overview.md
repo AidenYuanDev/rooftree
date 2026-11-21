@@ -63,7 +63,7 @@ graph LR
 | 级别 | 文档 | 内容 | 精读量 |
 |---|---|---|---|
 | 0 | — | 前置知识：C++20（chrono、智能指针、移动语义、模板/CRTP/concepts）、Boost.Asio 基础 | — |
-| 1 基础工具 | [01-define-errors](01-define-errors.md) | 整数类型、`ASSERT` 和 `ABORT` | 90 行 |
+| 1 基础工具 | [01-define-errors](01-define-errors.md) | 整数类型、`ASSERT` 和 `ABORT`、`Result` | 90 行 |
 | | [02-time](02-time.md) | `Milliseconds`、`TimePoint`、`getMSTime` 和回绕 | 50 行 |
 | | [03-string](03-string.md) | `StringFormat`（std::format）、`StringTo`、切分、十六进制、UTF-8、时长 | 350 行 |
 | | [04-random](04-random.md) | `urand`、`frand`：每个线程一个生成器 | 70 行 |

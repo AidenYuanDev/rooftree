@@ -35,6 +35,7 @@
 
 #include "Define.h"
 #include "Optional.h"
+#include "Result.h"
 #include <boost/json/object.hpp>
 #include <span>
 #include <string>
@@ -59,8 +60,8 @@ public:
     // bfbs, a binary schema (XBinarySchema::data()), outlives this
     explicit FlatJsonSchema(uint8 const* bfbs);
 
-    // Once, before use: false with error naming what isn't supported
-    bool Load(std::string& error);
+    // Once, before use: the error names what isn't supported
+    Rooftree::Result<> Load();
 
     // "Namespace.Table"
     reflection::Object const* Find(std::string_view name) const;

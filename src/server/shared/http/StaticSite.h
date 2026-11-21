@@ -19,6 +19,7 @@
 #include "Define.h"
 #include "HttpCommon.h"
 #include "Optional.h"
+#include "Result.h"
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -39,8 +40,8 @@ class StaticSite
 {
 public:
     // Every regular file under directory (itself possibly a symlink to a release), keyed by its URL
-    // path: "/zh/index.html". Null, with error set, if the directory can't be read
-    static std::shared_ptr<StaticSite const> Load(std::filesystem::path const& directory, std::string& error);
+    // path: "/zh/index.html". The error says why if the directory can't be read
+    static Rooftree::Result<std::shared_ptr<StaticSite const>> Load(std::filesystem::path const& directory);
 
     // path as GetRequestPath() returns it
     StaticFile const* Find(std::string_view path) const;

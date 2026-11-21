@@ -69,9 +69,8 @@ FlatJsonSchema const& GetArenaSchema()
     static FlatJsonSchema const schema = []
     {
         FlatJsonSchema loaded(Arena::StateBinarySchema::data());
-        std::string error;
-        bool ok = loaded.Load(error);
-        ASSERT(ok, "Arena.fbs: %s", error.c_str());
+        Rooftree::Result<> ok = loaded.Load();
+        ASSERT(ok, "Arena.fbs: %s", ok ? "" : ok.error().c_str());
         return loaded;
     }();
     return schema;

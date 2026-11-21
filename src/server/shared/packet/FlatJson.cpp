@@ -535,7 +535,7 @@ FlatJsonSchema::FlatJsonSchema(uint8 const* bfbs) : _schema(reflection::GetSchem
 {
 }
 
-bool FlatJsonSchema::Load(std::string& error)
+Rooftree::Result<> FlatJsonSchema::Load()
 {
     auto supported = [&](BaseType type, int32 index)
     {
@@ -554,25 +554,21 @@ bool FlatJsonSchema::Load(std::string& error)
             bool ok = supported(type.base_type(), type.index())
                 && (type.base_type() != reflection::Vector || (supported(type.element(), type.index()) && type.element() != reflection::Vector));
             if (!ok)
-            {
-                error = StringFormat("{}.{}: structs, unions, arrays and vectors of vectors aren't supported", Name(object->name()), Name(field->name()));
-                return false;
-            }
+                return std::unexpected(StringFormat("{}.{}: structs, unions, arrays and vectors of vectors aren't supported",
+                    Name(object->name()), Name(field->name())));
 
             if (HasAttribute(*field, "json_map"))
             {
                 reflection::Field const* key = type.base_type() == reflection::Vector && type.element() == reflection::Obj
                     ? _schema->objects()->Get(type.index())->fields()->LookupByKey("key") : nullptr;
                 if (!key || key->type()->base_type() != reflection::String)
-                {
-                    error = StringFormat("{}.{}: a json_map is a vector of tables with a string key", Name(object->name()), Name(field->name()));
-                    return false;
-                }
+                    return std::unexpected(StringFormat("{}.{}: a json_map is a vector of tables with a string key", Name(object->name()),
+                        Name(field->name())));
             }
         }
     }
 
-    return true;
+    return {};
 }
 
 reflection::Object const* FlatJsonSchema::Find(std::string_view name) const

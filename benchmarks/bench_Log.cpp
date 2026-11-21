@@ -20,13 +20,12 @@ namespace
 {
 void LoadLogConfig(std::string const& loggers, std::string const& fileAppender = "2,3,0,rooftree_bench.log,w")
 {
-    std::string error;
     REQUIRE(sConfigMgr->LoadString(Rooftree::StringFormat(R"(
         LogsDir: "{}"
         Appender:
           File: "{}"
         Logger: {{ {} }}
-    )", std::filesystem::temp_directory_path().generic_string(), fileAppender, loggers), error));
+    )", std::filesystem::temp_directory_path().generic_string(), fileAppender, loggers)));
     sLog->LoadFromConfig();
 }
 

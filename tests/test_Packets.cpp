@@ -31,8 +31,7 @@ struct Schema
 {
     Schema()
     {
-        std::string error;
-        REQUIRE(Flat.Load(error));
+        REQUIRE(Flat.Load());
         Everything = Flat.Find("Test.Everything");
         REQUIRE(Everything);
     }

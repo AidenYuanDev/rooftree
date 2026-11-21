@@ -63,9 +63,8 @@ using DemoDatabaseWorkerPool = DatabaseWorkerPool<DemoDatabaseConnection>;
 int main(int argc, char** argv)
 {
     std::string configFile = argc > 1 ? argv[1] : "rooftree.yaml";
-    std::string configError;
-    if (!sConfigMgr->LoadFile(configFile, configError))
-        std::print(stderr, "Could not load {} ({}), using defaults\n", configFile, configError);
+    if (Rooftree::Result<> loaded = sConfigMgr->LoadFile(configFile); !loaded)
+        std::print(stderr, "Could not load {} ({}), using defaults\n", configFile, loaded.error());
 
     sLog->LoadFromConfig();
 

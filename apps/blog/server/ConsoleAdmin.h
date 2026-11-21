@@ -33,6 +33,7 @@
 #define BLOG_CONSOLE_ADMIN_H
 
 #include "ConsoleCommand.h"
+#include "Result.h"
 
 namespace Blog
 {
@@ -40,8 +41,8 @@ namespace Blog
 std::vector<Rooftree::Server::Command> GetConsoleAdminCommands();
 std::vector<Rooftree::Server::Command> GetConsoleAccountAdminCommands();
 
-// Worker: a file the console names, false with error set when it can't be read (or is too large)
-bool ReadConsoleFile(std::string const& path, std::string& data, std::string& error);
+// Worker: a file the console names, or why it can't be read (or is too large)
+Rooftree::Result<std::string> ReadConsoleFile(std::string const& path);
 }
 
 #endif // BLOG_CONSOLE_ADMIN_H

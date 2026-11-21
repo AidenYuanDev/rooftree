@@ -30,8 +30,8 @@ std::string LastOpenSslError()
 }
 }
 
-std::shared_ptr<boost::asio::ssl::context> CreateServerSslContext(std::string const& certificateChainFile,
-    std::string const& privateKeyFile, std::string& error)
+Result<std::shared_ptr<boost::asio::ssl::context>> CreateServerSslContext(std::string const& certificateChainFile,
+    std::string const& privateKeyFile)
 {
     auto context = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tls_server);
     SSL_CTX* native = context->native_handle();
@@ -40,30 +40,26 @@ std::shared_ptr<boost::asio::ssl::context> CreateServerSslContext(std::string co
     context->set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::single_dh_use);
     if (!SSL_CTX_set_cipher_list(native, Tls12Ciphers))
     {
-        error = "no usable cipher: " + LastOpenSslError();
-        return nullptr;
+        return std::unexpected("no usable cipher: " + LastOpenSslError());
     }
 
     boost::system::error_code ec;
     context->use_certificate_chain_file(certificateChainFile, ec);
     if (ec)
     {
-        error = certificateChainFile + ": " + ec.message();
-        return nullptr;
+        return std::unexpected(certificateChainFile + ": " + ec.message());
     }
 
     context->use_private_key_file(privateKeyFile, boost::asio::ssl::context::pem, ec);
     if (ec)
     {
-        error = privateKeyFile + ": " + ec.message();
-        return nullptr;
+        return std::unexpected(privateKeyFile + ": " + ec.message());
     }
 
     if (!SSL_CTX_check_private_key(native))
     {
-        error = privateKeyFile + " is not the key of " + certificateChainFile;
         ERR_clear_error();
-        return nullptr;
+        return std::unexpected(privateKeyFile + " is not the key of " + certificateChainFile);
     }
 
     return context;

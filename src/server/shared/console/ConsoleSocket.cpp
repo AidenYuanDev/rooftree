@@ -178,7 +178,7 @@ ConsoleSocketServer::~ConsoleSocketServer()
     Stop();
 }
 
-bool ConsoleSocketServer::Start(Asio::IoContext& ioContext, std::string const& path, std::string& error)
+Rooftree::Result<> ConsoleSocketServer::Start(Asio::IoContext& ioContext, std::string const& path)
 {
     using boost::asio::local::stream_protocol;
 
@@ -187,19 +187,13 @@ bool ConsoleSocketServer::Start(Asio::IoContext& ioContext, std::string const& p
     if (lstat(path.c_str(), &existing) == 0)
     {
         if (!S_ISSOCK(existing.st_mode))
-        {
-            error = path + " exists and is no socket";
-            return false;
-        }
+            return std::unexpected(path + " exists and is no socket");
 
         stream_protocol::socket probe(ioContext);
         boost::system::error_code probeError;
         probe.connect(stream_protocol::endpoint(path), probeError);
         if (!probeError)
-        {
-            error = "another server listens on " + path;
-            return false;
-        }
+            return std::unexpected("another server listens on " + path);
         ::unlink(path.c_str());
     }
 
@@ -208,21 +202,20 @@ bool ConsoleSocketServer::Start(Asio::IoContext& ioContext, std::string const& p
         auto acceptor = std::make_unique<stream_protocol::acceptor>(ioContext, stream_protocol::endpoint(path));
         if (::chmod(path.c_str(), S_IRUSR | S_IWUSR) != 0)
         {
-            error = path + ": chmod: " + std::strerror(errno);
+            std::string error = path + ": chmod: " + std::strerror(errno);
             ::unlink(path.c_str());
-            return false;
+            return std::unexpected(std::move(error));
         }
         _acceptor = std::move(acceptor);
     }
     catch (boost::system::system_error const& bindError)
     {
-        error = path + ": " + bindError.code().message();
-        return false;
+        return std::unexpected(path + ": " + bindError.code().message());
     }
 
     _path = path;
     AcceptLoop();
-    return true;
+    return {};
 }
 
 Rooftree::Detached ConsoleSocketServer::AcceptLoop()

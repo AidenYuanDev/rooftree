@@ -27,6 +27,7 @@
 #define ROOFTREE_CONFIG_H
 
 #include "Define.h"
+#include "Result.h"
 #include <yaml-cpp/yaml.h>
 #include <functional>
 #include <memory>
@@ -121,10 +122,10 @@ public:
     ConfigMgr(ConfigMgr const&) = delete;
     ConfigMgr& operator=(ConfigMgr const&) = delete;
 
-    // On failure the current config stays and error says why
-    bool LoadFile(std::string const& file, std::string& error);
-    bool LoadString(std::string_view content, std::string& error);
-    bool Reload(std::string& error);
+    // On failure the current config stays, the error says why
+    Rooftree::Result<> LoadFile(std::string const& file);
+    Rooftree::Result<> LoadString(std::string_view content);
+    Rooftree::Result<> Reload();
 
     // The current snapshot, never null (an empty config before the first load). Safe from any thread
     std::shared_ptr<Config const> GetConfig() const;

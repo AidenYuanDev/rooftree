@@ -275,18 +275,17 @@ boost::asio::ip::address WorldHttpService::GetClientAddress(Net::Http::Request c
     return client;
 }
 
-bool WorldHttpService::LoadSslContext(std::string& error)
+Rooftree::Result<> WorldHttpService::LoadSslContext()
 {
     if (!IsSsl())
-        return true;
+        return {};
 
-    std::shared_ptr<boost::asio::ssl::context> context = Net::CreateServerSslContext(_settings.SslCertificateFile, _settings.SslPrivateKeyFile, error);
-    if (!context)
-        return false;
-
-    std::scoped_lock lock(_sslContextLock);
-    _sslContext = std::move(context);
-    return true;
+    return Net::CreateServerSslContext(_settings.SslCertificateFile, _settings.SslPrivateKeyFile)
+        .transform([this](std::shared_ptr<boost::asio::ssl::context> context)
+        {
+            std::scoped_lock lock(_sslContextLock);
+            _sslContext = std::move(context);
+        });
 }
 
 std::shared_ptr<WorldHttpSocket> WorldHttpService::CreateSocket(Net::IoContextTcpSocket&& socket)

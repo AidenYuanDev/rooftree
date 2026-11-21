@@ -14,6 +14,7 @@
 #define BLOG_OAUTH_H
 
 #include "Optional.h"
+#include "Result.h"
 #include <string>
 #include <string_view>
 #include <vector>
@@ -58,10 +59,10 @@ struct OAuthPkce
 
 std::string BuildOAuthAuthorizeUrl(OAuthProvider const& provider, std::string_view redirectUri, std::string_view state, std::string_view codeChallenge);
 
-// Worker: the code of the callback exchanged for a token, the user read with it. Empty with error set
+// Worker: the code of the callback exchanged for a token, the user read with it; the error says why
 // when the provider refused or didn't answer
-Optional<OAuthIdentity> WorkerFetchOAuthIdentity(OAuthProvider const& provider, std::string const& redirectUri, std::string const& code,
-    std::string const& codeVerifier, std::string& error);
+Rooftree::Result<OAuthIdentity> WorkerFetchOAuthIdentity(OAuthProvider const& provider, std::string const& redirectUri, std::string const& code,
+    std::string const& codeVerifier);
 
 // A user name for a new account from the provider's login or name: letters, digits and _, 3 to 20
 std::string SuggestUsername(OAuthIdentity const& identity);

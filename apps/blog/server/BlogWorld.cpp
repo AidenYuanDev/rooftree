@@ -24,16 +24,15 @@ namespace
 void LoadSiteInto(Rooftree::Server::StaticSiteHolder& holder, std::string const& directory)
 {
     TimePoint start = TimePoint::clock::now();
-    std::string error;
-    std::shared_ptr<Rooftree::Server::StaticSite const> site = Rooftree::Server::StaticSite::Load(directory, error);
+    Rooftree::Result<std::shared_ptr<Rooftree::Server::StaticSite const>> site = Rooftree::Server::StaticSite::Load(directory);
     if (!site)
     {
-        RT_LOG_ERROR("blog", "Blog.Static.Directory: {}, the site being served stays", error);
+        RT_LOG_ERROR("blog", "Blog.Static.Directory: {}, the site being served stays", site.error());
         return;
     }
 
-    holder.Set(site);
-    RT_LOG_INFO("blog", "Site of {} loaded: {} files, {} KiB in {} ms", directory, site->GetFileCount(), site->GetSize() / 1024,
+    holder.Set(*site);
+    RT_LOG_INFO("blog", "Site of {} loaded: {} files, {} KiB in {} ms", directory, (*site)->GetFileCount(), (*site)->GetSize() / 1024,
         std::chrono::duration_cast<Milliseconds>(TimePoint::clock::now() - start).count());
 }
 
@@ -200,10 +199,9 @@ void BlogWorld::AnnouncePublished(std::string_view kind, std::string path, std::
 
 void BlogWorld::Reload()
 {
-    std::string error;
-    if (!sConfigMgr->Reload(error))
+    if (Rooftree::Result<> reloaded = sConfigMgr->Reload(); !reloaded)
     {
-        RT_LOG_ERROR("blog", "Config reload failed, keeping the current one: {}", error);
+        RT_LOG_ERROR("blog", "Config reload failed, keeping the current one: {}", reloaded.error());
         return;
     }
 

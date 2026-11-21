@@ -86,14 +86,13 @@ std::string GzipETag(std::string_view etag)
 }
 }
 
-std::shared_ptr<StaticSite const> StaticSite::Load(std::filesystem::path const& directory, std::string& error)
+Rooftree::Result<std::shared_ptr<StaticSite const>> StaticSite::Load(std::filesystem::path const& directory)
 {
     std::error_code ec;
     std::filesystem::path root = std::filesystem::canonical(directory, ec);
     if (ec || !std::filesystem::is_directory(root, ec))
     {
-        error = StringFormat("{} is not a directory{}", directory.string(), ec ? ": " + ec.message() : "");
-        return nullptr;
+        return std::unexpected(StringFormat("{} is not a directory{}", directory.string(), ec ? ": " + ec.message() : ""));
     }
 
     std::shared_ptr<StaticSite> site = std::make_shared<StaticSite>();
@@ -107,8 +106,7 @@ std::shared_ptr<StaticSite const> StaticSite::Load(std::filesystem::path const& 
         Optional<std::string> body = ReadWholeFile(itr->path());
         if (ec || !body)
         {
-            error = StringFormat("{} can't be read", itr->path().string());
-            return nullptr;
+            return std::unexpected(StringFormat("{} can't be read", itr->path().string()));
         }
 
         site->_size += body->size();
@@ -126,8 +124,7 @@ std::shared_ptr<StaticSite const> StaticSite::Load(std::filesystem::path const& 
 
     if (ec)
     {
-        error = StringFormat("{} can't be read: {}", directory.string(), ec.message());
-        return nullptr;
+        return std::unexpected(StringFormat("{} can't be read: {}", directory.string(), ec.message()));
     }
 
     // A .gz without its file is served as itself, like any other file

@@ -36,7 +36,6 @@ using namespace std::chrono_literals;
 
 TEST_CASE("Config reads values by path", "[config]")
 {
-    std::string error;
     REQUIRE(sConfigMgr->LoadString(R"(
         Server:
           Name: rooftree
@@ -51,7 +50,7 @@ TEST_CASE("Config reads values by path", "[config]")
         Logger:
           root: "3,Console"
           server.http: "2,Console"
-    )", error));
+    )"));
     std::shared_ptr<Config const> config = sConfigMgr->GetConfig();
 
     CHECK(config->Get<std::string>("Server.Name", "") == "rooftree");
@@ -86,13 +85,12 @@ TEST_CASE("Config reads values by path", "[config]")
 
 TEST_CASE("Config applies environment overrides when it is loaded", "[config]")
 {
-    std::string error;
     std::string const yaml = "Server: { Port: 1234, Host: }";
 
     ::setenv("ROOFTREE_SERVER_PORT", "4321", 1);
     ::setenv("ROOFTREE_SERVER_HOST", "example.org", 1);
     ::setenv("ROOFTREE_SERVER_MISSING", "1", 1);
-    REQUIRE(sConfigMgr->LoadString(yaml, error));
+    REQUIRE(sConfigMgr->LoadString(yaml));
     ::unsetenv("ROOFTREE_SERVER_PORT");
     ::unsetenv("ROOFTREE_SERVER_HOST");
     ::unsetenv("ROOFTREE_SERVER_MISSING");
@@ -103,29 +101,33 @@ TEST_CASE("Config applies environment overrides when it is loaded", "[config]")
     CHECK(config->GetNode("Server")["Port"].as<int>() == 4321);
     CHECK_FALSE(config->Has("Server.Missing"));                   // only values in the file are overridden
 
-    REQUIRE(sConfigMgr->LoadString(yaml, error));
+    REQUIRE(sConfigMgr->LoadString(yaml));
     CHECK(sConfigMgr->Get<int>("Server.Port", 0) == 1234);
 }
 
 TEST_CASE("Config rejects invalid files and keeps the current one", "[config]")
 {
-    std::string error;
-    REQUIRE(sConfigMgr->LoadString("A: 1", error));
+    REQUIRE(sConfigMgr->LoadString("A: 1"));
     std::shared_ptr<Config const> current = sConfigMgr->GetConfig();
 
-    CHECK_FALSE(sConfigMgr->LoadString("Server: [unclosed", error));
-    CHECK(error.find("line 1") != std::string::npos);
-    CHECK_FALSE(sConfigMgr->LoadString("this is = not yaml", error)); // a plain scalar, not a mapping
-    CHECK_FALSE(sConfigMgr->LoadString("A: 1\nA: 2\n", error));
-    CHECK(error.find("duplicate key 'A'") != std::string::npos);
+    Rooftree::Result<> unclosed = sConfigMgr->LoadString("Server: [unclosed");
+    REQUIRE_FALSE(unclosed);
+    CHECK(unclosed.error().find("line 1") != std::string::npos);
+    CHECK_FALSE(sConfigMgr->LoadString("this is = not yaml")); // a plain scalar, not a mapping
+    Rooftree::Result<> duplicate = sConfigMgr->LoadString("A: 1\nA: 2\n");
+    REQUIRE_FALSE(duplicate);
+    CHECK(duplicate.error().find("duplicate key 'A'") != std::string::npos);
     // Two spellings of the same path
-    CHECK_FALSE(sConfigMgr->LoadString("Logger:\n  server.http: x\n  server:\n    http: y\n", error));
-    CHECK(error.find("duplicate key 'Logger.server.http'") != std::string::npos);
-    CHECK_FALSE(sConfigMgr->LoadFile("/nonexistent/rooftree.yaml", error));
+    Rooftree::Result<> spellings = sConfigMgr->LoadString("Logger:\n  server.http: x\n  server:\n    http: y\n");
+    REQUIRE_FALSE(spellings);
+    CHECK(spellings.error().find("duplicate key 'Logger.server.http'") != std::string::npos);
+    Rooftree::Result<> missing = sConfigMgr->LoadFile("/nonexistent/rooftree.yaml");
+    REQUIRE_FALSE(missing);
+    CHECK(missing.error().starts_with("/nonexistent/rooftree.yaml: "));
     CHECK(sConfigMgr->GetConfig() == current);
 
-    CHECK_FALSE(sConfigMgr->Reload(error)); // loaded from a string
-    CHECK(sConfigMgr->LoadString("", error)); // an empty file is an empty config
+    CHECK_FALSE(sConfigMgr->Reload()); // loaded from a string
+    CHECK(sConfigMgr->LoadString("")); // an empty file is an empty config
     CHECK(sConfigMgr->GetConfig()->GetKeys("").empty());
 }
 
@@ -155,7 +157,6 @@ struct YAML::convert<RealmInfo>
 
 TEST_CASE("Config decodes nested YAML into structs", "[config]")
 {
-    std::string error;
     REQUIRE(sConfigMgr->LoadString(R"(
         Realms:
           - { Name: one, Port: 8086, Tags: [pvp, rp] }
@@ -163,7 +164,7 @@ TEST_CASE("Config decodes nested YAML into structs", "[config]")
         Http:
           Port: 8080
           Limits: { Body: 1024, Header: 64 }
-    )", error));
+    )"));
     std::shared_ptr<Config const> config = sConfigMgr->GetConfig();
 
     std::vector<RealmInfo> realms = config->Get<std::vector<RealmInfo>>("Realms", {});
@@ -183,7 +184,7 @@ TEST_CASE("Config decodes nested YAML into structs", "[config]")
     CHECK_FALSE(config->Has("Http.Missing"));
 
     // A snapshot keeps its values, reloading only changes what GetConfig returns afterwards
-    REQUIRE(sConfigMgr->LoadString("Http: { Port: 9090 }", error));
+    REQUIRE(sConfigMgr->LoadString("Http: { Port: 9090 }"));
     CHECK(config->Get<int>("Http.Port", 0) == 8080);
     CHECK(sConfigMgr->Get<int>("Http.Port", 0) == 9090);
 }
@@ -193,25 +194,24 @@ TEST_CASE("ConfigMgr notifies subscribers of every load", "[config]")
     std::filesystem::path file = std::filesystem::temp_directory_path() / "rooftree_test_config.yaml";
     std::ofstream(file) << "Port: 1\n";
 
-    std::string error;
-    REQUIRE(sConfigMgr->LoadFile(file.string(), error));
+    REQUIRE(sConfigMgr->LoadFile(file.string()));
 
     std::vector<int> ports;
     ConfigMgr::Subscription subscription = sConfigMgr->OnLoaded([&](Config const& config) { ports.push_back(config.Get<int>("Port", 0)); });
     CHECK(ports == std::vector<int>{ 1 }); // called right away with the current config
 
     std::ofstream(file) << "Port: 2\n";
-    REQUIRE(sConfigMgr->Reload(error));
+    REQUIRE(sConfigMgr->Reload());
     CHECK(sConfigMgr->GetConfig()->GetFilename() == file.string());
 
     std::ofstream(file) << "Port: [broken\n";
-    CHECK_FALSE(sConfigMgr->Reload(error)); // failed loads notify nobody
+    CHECK_FALSE(sConfigMgr->Reload()); // failed loads notify nobody
     CHECK(ports == std::vector<int>{ 1, 2 });
 
     ConfigMgr::Subscription moved = std::move(subscription);
-    REQUIRE(sConfigMgr->LoadString("Port: 3", error));
+    REQUIRE(sConfigMgr->LoadString("Port: 3"));
     moved.Reset();
-    REQUIRE(sConfigMgr->LoadString("Port: 4", error));
+    REQUIRE(sConfigMgr->LoadString("Port: 4"));
     CHECK(ports == std::vector<int>{ 1, 2, 3 });
 
     std::filesystem::remove(file);
@@ -219,8 +219,7 @@ TEST_CASE("ConfigMgr notifies subscribers of every load", "[config]")
 
 TEST_CASE("Config can be reloaded while other threads read it", "[config]")
 {
-    std::string error;
-    REQUIRE(sConfigMgr->LoadString("Http: { Port: 1, Limits: { Body: 1 } }", error));
+    REQUIRE(sConfigMgr->LoadString("Http: { Port: 1, Limits: { Body: 1 } }"));
 
     std::atomic<bool> stop = false;
     std::atomic<int> reads = 0;
@@ -243,7 +242,7 @@ TEST_CASE("Config can be reloaded while other threads read it", "[config]")
     }
 
     for (int i = 2; i < 500; ++i)
-        REQUIRE(sConfigMgr->LoadString(Rooftree::StringFormat("Http: {{ Port: {0}, Limits: {{ Body: {0} }} }}", i), error));
+        REQUIRE(sConfigMgr->LoadString(Rooftree::StringFormat("Http: {{ Port: {0}, Limits: {{ Body: {0} }} }}", i)));
     stop = true;
     for (std::thread& reader : readers)
         reader.join();
@@ -267,13 +266,12 @@ std::vector<std::string> ReadLines(std::filesystem::path const& file)
 // Log config in one-line values, writing to <temp dir>/<file> only (no console noise)
 void LoadLogConfig(std::string const& loggers, std::string const& fileAppender = "2,1,0,rooftree_test.log,w")
 {
-    std::string error;
     REQUIRE(sConfigMgr->LoadString(Rooftree::StringFormat(R"(
         LogsDir: "{}"
         Appender:
           File: "{}"
         Logger: {{ {} }}
-    )", std::filesystem::temp_directory_path().generic_string(), fileAppender, loggers), error));
+    )", std::filesystem::temp_directory_path().generic_string(), fileAppender, loggers)));
     sLog->LoadFromConfig();
 }
 }
@@ -340,7 +338,6 @@ TEST_CASE("Log can be reloaded while other threads log", "[log]")
 
 TEST_CASE("Log config accepts YAML mappings as well as one-line values", "[log][config]")
 {
-    std::string error;
     REQUIRE(sConfigMgr->LoadString(R"(
         Appender:
           Line: "1,3,7,9 1 8 2 6 7"
@@ -375,7 +372,7 @@ TEST_CASE("Log config accepts YAML mappings as well as one-line values", "[log][
           server.http:
             Level: 2
             Appenders: [Console, Server]
-    )", error));
+    )"));
 
     std::shared_ptr<Config const> config = sConfigMgr->GetConfig();
     CHECK(config->GetKeys("Appender") == std::vector<std::string>{ "Line", "Console", "ColorLine", "Server", "Minimal", "NoFile", "Custom" });
@@ -392,14 +389,13 @@ TEST_CASE("Log config accepts YAML mappings as well as one-line values", "[log][
 
     // Every field can be overridden on its own
     ::setenv("ROOFTREE_APPENDER_CONSOLE_LEVEL", "4", 1);
-    REQUIRE(sConfigMgr->LoadString("Appender: { Console: { Type: 1, Level: 3, Flags: 7 } }", error));
+    REQUIRE(sConfigMgr->LoadString("Appender: { Console: { Type: 1, Level: 3, Flags: 7 } }"));
     ::unsetenv("ROOFTREE_APPENDER_CONSOLE_LEVEL");
     CHECK(LogConfig::GetAppenderConfigLine(*sConfigMgr->GetConfig(), "Appender.Console") == "1,4,7");
 }
 
 TEST_CASE("Log uses appenders and loggers written as YAML mappings", "[log]")
 {
-    std::string error;
     REQUIRE(sConfigMgr->LoadString(Rooftree::StringFormat(R"(
         LogsDir: "{}"
         Appender:
@@ -416,7 +412,7 @@ TEST_CASE("Log uses appenders and loggers written as YAML mappings", "[log]")
           server.http:
             Level: 2
             Appenders: [File]
-    )", std::filesystem::temp_directory_path().generic_string()), error));
+    )", std::filesystem::temp_directory_path().generic_string())));
     sLog->LoadFromConfig();
 
     CHECK(sLog->ShouldLog("server.http.session", LOG_LEVEL_DEBUG));

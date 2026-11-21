@@ -16,6 +16,7 @@
 
 #include "Define.h"
 #include "Optional.h"
+#include "Result.h"
 #include <string>
 #include <string_view>
 
@@ -46,9 +47,9 @@ void WorkerRemoveAvatar(uint32 userId, std::string const& directory);
 // Worker: the file of a picture name removed, when there is one
 void RemoveAvatarFile(std::string const& directory, std::string_view name);
 
-// Worker: the picture at a provider's address (asked for at 256 pixels). Empty with error set when it
-// didn't come or isn't a picture we take
-Optional<std::string> WorkerFetchProviderAvatar(std::string_view provider, std::string const& url, std::string& error);
+// Worker: the picture at a provider's address (asked for at 256 pixels), or why not: it didn't come or
+// isn't a picture we take
+Rooftree::Result<std::string> WorkerFetchProviderAvatar(std::string_view provider, std::string const& url);
 }
 
 #endif // BLOG_AVATAR_H

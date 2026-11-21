@@ -117,13 +117,8 @@ std::string GuessContentType(std::string const& path)
     return "application/octet-stream";
 }
 
-bool ReadWholeFile(std::string const& path, std::string& data, std::string& error)
-{
-    return ReadConsoleFile(path, data, error);
-}
-
 // a.b.c=x: {"a": {"b": {"c": "x"}}}
-bool SetNested(boost::json::object& root, std::string_view key, boost::json::value value, std::string& error)
+Rooftree::Result<> SetNested(boost::json::object& root, std::string_view key, boost::json::value value)
 {
     boost::json::object* object = &root;
     while (true)
@@ -131,55 +126,54 @@ bool SetNested(boost::json::object& root, std::string_view key, boost::json::val
         std::size_t dot = key.find('.');
         std::string_view name = key.substr(0, dot);
         if (name.empty())
-        {
-            error = "an item with an empty name";
-            return false;
-        }
+            return std::unexpected("an item with an empty name");
         if (dot == std::string_view::npos)
         {
             (*object)[name] = std::move(value);
-            return true;
+            return {};
         }
 
         boost::json::value& child = (*object)[name];
         if (child.is_null())
             child = boost::json::object();
         else if (!child.is_object())
-        {
-            error = Rooftree::StringFormat("{} is set twice, as a value and as an object", name);
-            return false;
-        }
+            return std::unexpected(Rooftree::StringFormat("{} is set twice, as a value and as an object", name));
         object = &child.as_object();
         key = key.substr(dot + 1);
     }
 }
 
-// Worker: the request's body and its Content-Type
-bool BuildBody(ApiCall& call, std::string& body, std::string& error)
+// Worker: the request's body, its Content-Type added to the call's headers
+Rooftree::Result<std::string> BuildBody(ApiCall& call)
 {
     switch (call.Body)
     {
         case BodyKind::None:
-            return true;
+            return std::string();
         case BodyKind::Raw:
-            body = call.Raw;
             if (!HasHeader(call, "Content-Type"))
                 call.Headers.emplace_back("Content-Type", "application/json");
-            return true;
+            return call.Raw;
         case BodyKind::File:
-            if (!ReadWholeFile(call.Raw, body, error))
-                return false;
-            if (!HasHeader(call, "Content-Type"))
+        {
+            Rooftree::Result<std::string> body = ReadConsoleFile(call.Raw);
+            if (body && !HasHeader(call, "Content-Type"))
                 call.Headers.emplace_back("Content-Type", GuessContentType(call.Raw));
-            return true;
+            return body;
+        }
         case BodyKind::Items:
         {
             boost::json::object object;
             for (Item const& item : call.Items)
             {
                 std::string text = item.Value;
-                if ((item.Kind == ItemKind::FileText || item.Kind == ItemKind::FileJson) && !ReadWholeFile(item.Value, text, error))
-                    return false;
+                if (item.Kind == ItemKind::FileText || item.Kind == ItemKind::FileJson)
+                {
+                    Rooftree::Result<std::string> file = ReadConsoleFile(item.Value);
+                    if (!file)
+                        return file;
+                    text = std::move(*file);
+                }
 
                 boost::json::value value;
                 if (item.Kind == ItemKind::Json || item.Kind == ItemKind::FileJson)
@@ -187,36 +181,33 @@ bool BuildBody(ApiCall& call, std::string& body, std::string& error)
                     boost::system::error_code code;
                     value = boost::json::parse(text, code);
                     if (code)
-                    {
-                        error = Rooftree::StringFormat("{}: not JSON ({})", item.Key, code.message());
-                        return false;
-                    }
+                        return std::unexpected(Rooftree::StringFormat("{}: not JSON ({})", item.Key, code.message()));
                 }
                 else
                     value = boost::json::string(text);
 
-                if (!SetNested(object, item.Key, std::move(value), error))
-                    return false;
+                if (Rooftree::Result<> set = SetNested(object, item.Key, std::move(value)); !set)
+                    return std::unexpected(std::move(set.error()));
             }
-            body = boost::json::serialize(object);
             if (!HasHeader(call, "Content-Type"))
                 call.Headers.emplace_back("Content-Type", "application/json");
-            return true;
+            return boost::json::serialize(object);
         }
         case BodyKind::Form:
         {
+            std::string body;
             std::string boundary = "----blog-console-" + Rooftree::Server::GenerateToken(16);
             for (Item const& item : call.Items)
             {
                 body += "--" + boundary + "\r\n";
                 if (item.Kind == ItemKind::FormFile)
                 {
-                    std::string data;
-                    if (!ReadWholeFile(item.Value, data, error))
-                        return false;
+                    Rooftree::Result<std::string> data = ReadConsoleFile(item.Value);
+                    if (!data)
+                        return data;
                     body += Rooftree::StringFormat("Content-Disposition: form-data; name=\"{}\"; filename=\"{}\"\r\nContent-Type: {}\r\n\r\n",
                         item.Key, std::filesystem::path(item.Value).filename().string(), GuessContentType(item.Value));
-                    body += data;
+                    body += *data;
                 }
                 else
                     body += Rooftree::StringFormat("Content-Disposition: form-data; name=\"{}\"\r\n\r\n{}", item.Key, item.Value);
@@ -224,10 +215,10 @@ bool BuildBody(ApiCall& call, std::string& body, std::string& error)
             }
             body += "--" + boundary + "--\r\n";
             call.Headers.emplace_back("Content-Type", "multipart/form-data; boundary=" + boundary);
-            return true;
+            return body;
         }
     }
-    return true;
+    return std::string();
 }
 
 // Worker: who, a session for it, the request, the session gone again
@@ -250,15 +241,18 @@ ApiResult WorkerCall(ApiCall call)
     UserRow user = UserRow::FromFields(account->Fetch());
     result.Username = user.Username;
 
-    std::string body;
-    if (!BuildBody(call, body, result.Error))
+    Rooftree::Result<std::string> body = BuildBody(call);
+    if (!body)
+    {
+        result.Error = std::move(body.error());
         return result;
+    }
 
     NewAuthSession session = WorkerCreateAuthSession(user.Id, ApiSessionLifetime, "127.0.0.1", std::string(ApiUserAgent));
     result.SessionHash = session.Hash;
 
     Rooftree::Server::HttpClientRequest request{ .Method = call.Method, .Url = call.Url + call.Target, .Headers = call.Headers,
-        .Body = std::move(body), .Timeout = ApiTimeout, .MaxResponseSize = call.OutFile.empty() ? MaxPrintedResponse : MaxSavedResponse };
+        .Body = std::move(*body), .Timeout = ApiTimeout, .MaxResponseSize = call.OutFile.empty() ? MaxPrintedResponse : MaxSavedResponse };
     request.Headers.emplace_back("Cookie", sWorld->GetSettings().CookieName + "=" + session.Token);
     request.Headers.emplace_back("X-CSRF-Token", session.CsrfToken);
     request.Headers.emplace_back("Origin", call.Origin);

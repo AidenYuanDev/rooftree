@@ -194,22 +194,16 @@ void SetUpHttp(WorldHttpService& http, Config const& config, Blog::BlogWorld con
     http.SetSettings(std::move(settings));
 }
 
-// Server.Https: false (and logged) without a certificate that loads
-bool SetUpHttps(WorldHttpService& https, Config const& config, WorldHttpSettings settings)
+// Server.Https: the certificate and its key, loaded
+Rooftree::Result<> SetUpHttps(WorldHttpService& https, Config const& config, WorldHttpSettings settings)
 {
     settings.SslCertificateFile = config.Get<std::string>(Blog::ServerKey(config, "Https.CertificateFile"), "");
     settings.SslPrivateKeyFile = config.Get<std::string>(Blog::ServerKey(config, "Https.PrivateKeyFile"), "");
-    std::string error;
     if (settings.SslCertificateFile.empty() || settings.SslPrivateKeyFile.empty())
-        error = "CertificateFile and PrivateKeyFile are required";
+        return std::unexpected("CertificateFile and PrivateKeyFile are required");
 
     https.SetSettings(std::move(settings));
-    if (!error.empty() || !https.LoadSslContext(error))
-    {
-        RT_LOG_FATAL("blog", "Server.Https: {}", error);
-        return false;
-    }
-    return true;
+    return https.LoadSslContext();
 }
 
 // Signals and stopping
@@ -233,10 +227,12 @@ void Reload(Blog::BlogWorld& world, WorldHttpService* https)
     RT_LOG_INFO("blog", "SIGHUP: reloading the config");
     world.RequestReload();
 
-    std::string tlsError;
-    if (https && !https->LoadSslContext(tlsError))
-        RT_LOG_ERROR("blog", "Server.Https: {}, the current certificate stays", tlsError);
-    else if (https)
+    if (!https)
+        return;
+
+    if (Rooftree::Result<> loaded = https->LoadSslContext(); !loaded)
+        RT_LOG_ERROR("blog", "Server.Https: {}, the current certificate stays", loaded.error());
+    else
         RT_LOG_INFO("blog", "Certificate reloaded");
 }
 
@@ -337,11 +333,10 @@ void StartConsole(Config const& config, Blog::BlogWorld& world, Rooftree::Asio::
     if (socketPath.empty())
         return;
 
-    std::string socketError;
     consoleSocket.emplace(world, Blog::GetConsoleCommands());
-    if (!consoleSocket->Start(ioContext, socketPath, socketError))
+    if (Rooftree::Result<> started = consoleSocket->Start(ioContext, socketPath); !started)
     {
-        RT_LOG_ERROR("blog", "Server.Console.Socket: {}, no blog --console", socketError);
+        RT_LOG_ERROR("blog", "Server.Console.Socket: {}, no blog --console", started.error());
         consoleSocket.reset();
     }
     else
@@ -368,8 +363,11 @@ int Serve(Config const& config, Blog::BlogWorld& world)
     if (tlsAt.Port)
     {
         https.emplace("blog.https", world);
-        if (!SetUpHttps(*https, config, httpSettings))
+        if (Rooftree::Result<> tls = SetUpHttps(*https, config, httpSettings); !tls)
+        {
+            RT_LOG_FATAL("blog", "Server.Https: {}", tls.error());
             return 1;
+        }
         SetUpService(*https, world, webSocketRouter, acmeDirectory);
     }
 
@@ -461,10 +459,9 @@ int main(int argc, char** argv)
     if (!arguments)
         return 1;
 
-    std::string configError;
-    if (!sConfigMgr->LoadFile(arguments->ConfigFile, configError))
+    if (Rooftree::Result<> loaded = sConfigMgr->LoadFile(arguments->ConfigFile); !loaded)
     {
-        std::print(stderr, "Could not load {}: {}\n", arguments->ConfigFile, configError);
+        std::print(stderr, "Could not load {}: {}\n", arguments->ConfigFile, loaded.error());
         return 1;
     }
 

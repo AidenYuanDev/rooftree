@@ -124,15 +124,14 @@ void World::Update(uint32 diff)
     // A quiet point: no session or player is being updated, so the settings change all at once
     if (_reloadRequested.exchange(false))
     {
-        std::string error;
-        if (sConfigMgr->Reload(error))
+        if (Rooftree::Result<> reloaded = sConfigMgr->Reload())
         {
             sLog->LoadFromConfig();
             LoadConfigSettings(*sConfigMgr->GetConfig());
             RT_LOG_INFO("arena.world", "Config reloaded");
         }
         else
-            RT_LOG_ERROR("arena.world", "Config reload failed, keeping the current one: {}", error);
+            RT_LOG_ERROR("arena.world", "Config reload failed, keeping the current one: {}", reloaded.error());
     }
 
     AddQueuedSessions();
