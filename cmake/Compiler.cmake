@@ -54,6 +54,15 @@ if(WITH_WARNINGS)
   endif()
 endif()
 
+# std::stacktrace (ASSERT and ABORT print one) is in libstdc++'s libstdc++exp, with GCC and with Clang
+# on libstdc++
+target_link_libraries(rooftree-core-interface INTERFACE stdc++exp)
+# Release keeps line tables and function names (-g1, not full debug information): the stack traces
+# name files and lines, and so do gdb and perf on the deployed binary. Compressed (libbacktrace reads
+# zlib sections): the blog is 19 MB instead of 44 (8 without -g1)
+target_compile_options(rooftree-core-interface INTERFACE $<$<CONFIG:Release>:-g1>)
+target_link_options(rooftree-core-interface INTERFACE $<$<CONFIG:Release>:-Wl,--compress-debug-sections=zlib>)
+
 if(WITH_COREDEBUG)
   target_compile_options(rooftree-core-interface INTERFACE -g3)
 endif()

@@ -2,9 +2,10 @@
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
  * What may not happen: ASSERT(condition) or ASSERT(condition, "printf format", arguments...) writes
- * where and what to stderr and aborts, for a core dump (systemd starts the server again). On in every
- * build: they guard what would otherwise corrupt data or memory. ABORT() and ABORT_MSG(...) abort
- * unconditionally (the freeze detector: the main thread hangs).
+ * where and what to stderr, with the stack trace, and aborts, for a core dump (systemd starts the server
+ * again). On in every build: they guard what would otherwise corrupt data or memory. ABORT() and
+ * ABORT_MSG(...) abort unconditionally (the freeze detector: the main thread hangs; its trace is the io
+ * thread's, the core dump has the main thread's).
  *
  * For what can go wrong at run time (a bad request, a file missing) return an error or throw, never
  * assert.

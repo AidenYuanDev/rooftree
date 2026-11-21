@@ -6,6 +6,8 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <stacktrace>
+#include <string>
 
 namespace
 {
@@ -18,6 +20,18 @@ namespace
         std::fputs("  ", stderr);
         std::vfprintf(stderr, format, *args);
         std::fputc('\n', stderr);
+    }
+
+    // Where it happened, from the caller of Report on: function names in every build, files and lines
+    // where there is debug information (Release has -g1). Allocates, which may itself fail here
+    try
+    {
+        std::fputs(std::to_string(std::stacktrace::current(1)).c_str(), stderr);
+        std::fputc('\n', stderr);
+    }
+    catch (...)
+    {
+        std::fputs("  (no stack trace)\n", stderr);
     }
     std::fflush(stderr);
     std::abort();
