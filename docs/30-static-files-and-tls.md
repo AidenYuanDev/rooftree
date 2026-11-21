@@ -94,7 +94,7 @@
 
 context 建好后就不再改。`LoadSslContext` 读到新证书就建一个新的 context，在锁里替换 `shared_ptr`（[WorldHttpService.cpp:278](../src/server/shared/http/WorldHttpService.cpp#L278)）。之后接受的连接用新的；已经打开的连接各自持有旧 context 的 `shared_ptr`（OpenSSL 的 `SSL` 对象引用着它），用完才释放。新文件读不了、或者私钥和证书对不上，就返回 `false`，继续用当前的 context。
 
-博客在收到 SIGHUP 时调用它（[Main.cpp:375](../apps/blog/server/Main.cpp#L375)）。certbot 续期成功后由 `--deploy-hook` 把证书复制到服务器能读的地方，再 `systemctl reload blog`。
+博客在收到 SIGHUP 时调用它（[Main.cpp:230](../apps/blog/server/Main.cpp#L230)）。certbot 续期成功后由 `--deploy-hook` 把证书复制到服务器能读的地方，再 `systemctl reload blog`。
 
 ### 3.8 80 端口：跳转和 ACME
 
@@ -104,7 +104,7 @@ TLS 服务之外，80 端口还要有一个明文服务：
 - **ACME 挑战**：Let's Encrypt 续期时会访问 `http://域名/.well-known/acme-challenge/<token>`。这些路径不跳转，由博客的路由从 certbot `--webroot` 的目录里读文件回复。这样续期时服务器不用停。
 - **本机自己的请求**：`RedirectExempt` 里的地址照常处理。重建页面时 React Router 在本机通过 `http://127.0.0.1/api/...` 读文章，不能被跳走，所以博客把 127.0.0.1 和 ::1 设成豁免。
 
-明文服务和 TLS 服务注册同样的路由（[Main.cpp:324](../apps/blog/server/Main.cpp#L324)），只是 TLS 服务多带一个 `Strict-Transport-Security` 头：浏览器记住一年内这个域名只用 https。
+明文服务和 TLS 服务注册同样的路由（[Main.cpp:172](../apps/blog/server/Main.cpp#L172)），只是 TLS 服务多带一个 `Strict-Transport-Security` 头：浏览器记住一年内这个域名只用 https。
 
 ## 4. 线程与安全
 

@@ -87,6 +87,9 @@ public:
 
     // Main thread, at startup and on every reload
     void LoadSettings(BlogSettings settings);
+    // Startup, after LoadSettings and before the network: the tags, the bans, the site's profile, the
+    // search index, the comment counts and the prerendered site, so the first request has them all
+    void LoadFromDatabase();
     BlogSettings const& GetSettings() const { return _settings; }
 
     void Update(uint32 diff);

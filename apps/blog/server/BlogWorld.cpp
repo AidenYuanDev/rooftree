@@ -120,6 +120,22 @@ void BlogWorld::LoadSettings(BlogSettings settings)
     _worldTicker.SetMaxCatchUp(_settings.WorldTickMaxCatchUp);
 }
 
+void BlogWorld::LoadFromDatabase()
+{
+    SetTags(LoadTagsDirect());
+    SetIpBans(LoadIpBansDirect());
+    SetSiteProfile(LoadSiteProfileDirect());
+    CountMissingWordsDirect();
+
+    TimePoint indexStart = TimePoint::clock::now();
+    std::unique_ptr<SearchIndex> searchIndex = SearchIndex::Load();
+    RT_LOG_INFO("blog", "Search index of {} documents built in {} ms", searchIndex->GetDocumentCount(),
+        std::chrono::duration_cast<Milliseconds>(TimePoint::clock::now() - indexStart).count());
+    SetSearchIndex(std::move(searchIndex));
+    SetCommentCounts(LoadCommentCountsDirect());
+    LoadStaticSite(true);
+}
+
 void BlogWorld::Update(uint32 diff)
 {
     // Between two updates nothing runs, so the settings change all at once

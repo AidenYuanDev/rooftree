@@ -350,4 +350,14 @@ using BlogDatabaseTransaction = SQLTransaction<BlogDatabaseConnection>;
 
 extern BlogDatabaseWorkerPool BlogDatabase;
 
+class Config;
+
+namespace Blog
+{
+// Startup: connects with Database.Blog, checks that every migration of Blog.MigrationsDirectory was
+// applied and prepares the statements. False (and logged) when one of them fails, closed again
+bool OpenDatabase(Config const& config);
+void CloseDatabase();
+}
+
 #endif // BLOG_DATABASE_H

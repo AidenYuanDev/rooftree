@@ -3,7 +3,14 @@
  */
 
 #include "BlogDatabase.h"
+#include "Config.h"
+#include "DatabaseConfig.h"
 #include "DatabaseWorkerPool.h"
+#include "Field.h"
+#include "Log.h"
+#include "QueryResult.h"
+#include <filesystem>
+#include <set>
 
 // Languages are listed "zh" first everywhere: ORDER BY lang DESC, there are only the two
 // Columns of a user row, in the order UserRow::FromFields (BlogTypes.cpp) reads them
@@ -621,3 +628,78 @@ void BlogDatabaseConnection::DoPrepareStatements()
 template class DatabaseWorkerPool<BlogDatabaseConnection>;
 
 BlogDatabaseWorkerPool BlogDatabase;
+
+namespace Blog
+{
+namespace
+{
+// dbmate keeps the applied versions in schema_migrations; each file of the migrations directory has to
+// be there, statements are prepared against the tables they create
+bool CheckMigrations(std::string const& directory)
+{
+    std::set<std::string> expected;
+    std::error_code error;
+    for (std::filesystem::directory_entry const& entry : std::filesystem::directory_iterator(directory, error))
+    {
+        std::string name = entry.path().filename().string();
+        if (entry.path().extension() == ".sql" && name.find('_') != std::string::npos)
+            expected.insert(name.substr(0, name.find('_')));
+    }
+
+    if (error || expected.empty())
+    {
+        RT_LOG_ERROR("blog", "No migrations found in {} (Blog.MigrationsDirectory)", directory);
+        return false;
+    }
+
+    // A plain query: before the first migration schema_migrations doesn't exist, which Query logs
+    QueryResult result = BlogDatabase.Query("SELECT version FROM schema_migrations");
+    if (result)
+    {
+        do
+            expected.erase(result->Fetch()[0].GetString());
+        while (result->NextRow());
+    }
+
+    if (!expected.empty())
+    {
+        RT_LOG_ERROR("blog", "The database lacks {} migration(s), starting with {}. Apply them first: pnpm db:up in apps/blog",
+            expected.size(), *expected.begin());
+        return false;
+    }
+
+    return true;
+}
+}
+
+bool OpenDatabase(Config const& config)
+{
+    std::optional<DatabaseConfig> database = config.Get<DatabaseConfig>("Database.Blog");
+    if (!database)
+    {
+        RT_LOG_ERROR("blog", "Database.Blog is not set or invalid, it needs at least Host, User and Name");
+        return false;
+    }
+
+    BlogDatabase.SetConnectionInfo(database->Connection, database->WorkerThreads, database->SynchThreads);
+    // Open returns an error code
+    if (BlogDatabase.Open() != 0)
+    {
+        RT_LOG_ERROR("blog", "Could not connect to the blog database");
+        return false;
+    }
+
+    if (!CheckMigrations(config.Get<std::string>("Blog.MigrationsDirectory", "blog-migrations")) || !BlogDatabase.PrepareStatements())
+    {
+        BlogDatabase.Close();
+        return false;
+    }
+
+    return true;
+}
+
+void CloseDatabase()
+{
+    BlogDatabase.Close();
+}
+}

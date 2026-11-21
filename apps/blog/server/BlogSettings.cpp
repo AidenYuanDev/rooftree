@@ -92,6 +92,9 @@ bool BlogSettings::LoadFromConfig(Config const& config)
     settings.MailOutboxDirectory = config.Get<std::string>("Blog.Mail.OutboxDirectory", "");
     settings.OAuthProviders = OAuthProvider::FromConfig(config);
 
+    settings.MinUpdateDiff = Milliseconds(config.Get<uint32>(ServerKey(config, "MinUpdateDiff"), uint32(settings.MinUpdateDiff.count())));
+    settings.StatsInterval = Seconds(config.Get<uint32>(ServerKey(config, "StatsInterval"), uint32(settings.StatsInterval.count())));
+    settings.ShutdownDelay = Seconds(config.Get<uint32>(ServerKey(config, "ShutdownDelay"), uint32(settings.ShutdownDelay.count())));
     settings.WorldTick = Milliseconds(config.Get<uint32>(ServerKey(config, "WorldTick"), uint32(settings.WorldTick.count())));
     settings.WorldTickMaxCatchUp = std::max(1u, config.Get<uint32>(ServerKey(config, "WorldTickMaxCatchUp"), settings.WorldTickMaxCatchUp));
     settings.Sessions = Rooftree::Server::SessionMgrSettings::FromConfig(config, ServerKey(config, "Sessions"));

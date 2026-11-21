@@ -1,9 +1,9 @@
 /*
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
- * Blog.* of blog.yaml, and the Sessions and AntiDos of Server.*. LoadFromConfig runs at startup and
- * again on SIGHUP (between two updates, on the main thread); the network settings (addresses, ports,
- * threads) are only read at startup.
+ * Blog.* of blog.yaml, and the reloadable ones of Server.* (the main loop's, Sessions, AntiDos).
+ * LoadFromConfig runs at startup and again on SIGHUP (between two updates, on the main thread); the
+ * network settings (addresses, ports, threads) are only read at startup, by Main.cpp.
  */
 
 #ifndef BLOG_SETTINGS_H
@@ -96,6 +96,12 @@ struct BlogSettings
     // An enabled provider by name, null if there is none
     OAuthProvider const* FindOAuthProvider(std::string_view name) const;
     uint32 NewsletterMailsPerMinute = 60;
+
+    // The main loop: an update every MinUpdateDiff at least, its times logged every StatsInterval (0:
+    // never), a SIGTERM stopping it after ShutdownDelay (0: right away)
+    Milliseconds MinUpdateDiff = 2ms;
+    Seconds StatsInterval = 60s;
+    Seconds ShutdownDelay = 0s;
 
     // Server.WorldTick: the game's world, every WorldTick at most WorldTickMaxCatchUp ticks in one update
     Milliseconds WorldTick = 50ms;
