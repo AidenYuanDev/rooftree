@@ -72,6 +72,14 @@ public:
                 else
                     json[key] = text ? Name(text) : std::string_view();
             }
+            else if (IsStruct(type.base_type(), type.index()))
+            {
+                uint8 const* data = table.GetStruct<uint8 const*>(field->offset());
+                if (data)
+                    json[key] = StructToJson(*_schema.objects()->Get(type.index()), data);
+                else
+                    json[key] = nullptr;
+            }
             else if (type.base_type() == reflection::Obj)
             {
                 flatbuffers::Table const* child = flatbuffers::GetFieldT(table, *field);
@@ -103,6 +111,7 @@ public:
         // What tables hold by offset is built first, a table is built in one go
         std::vector<std::pair<reflection::Field const*, flatbuffers::uoffset_t>> offsets;
         std::vector<std::pair<reflection::Field const*, boost::json::value const*>> scalars;
+        std::vector<std::pair<reflection::Field const*, std::vector<uint8>>> structs;
         for (reflection::Field const* field : *object.fields())
         {
             boost::json::value const* value = json.if_contains(Name(field->name()));
@@ -117,7 +126,7 @@ public:
                 {
                     if (IsScalar(type.base_type()))
                         scalars.emplace_back(field, &ZeroValue);
-                    else
+                    else if (!IsStruct(type.base_type(), type.index()))
                         offsets.emplace_back(field, BuildEmpty(type, builder));
                 }
                 continue;
@@ -125,6 +134,15 @@ public:
 
             if (IsScalar(type.base_type()))
                 scalars.emplace_back(field, value);
+            else if (IsStruct(type.base_type(), type.index()))
+            {
+                if (Optional<std::vector<uint8>> bytes = BuildStruct(*_schema.objects()->Get(type.index()), *value))
+                {
+                    if (HasAttribute(*field, "json_closed") && !HasOnlyFields(*_schema.objects()->Get(type.index()), value->get_object()))
+                        Fail("unknown_key");
+                    structs.emplace_back(field, std::move(*bytes));
+                }
+            }
             else if (HasAttribute(*field, "json_map"))
             {
                 if (Optional<flatbuffers::uoffset_t> offset = BuildMap(type, *value, builder))
@@ -155,6 +173,13 @@ public:
             AddScalar(builder, *field, integer, floating);
         for (auto const& [field, offset] : offsets)
             builder.AddOffset(field->offset(), flatbuffers::Offset<void>(offset));
+        // Inline, the way FlatBufferBuilder::AddStruct writes one
+        for (auto const& [field, bytes] : structs)
+        {
+            builder.Align(_schema.objects()->Get(field->type()->index())->minalign());
+            builder.PushBytes(bytes.data(), bytes.size());
+            builder.TrackField(field->offset(), builder.GetSize());
+        }
         return builder.EndTable(start);
     }
 
@@ -219,6 +244,28 @@ private:
         return integer;
     }
 
+    bool IsStruct(BaseType type, int32 index) const
+    {
+        return type == reflection::Obj && _schema.objects()->Get(index)->is_struct();
+    }
+
+    // Every field: a struct has them all
+    boost::json::object StructToJson(reflection::Object const& object, uint8 const* data) const
+    {
+        boost::json::object json;
+        for (reflection::Field const* field : *object.fields())
+        {
+            reflection::Type const& type = *field->type();
+            uint8 const* at = data + field->offset();
+            if (type.base_type() == reflection::Obj)
+                json[Name(field->name())] = StructToJson(*_schema.objects()->Get(type.index()), at);
+            else
+                json[Name(field->name())] = ScalarToJson(type.base_type(), type.index(), flatbuffers::GetAnyValueI(type.base_type(), at),
+                    flatbuffers::GetAnyValueF(type.base_type(), at));
+        }
+        return json;
+    }
+
     reflection::EnumVal const* FindEnumValue(int32 enumIndex, int64 integer) const
     {
         for (reflection::EnumVal const* value : *_schema.enums()->Get(enumIndex)->values())
@@ -238,6 +285,11 @@ private:
                     flatbuffers::GetAnyVectorElemF(vector, element, i)));
             else if (element == reflection::String)
                 json.push_back(boost::json::value(Name(flatbuffers::GetAnyVectorElemPointer<flatbuffers::String const>(vector, i))));
+            else if (IsStruct(element, type.index()))
+            {
+                reflection::Object const& object = *_schema.objects()->Get(type.index());
+                json.push_back(StructToJson(object, vector->Data() + i * object.bytesize()));
+            }
             else if (element == reflection::Obj)
                 json.push_back(TableToJson(*_schema.objects()->Get(type.index()),
                     *flatbuffers::GetAnyVectorElemPointer<flatbuffers::Table const>(vector, i)));
@@ -356,6 +408,52 @@ private:
         return builder.EndVector(0);
     }
 
+    // A struct's bytes: what the JSON has of its fields, 0 for the others (a struct has them all). All
+    // of it or none
+    Optional<std::vector<uint8>> BuildStruct(reflection::Object const& object, boost::json::value const& value)
+    {
+        if (!value.is_object())
+            return Fail("not_an_object"), Optional<std::vector<uint8>>();
+
+        std::size_t errors = _errors.size();
+        std::vector<uint8> bytes(object.bytesize());
+        WriteStruct(object, value.get_object(), bytes.data());
+        if (_errors.size() != errors)
+            return {};
+        return bytes;
+    }
+
+    void WriteStruct(reflection::Object const& object, boost::json::object const& json, uint8* data)
+    {
+        for (reflection::Field const* field : *object.fields())
+        {
+            boost::json::value const* value = json.if_contains(Name(field->name()));
+            if (!value || value->is_null())
+                continue;
+
+            PathScope scope(_path, Name(field->name()));
+            reflection::Type const& type = *field->type();
+            uint8* at = data + field->offset();
+            if (type.base_type() == reflection::Obj)
+            {
+                if (value->is_object())
+                    WriteStruct(*_schema.objects()->Get(type.index()), value->get_object(), at);
+                else
+                    Fail("not_an_object");
+                continue;
+            }
+
+            Optional<int64> integer;
+            double floating = 0;
+            if (!ReadScalar(type.base_type(), type.index(), *value, integer, floating))
+                continue;
+            if (integer)
+                flatbuffers::SetAnyValueI(type.base_type(), at, *integer);
+            else
+                flatbuffers::SetAnyValueF(type.base_type(), at, floating);
+        }
+    }
+
     // A string, table or vector of type (baseType: the field's or, in a vector, the element's); none
     // with its error if value isn't one
     Optional<flatbuffers::uoffset_t> BuildValue(BaseType baseType, reflection::Type const& type, boost::json::value const& value,
@@ -402,6 +500,28 @@ private:
             builder.StartVector(array.size(), size, size);
             for (std::size_t i = array.size(); i-- > 0;)
                 PushScalar(builder, element, values[i].first, values[i].second);
+            return builder.EndVector(array.size());
+        }
+
+        if (IsStruct(element, type.index()))
+        {
+            reflection::Object const& object = *_schema.objects()->Get(type.index());
+            std::vector<uint8> bytes;
+            bytes.reserve(array.size() * object.bytesize());
+            for (std::size_t i = 0; i < array.size(); ++i)
+            {
+                PathScope scope(_path, std::to_string(i));
+                if (array[i].is_null())
+                    Fail("null");
+                else if (Optional<std::vector<uint8>> element = BuildStruct(object, array[i]))
+                    bytes.insert(bytes.end(), element->begin(), element->end());
+            }
+            if (_errors.size() != errors)
+                return {};
+
+            // In the vector as they are in memory, first to last
+            builder.StartVector(array.size(), object.bytesize(), object.minalign());
+            builder.PushBytes(bytes.data(), bytes.size());
             return builder.EndVector(array.size());
         }
 
@@ -537,24 +657,20 @@ FlatJsonSchema::FlatJsonSchema(uint8 const* bfbs) : _schema(reflection::GetSchem
 
 Rooftree::Result<> FlatJsonSchema::Load()
 {
-    auto supported = [&](BaseType type, int32 index)
+    auto supported = [&](BaseType type)
     {
-        if (type == reflection::Union || type == reflection::UType || type == reflection::Array || type == reflection::Vector64)
-            return false;
-        return type != reflection::Obj || !_schema->objects()->Get(index)->is_struct();
+        return type != reflection::Union && type != reflection::UType && type != reflection::Array && type != reflection::Vector64;
     };
 
     for (reflection::Object const* object : *_schema->objects())
     {
-        if (object->is_struct())
-            continue;
         for (reflection::Field const* field : *object->fields())
         {
             reflection::Type const& type = *field->type();
-            bool ok = supported(type.base_type(), type.index())
-                && (type.base_type() != reflection::Vector || (supported(type.element(), type.index()) && type.element() != reflection::Vector));
+            bool ok = supported(type.base_type())
+                && (type.base_type() != reflection::Vector || (supported(type.element()) && type.element() != reflection::Vector));
             if (!ok)
-                return std::unexpected(StringFormat("{}.{}: structs, unions, arrays and vectors of vectors aren't supported",
+                return std::unexpected(StringFormat("{}.{}: unions, fixed arrays and vectors of vectors aren't supported",
                     Name(object->name()), Name(field->name())));
 
             if (HasAttribute(*field, "json_map"))

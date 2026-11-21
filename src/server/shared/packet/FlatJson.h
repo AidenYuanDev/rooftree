@@ -7,8 +7,11 @@
  * answers with becomes the JSON the client expects. One schema describes both, nothing is written
  * per message.
  *
- * Tables, strings, scalars, enums (by name in JSON) and vectors of them; structs and unions aren't
- * supported (Load says which field has one). Field names are the JSON keys as they are.
+ * Tables, structs, strings, scalars, enums (by name in JSON) and vectors of them; unions and fixed
+ * arrays aren't supported (Load says which field has one). Field names are the JSON keys as they are.
+ * A struct is an object of all its fields both ways: one absent from a table is null, a field the
+ * JSON leaves out of one is 0 (a struct has no absent field), one that doesn't fit leaves out the
+ * whole struct. json_null changes nothing for a struct, json_closed applies.
  *
  *  JSON to a   keys the schema doesn't have are left out, so are nulls; a value of the wrong type or
  *  table       out of its type's range is left out too and named in the errors ("posts.0.id",

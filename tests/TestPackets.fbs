@@ -59,4 +59,24 @@ table Ping {
   text:string;
 }
 
+// Structs: inline, all their fields always there
+struct Point {
+  x:float;
+  y:float;
+}
+
+struct Spot {
+  id:uint;
+  at:Point;
+  color:Color;
+  on:bool;
+}
+
+table Shapes {
+  spot:Spot;
+  spots:[Spot];
+  points:[Point];
+  closed:Point (json_closed);
+}
+
 root_type Everything;

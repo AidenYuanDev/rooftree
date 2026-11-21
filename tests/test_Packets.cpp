@@ -317,3 +317,75 @@ TEST_CASE("FlatJsonSchema from JSON", "[server][packet]")
         CHECK(schema.Flat.GetFieldNames(*schema.Everything).size() == 16);
     }
 }
+
+TEST_CASE("FlatJsonSchema structs", "[server][packet]")
+{
+    Schema schema;
+    reflection::Object const* shapes = schema.Flat.Find("Test.Shapes");
+    REQUIRE(shapes);
+    FlatJsonErrors errors;
+
+    SECTION("to JSON: every field, an absent struct is null")
+    {
+        flatbuffers::FlatBufferBuilder builder;
+        std::vector<Test::Spot> spots{ Test::Spot(1, Test::Point(1.5f, -2), Test::Color::Blue, true), Test::Spot(2, Test::Point(), Test::Color::Red, false) };
+        auto spotsOffset = builder.CreateVectorOfStructs(spots);
+        auto points = builder.CreateVectorOfStructs(std::vector<Test::Point>{});
+        Test::Spot spot(7, Test::Point(3, 4), Test::Color::Green, false);
+        builder.Finish(Test::CreateShapes(builder, &spot, spotsOffset, points));
+
+        std::span<uint8 const> buffer(builder.GetBufferPointer(), builder.GetSize());
+        REQUIRE(schema.Flat.Verify(*shapes, buffer));
+        CHECK(schema.Flat.ToJson(*shapes, buffer) == Parse(R"({"spot": {"id": 7, "at": {"x": 3.0, "y": 4.0}, "color": "Green", "on": false},
+            "spots": [{"id": 1, "at": {"x": 1.5, "y": -2.0}, "color": "Blue", "on": true}, {"id": 2, "at": {"x": 0.0, "y": 0.0}, "color": "Red", "on": false}],
+            "points": [], "closed": null})"));
+    }
+
+    SECTION("from JSON and back, a field left out is 0")
+    {
+        boost::json::object json = Parse(R"({"spot": {"id": 4294967295, "at": {"y": 0.25}, "color": "Blue"},
+            "spots": [{"id": 1, "on": true}, {"id": 2, "at": {"x": -1, "y": 1}}], "points": [{"x": 5, "y": 6}], "closed": {"x": 1}})");
+        std::string buffer = schema.Flat.FromJson(*shapes, json, errors);
+        CHECK(errors.empty());
+        REQUIRE(schema.Flat.Verify(*shapes, Bytes(buffer)));
+
+        Test::Shapes const* read = flatbuffers::GetRoot<Test::Shapes>(buffer.data());
+        REQUIRE(read->spot());
+        CHECK(read->spot()->id() == 4294967295u);
+        CHECK(read->spot()->at().x() == 0);
+        CHECK(read->spot()->at().y() == 0.25f);
+        CHECK(read->spot()->color() == Test::Color::Blue);
+        REQUIRE(read->spots()->size() == 2);
+        CHECK(read->spots()->Get(0)->on());
+        CHECK(read->spots()->Get(1)->id() == 2u);
+        CHECK(read->spots()->Get(1)->at().x() == -1);
+        CHECK(read->points()->Get(0)->y() == 6);
+        CHECK(read->closed()->x() == 1);
+
+        CHECK(schema.Flat.ToJson(*shapes, Bytes(buffer)) == Parse(R"({"spot": {"id": 4294967295, "at": {"x": 0.0, "y": 0.25}, "color": "Blue", "on": false},
+            "spots": [{"id": 1, "at": {"x": 0.0, "y": 0.0}, "color": "Red", "on": true}, {"id": 2, "at": {"x": -1.0, "y": 1.0}, "color": "Red", "on": false}],
+            "points": [{"x": 5.0, "y": 6.0}], "closed": {"x": 1.0, "y": 0.0}})"));
+    }
+
+    SECTION("what doesn't fit leaves the whole struct out and is named")
+    {
+        auto fails = [&](std::string_view json)
+        {
+            std::string buffer = schema.Flat.FromJson(*shapes, Parse(json), errors);
+            REQUIRE(schema.Flat.Verify(*shapes, Bytes(buffer)));
+            Test::Shapes const* read = flatbuffers::GetRoot<Test::Shapes>(buffer.data());
+            CHECK_FALSE(read->spot());
+            CHECK_FALSE(read->spots());
+            REQUIRE(errors.size() == 1);
+            return errors[0].first + ": " + errors[0].second;
+        };
+
+        CHECK(fails(R"({"spot": {"id": -1}})") == "spot.id: out_of_range");
+        CHECK(fails(R"({"spot": {"at": {"x": "1"}}})") == "spot.at.x: not_a_number");
+        CHECK(fails(R"({"spot": {"at": 3}})") == "spot.at: not_an_object");
+        CHECK(fails(R"({"spot": [1]})") == "spot: not_an_object");
+        CHECK(fails(R"({"spots": [{"id": 1}, {"color": "Purple"}]})") == "spots.1.color: unknown_value");
+        CHECK(fails(R"({"spots": [{"id": 1}, null]})") == "spots.1: null");
+        CHECK(fails(R"({"closed": {"x": 1, "z": 2}})") == "closed: unknown_key");
+    }
+}
