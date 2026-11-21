@@ -58,7 +58,7 @@ public:
     using Client::Client;
 
     std::atomic<bool> Done = false;
-    std::atomic<uint32> States = 0;
+    std::atomic<uint32> Frames = 0;
 
 protected:
     void OnOpen() override
@@ -102,17 +102,28 @@ protected:
                 Send(MakePacket(Arena::Opcode::Ping, builder));
                 break;
             }
-            case Arena::Opcode::State:
+            case Arena::Opcode::Units:
+                if (verifier.VerifyBuffer<Arena::Units>(nullptr))
+                {
+                    Arena::Units const* units = flatbuffers::GetRoot<Arena::Units>(payload.data());
+                    std::print("{} Units, {} bytes:", tag, packet.size());
+                    if (units->units())
+                        for (Arena::UnitInfo const* unit : *units->units())
+                            std::print(" {} is {}", unit->id(), Str(unit->name()));
+                    std::print(", {} gone\n", units->gone() ? units->gone()->size() : 0);
+                }
+                break;
+            case Arena::Opcode::Frame:
             {
-                // 20 states a second, print the first and then one a second
-                if (!verifier.VerifyBuffer<Arena::State>(nullptr) || States++ % 20)
+                // 20 frames a second, print the first and then one a second
+                if (!verifier.VerifyBuffer<Arena::Frame>(nullptr) || Frames++ % 20)
                     break;
-                Arena::State const* state = flatbuffers::GetRoot<Arena::State>(payload.data());
-                std::print("{} State, {} bytes:", tag, packet.size());
-                if (state->players())
-                    for (Arena::PlayerState const* player : *state->players())
-                        std::print(" {} at ({:.0f}, {:.0f})", Str(player->name()), player->x(), player->y());
-                std::print(", {} coins{}\n", state->coins() ? state->coins()->size() : 0, state->goldRush() ? ", gold rush" : "");
+                Arena::Frame const* frame = flatbuffers::GetRoot<Arena::Frame>(payload.data());
+                std::print("{} Frame {}, {} bytes:", tag, frame->tick(), packet.size());
+                if (frame->units())
+                    for (Arena::UnitMotion const* unit : *frame->units())
+                        std::print(" {} at ({:.0f}, {:.0f})", unit->id(), unit->x(), unit->y());
+                std::print(", {} coins{}\n", frame->coins() ? frame->coins()->size() : 0, frame->goldRush() ? ", gold rush" : "");
                 break;
             }
             case Arena::Opcode::ChatMessage:
@@ -223,7 +234,7 @@ int main(int argc, char** argv)
 
     if (!client->Done)
     {
-        std::print("round trip {} ms, {} states received, leaving\n", client->GetRoundTripTime(), uint32(client->States));
+        std::print("round trip {} ms, {} frames received, leaving\n", client->GetRoundTripTime(), uint32(client->Frames));
         client->Close();
         while (!client->Done)
             std::this_thread::sleep_for(10ms);

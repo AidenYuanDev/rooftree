@@ -100,11 +100,12 @@ HTTP 入口还做了几件包用不到的事：`Retry-After` 头来自 Error 的
 - **`json_omit`**：回答里有些字段只有部分对象才有（用户详情的 `sessions`）。标了这个属性，缺少时 JSON 里就不出现这个键。
 - **`json_closed`**：对象的键必须都是表里的字段，否则报 `unknown_key`。用在语言表这类地方，`translations: {de: …}` 这种写错的键应该报错，而不是悄悄丢掉。
 - **`json_map`**：JSON 里以任意字符串为键的对象（按图片地址查尺寸、按表情数表态），FlatBuffers 没有对应的类型。标了这个属性的字段是一组表，表里有一个叫 `key` 的字符串字段：JSON 里每一项变成 `key: 值`。表里除 `key` 只有一个字段时，值就是这个字段的值（`{"like": 3}`）；有好几个字段时，值是由它们组成的对象（`{"/a.png": {"width": 1, "height": 2}}`）。出错的值按键报告（`counts.like`）。
-- 不支持 struct、union 和定长数组，`Load()` 会指出是哪个字段。
+- 支持 struct（表里的 struct 字段和 struct 的数组）：JSON 里是包含全部字段的对象。表里没有这个 struct 时是 null；JSON 少写的字段按 0 处理，因为 struct 的字段总是都在；有一个字段不合法，整个 struct 都不写。`json_null` 对 struct 不起作用，`json_closed` 照常有效。
+- 不支持 union 和定长数组，`Load()` 会指出是哪个字段。
 
 ## 5. arena：游戏消息也是包
 
-[apps/arena](../apps/arena) 的消息原来是 `{"type": ...}` 的 JSON，2026-11-02 起换成了包，给原生客户端（[KCP](33-kcp.md)、UE5）用。所有消息都定义在 [Arena.fbs](../apps/arena/schema/Arena.fbs) 里：一个 `Opcode` 枚举，客户端发的是 0x00xx（`Ping`、`Input`、`Chat`），服务器发的是 0x01xx（`Welcome`、`Pong`、`State`、`ChatMessage`、`SystemMessage`），每个 opcode 对应一个同名的表。包头沿用第 3 节的 8 字节，requestId 一律是 0：arena 没有请求和回答，`Pong` 带回 `Ping` 的 `t` 就够了。
+[apps/arena](../apps/arena) 的消息原来是 `{"type": ...}` 的 JSON，2026-11-02 起换成了包，给原生客户端（[KCP](33-kcp.md)、UE5）用。所有消息都定义在 [Arena.fbs](../apps/arena/schema/Arena.fbs) 里：一个 `Opcode` 枚举，客户端发的是 0x00xx（`Ping`、`Input`、`Chat`），服务器发的是 0x01xx（`Welcome`、`Pong`、`Frame`、`Units`、`ChatMessage`、`SystemMessage` 等），每个 opcode 对应一个同名的表。0x0103 原来是 `State`，2026-11-21 拆成了 `Frame` 和 `Units`（见 [35](35-examples-and-apps.md)），这个编号不再使用。包头沿用第 3 节的 8 字节，requestId 一律是 0：arena 没有请求和回答，`Pong` 带回 `Ping` 的 `t` 就够了。
 
 | 连接 | 收 | 发 |
 |---|---|---|
@@ -115,12 +116,12 @@ HTTP 入口还做了几件包用不到的事：`Retry-After` 头来自 Error 的
 网页一行没改：JSON 的 `type` 和字段名都和原来一样。[ArenaPackets.cpp](../apps/arena/ArenaPackets.cpp) 里有一张小表，给每个 opcode 起 JSON 里的名字（客户端的 `Chat` 和服务器的 `ChatMessage` 都叫 `chat`），转换由 `FlatJsonSchema` 按 schema 完成，不用为每个消息写代码。
 
 - **读**：`ReadClientPacket` / `ReadClientJson` 在网络线程上把消息变成 `ClientMessage`（opcode + 校验过的表），世界线程上的处理函数直接拿到表：`void HandleInput(Arena::Input const& input)`。不认识的 opcode 或 type 忽略（可能是更新的客户端）；不是包、表校验不过、不是 JSON 就以 1007 关闭。
-- **写**：处理函数和 World 用生成代码构建表，包成 `ServerPacket`。广播（每帧的 `State`）只构建一次；发给网页的 JSON 在第一次需要时转换一次，之后发给其他网页都用这一份。
-- **大小**：一个玩家、6 个金币时，`State` 的包是 228 字节，同样内容的 JSON 是 542 字节。
+- **写**：处理函数和 World 用生成代码构建表，包成 `ServerPacket`。广播（比如系统消息）只构建一次；每帧的 `Frame` 每个客户端各不相同，各自构建；发给网页的 JSON 在第一次需要时转换一次，之后发给其他网页都用这一份。
+- **大小**：`Frame` 里一个单位 24 字节、一个金币 16 字节（都是 struct，没有表的偏移量），500 人时平均 27 个单位、727 字节。改用 struct 之前，一个玩家、6 个金币的 `State` 包是 228 字节，同样内容的 JSON 是 542 字节。
 
 注意的地方：
 
-- **flatc 只为有 `root_type` 的 schema 生成二进制 schema**，生成的类型以根表命名（`Arena::StateBinarySchema`）。包靠 opcode 说明是哪个表，`root_type` 只是为了让它生成。
+- **flatc 只为有 `root_type` 的 schema 生成二进制 schema**，生成的类型以根表命名（`Arena::FrameBinarySchema`）。包靠 opcode 说明是哪个表，`root_type` 只是为了让它生成。
 - **JSON 的键按字母顺序输出**：反射里的字段按名字排序。按名字取字段的代码不受影响。
 - **包里的字符串可以是任意字节**：WebSocket 的文本帧已经检查过 UTF-8，二进制帧和 KCP 没有，所以聊天的处理函数自己检查。
 - **float 在 JSON 里会变成很长的小数**（`858.4244384765625`）：float 先转成 double 再输出，原来的 JSON 也是这样。包里就是 4 个字节。

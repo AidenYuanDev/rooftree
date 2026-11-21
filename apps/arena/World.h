@@ -10,15 +10,20 @@
  *   2. add the sessions the network threads logged in, update every session (run its messages)
  *   3. move the players, collect coins, work out who sees whom (combat/Visibility.h), run the combat
  *      (casts, auras) and send what happened in it, run the TaskScheduler and the EventMap
- *   4. send every client the new state
+ *   4. send every client its Frame: where what it sees is now (and before it, Units: what else changed)
  *
  * A player whose connection went stays in the world for Arena.LingerTime, standing, still to be hit: a
  * login in that time takes it over as it was (hurt, dead, on cooldown), so a relog heals or revives
  * nothing. After it, it is saved and goes.
  *
- * A client hears only of what its player sees: the State lists the players within
+ * A client hears only of what its player sees: the Frame lists the players within
  * Arena.World.ViewDistance (Arena.World.MaxVisible of them at most, the nearest) and the coins in that
  * distance, the combat log the events whose caster or target it sees. System messages still go to all.
+ *
+ * The Frame goes every tick unreliably and holds only what changes all the time (position, facing,
+ * health, mana) in structs, to fit one datagram; the rest of a unit goes reliably in Units once when
+ * the client starts seeing it and again whenever it changes. Each session keeps what it was told
+ * (ArenaSession::GetSentUnits) to know what changed.
  */
 
 #ifndef ARENA_WORLD_H
@@ -49,7 +54,7 @@ struct WorldSettings
     float Height = 700.0f;
     float PlayerSpeed = 220.0f;             // per second
     float ViewDistance = 600.0f;            // a player sees this far
-    uint32 MaxVisible = 30;                 // players in one State at most, itself too; 0 for no limit
+    uint32 MaxVisible = 30;                 // players in one Frame at most, itself too; 0 for no limit
     uint32 MaxCoins = 15;
     Milliseconds CoinSpawnInterval = 1s;
     Milliseconds GoldRushInterval = 60s;
@@ -121,7 +126,8 @@ private:
     void UpdateEvents(uint32 diff);
     void SpawnCoin();
     void SavePlayers();
-    void SendState();
+    // Each client its Units, if any, and its Frame
+    void SendFrames();
     void LogUpdateStats();
 
     struct Coin
@@ -150,6 +156,7 @@ private:
     std::vector<Coin> _coins;
     uint32 _nextCoinId = 1;
     bool _goldRush = false;
+    uint32 _tick = 0;           // Frame.tick
 
     CombatMap _combat;
     Visibility _visibility;     // as of this update's movement
@@ -161,10 +168,11 @@ private:
         std::chrono::microseconds Total = 0us;
         std::chrono::microseconds Max = 0us;
         uint64 CombatEvents = 0;
-        uint64 States = 0;
-        uint64 StateBytes = 0;
-        uint64 StatesReliable = 0;      // too large for one datagram: KCP sends them reliably
-        uint64 StatePlayers = 0;
+        uint64 Frames = 0;
+        uint64 FrameBytes = 0;
+        uint64 FramesReliable = 0;      // too large for one datagram: KCP sends them reliably
+        uint64 FrameUnits = 0;
+        uint64 UnitsBytes = 0;          // Units messages'
     } _updateStats;
 
     TaskScheduler _scheduler;   // coin spawns, periodic saves

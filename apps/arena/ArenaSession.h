@@ -24,6 +24,7 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 class ArenaConnection;
 class Player;
@@ -78,6 +79,26 @@ public:
     void HandleCancelCast(Arena::CancelCast const& cancelCast);
     void HandleAttack(Arena::Attack const& attack);
 
+    // What the client was last told of each unit it sees, by id, besides where it is (World::SendFrames)
+    struct SentUnitInfo
+    {
+        uint32 MaxHealth = 0;
+        uint32 MaxMana = 0;
+        uint8 Power = 0;
+        uint8 Class = 0;
+        uint32 Target = 0;
+        uint32 AttackTarget = 0;
+        uint8 ComboPoints = 0;
+        float Speed = 0.0f;
+        uint32 Score = 0;
+        uint32 Total = 0;
+        uint32 Kills = 0;
+        uint32 Deaths = 0;
+
+        bool operator==(SentUnitInfo const&) const = default;
+    };
+    std::unordered_map<uint32, SentUnitInfo>& GetSentUnits() { return _sentUnits; }
+
 private:
     // takenOver: from another connection or one that went, where it stands
     void OnPlayerLoaded(std::unique_ptr<Player> player, bool takenOver);
@@ -97,6 +118,7 @@ private:
 
     uint32 _idleTime = 0;
     uint32 _chatCooldown = 0;   // ms until the next chat line is accepted
+    std::unordered_map<uint32, SentUnitInfo> _sentUnits;
 };
 
 #endif // ARENA_SESSION_H

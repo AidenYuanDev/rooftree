@@ -138,7 +138,7 @@ arena 的 `ArenaSession` 原来直接持有 `ArenaSocket`（WebSocket）。现�
 | 连接类 | `ArenaSocket` | `ArenaKcpConnection`（[ArenaKcp.h](../apps/arena/ArenaKcp.h)） |
 | 凭证 | ticket 放在握手的查询字符串里 | ticket 是 Hello 的 token，Hello 用登录时返回的 `kcpKey` 加密 |
 | 消息 | JSON 文本，在入口按 schema 转换（`format=packets` 时直接收发包） | FlatBuffers 包（[Arena.fbs](../apps/arena/schema/Arena.fbs)），见 [32](32-packets.md) 第 5 节 |
-| 每帧的 state | 照常发送 | 不可靠发送，丢了由下一帧补上；超过 1171 字节自动改为可靠发送 |
+| 每帧的 `Frame` | 照常发送 | 不可靠发送，丢了由下一帧补上；超过 1171 字节自动改为可靠发送 |
 
 登录的回答多了 `kcpPort` 和 `kcpKey`（十六进制）。ticket 仍然只能用一次，WebSocket 和 KCP 谁先用都可以。配置在 `Arena.Kcp.*`，见 `arena.yaml.dist`。
 
@@ -152,7 +152,7 @@ build/bin/arena_kcp_client <用户名> <密码> 127.0.0.1 8090 5
 ## 5. 常见的坑
 
 - **先把消息取出来，再发确认**：确认里带着自己的接收窗口（还能收多少个段）。一个丢了的段重传到达时，排在它后面的段一下子全部完整，最多 128 个进入接收队列。如果这时候发确认，告诉对方的窗口就是 0，对方会停止发送，等 KCP 的窗口探测，第一次要等 **7 秒**。客户端原来就是这个顺序，20% 丢包的测试里 1% 的运行卡了 7 秒以上；改成先取消息、再 `Flush` 之后，200 次运行最慢 0.7 秒。测试里等待的时间因此从 15 秒收紧到 5 秒，再出现这种卡顿就会失败。
-- **不可靠消息会超过可靠消息**：可靠消息要等下一次 flush 才发，不可靠消息立即发。所以发不可靠消息之前，先把排在前面的可靠消息 flush 掉，没有丢包时两者的顺序就和发送的顺序一致（测试"without loss what was sent reliably first arrives first"）。有丢包时仍然可能乱序，客户端要能处理"先收到 state、后收到 welcome"。
+- **不可靠消息会超过可靠消息**：可靠消息要等下一次 flush 才发，不可靠消息立即发。所以发不可靠消息之前，先把排在前面的可靠消息 flush 掉，没有丢包时两者的顺序就和发送的顺序一致（测试"without loss what was sent reliably first arrives first"）。有丢包时仍然可能乱序，客户端要能处理"先收到 Frame、后收到 Welcome"，以及"先收到 Frame、后收到同一帧的 Units"。
 - **Hello 的 token 是明文**：所以不能在认证之前用掉它（3.2）。登录也必须走 HTTPS，否则密钥和 token 一起被看到，加密就没有意义了。
 - **一个 token 两个客户端**：如果没有 Hello 里的 nonce，第二个客户端的 Hello 会被当成第一个的重发，拿到同一个 conv。
 - **UDP 会被封**：有些公司和学校的网络不放行 UDP。客户端连不上 KCP 时应该回到 WebSocket，arena 两条路都开着就是为了这个。
@@ -169,7 +169,7 @@ build/bin/arena_kcp_client <用户名> <密码> 127.0.0.1 8090 5
 
 ## 7. 思考题与练习
 
-1. 一个玩家、6 个金币时，state 的包是 228 字节，同样内容的 JSON 是 542 字节。多少个玩家时 state 的包会超过 `MaxBodySize`、改为可靠发送？玩家的名字只在变化时发送，能省多少？
+1. 一个玩家、6 个金币时，原来的 state 包是 228 字节，同样内容的 JSON 是 542 字节。多少个玩家时 state 的包会超过 `MaxBodySize`、改为可靠发送？玩家的名字只在变化时发送，能省多少？（arena 的答案：一个玩家约 75 字节，超过 15 人就超了；拆成每帧的 `Frame` 和变化时才发的 `Units` 以后，一个玩家 24 字节，约 35 人加 15 个金币才超，见 [35](35-examples-and-apps.md)。）
 2. 客户端连不上 UDP 时回到 WebSocket（`/arena?ticket=...&format=packets`，收发的是同样的包）：在 `arena_kcp_client` 里加上，判断条件是什么？等多久？
 3. 一个 `Server` 只有一个线程。用 `SO_REUSEPORT` 开几个 socket、几个线程监听同一个端口，内核按四元组分配数据报。连接换地址（3.5）以后会出什么问题？
 4. 位置同步只要最新的一份：客户端的输入能不能也走不可靠消息？丢了一个"停止移动"的输入会怎样，怎么避免？

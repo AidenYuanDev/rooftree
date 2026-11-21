@@ -110,7 +110,9 @@ const css = name => getComputedStyle(document.documentElement).getPropertyValue(
 
 let ws = null;
 let me = null;              // welcome message
-let snapshots = [];         // last two states with their arrival time, for interpolation
+let snapshots = [];         // last two frames with their arrival time, for interpolation
+let units = new Map();      // id -> what a 'units' message said of it (name, score...), until it's gone
+let lastTick = 0;
 let leaderboardTimer = null;
 let pingTimer = null;
 let rtt = null;
@@ -162,7 +164,7 @@ function connect(login) {
   ws.onclose = e => {
     clearInterval(pingTimer);
     clearInterval(leaderboardTimer);
-    ws = null; me = null; snapshots = [];
+    ws = null; me = null; snapshots = []; units = new Map(); lastTick = 0;
     $('game').classList.remove('active');
     $('login').hidden = false;
     $('logout').hidden = true;
@@ -195,10 +197,17 @@ function handle(msg) {
       lastInput = { dx: 0, dy: 0 };
       updateInput();
       break;
-    case 'state':
-      snapshots.push({ time: performance.now(), players: new Map(msg.players.map(p => [p.id, p])), coins: msg.coins, goldRush: msg.goldRush });
+    case 'units':
+      for (const unit of msg.units) units.set(unit.id, unit);
+      for (const id of msg.gone) units.delete(id);
+      break;
+    case 'frame':
+      // Unreliable: one older than the last may come late
+      if (msg.tick <= lastTick) break;
+      lastTick = msg.tick;
+      snapshots.push({ time: performance.now(), players: new Map(msg.units.map(p => [p.id, p])), coins: msg.coins, goldRush: msg.goldRush });
       if (snapshots.length > 2) snapshots.shift();
-      renderOnline(msg.players);
+      renderOnline(msg.units);
       $('banner').style.display = msg.goldRush ? 'block' : 'none';
       break;
     case 'chat':
@@ -298,9 +307,14 @@ function renderRows(list, rows) {
   }));
 }
 
+// What a frame's unit is: its info, or nothing known yet if the 'units' message is still on its way
+function infoOf(id) {
+  return units.get(id) || { name: '…', score: 0 };
+}
+
 function renderOnline(players) {
-  const sorted = [...players].sort((a, b) => b.score - a.score);
-  renderRows($('online'), sorted.map(p => ({ name: p.name, value: p.score, color: colorOf(p.id), isMe: me && p.id === me.id })));
+  const rows = players.map(p => ({ id: p.id, ...infoOf(p.id) })).sort((a, b) => b.score - a.score);
+  renderRows($('online'), rows.map(p => ({ name: p.name, value: p.score, color: colorOf(p.id), isMe: me && p.id === me.id })));
 }
 
 async function refreshLeaderboard() {
@@ -382,7 +396,8 @@ function render(now) {
     ctx.font = `${p.id === me.id ? '600 ' : ''}13px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`${p.name} · ${p.score}`, p.x, p.y - me.playerRadius - 4);
+    const info = infoOf(p.id);
+    ctx.fillText(`${info.name} · ${info.score}`, p.x, p.y - me.playerRadius - 4);
   }
 }
 requestAnimationFrame(render);

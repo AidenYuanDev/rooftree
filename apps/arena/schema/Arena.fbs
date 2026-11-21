@@ -21,12 +21,14 @@ enum Opcode : ushort {
   // Server to client
   Welcome = 0x0101,
   Pong = 0x0102,
-  State = 0x0103,
+  // 0x0103 was State, everything about the players it saw every tick: Frame and Units since
   ChatMessage = 0x0104,
   SystemMessage = 0x0105,
   Spells = 0x0106,
   CastFailed = 0x0107,
   CombatLog = 0x0108,
+  Frame = 0x0109,
+  Units = 0x010A,
 }
 
 // combat/Unit.h's CastResult, same values
@@ -127,7 +129,7 @@ table CancelCast {
 }
 // In game: attack a unit with weapon swings until told otherwise (0) or it dies: one every few seconds
 // while it is in melee range, none while casting or stunned. A unit that can't be attacked is ignored;
-// PlayerState.attackTarget says what is attacked
+// UnitInfo.attackTarget says what is attacked
 table Attack {
   target:uint;
 }
@@ -151,40 +153,59 @@ table Pong {
   t:double;
 }
 
-table PlayerState {
+// What changes all the time of a unit the player sees: in every Frame. A struct, with no field
+// offsets, so that 30 of them and the coins go in one datagram (KCP's MaxBodySize, 1171 bytes)
+struct UnitMotion {
   id:uint;
-  name:string;
   x:float;
   y:float;
-  score:uint;   // this session's coins
-  total:uint;   // all time
-  health:uint;  // 0: dead, back in Arena.Combat.RespawnTime
-  maxHealth:uint;
-  mana:uint;
-  maxMana:uint;
-  target:uint;  // SetTarget's
-  kills:uint;   // this session's
-  deaths:uint;
   facing:float; // radians, see Input
-  attackTarget:uint;  // Attack's, 0 when not attacking
-  playerClass:PlayerClass;
-  power:PowerType;    // what mana and maxMana are
-  comboPoints:ubyte;
-  speed:float;        // walking now, per second: Arena.World.PlayerSpeed times its boosts
+  health:uint;  // 0: dead, back in Arena.Combat.RespawnTime
+  mana:uint;    // of its power, UnitInfo.power
 }
 
-table CoinState {
+struct CoinSpot {
   id:uint;
   x:float;
   y:float;
   value:uint;
 }
 
-// Every world tick to everyone in game, unreliably over KCP: the next one replaces a lost one
-table State {
-  players:[PlayerState];
-  coins:[CoinState];
+// Every world tick to everyone in game, unreliably over KCP: the next one replaces a lost one. The
+// units the player sees, itself too (Arena.World.ViewDistance, the nearest Arena.World.MaxVisible),
+// and the coins in that range. A unit's other fields come in Units, which may arrive after the first
+// Frame that has it
+table Frame {
+  tick:uint;            // one more each world update: one older than the last that came is stale
+  units:[UnitMotion];
+  coins:[CoinSpot];
   goldRush:bool;
+}
+
+// What changes now and then of a unit the player sees
+table UnitInfo {
+  id:uint;
+  name:string;
+  maxHealth:uint;
+  maxMana:uint;
+  power:PowerType;    // what mana and maxMana are
+  playerClass:PlayerClass;
+  target:uint;        // SetTarget's
+  attackTarget:uint;  // Attack's, 0 when not attacking
+  comboPoints:ubyte;
+  speed:float;        // walking now, per second: Arena.World.PlayerSpeed times its boosts
+  score:uint;         // this session's coins
+  total:uint;         // all time
+  kills:uint;         // this session's
+  deaths:uint;
+}
+
+// Reliably and in order, before the tick's Frame: all of a unit's UnitInfo when the player starts
+// seeing it or any of it changed, and the units it stopped seeing (their info is sent again when they
+// come back). What a client keeps of a unit lives from its info to its gone
+table Units {
+  units:[UnitInfo];
+  gone:[uint];
 }
 
 table ChatMessage {
@@ -243,6 +264,6 @@ table CombatLog {
 }
 
 // Any of the tables would do: flatc embeds a binary schema (Arena_bfbs_generated.h, FlatJsonSchema's)
-// only for a schema with a root type, named after it (StateBinarySchema). Packets say their table by
+// only for a schema with a root type, named after it (FrameBinarySchema). Packets say their table by
 // the opcode, not this
-root_type State;
+root_type Frame;

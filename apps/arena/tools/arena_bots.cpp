@@ -107,9 +107,23 @@ protected:
                 if (Arena::Welcome const* welcome = Read<Arena::Welcome>(payload))
                     _id = welcome->id();
                 break;
-            case Arena::Opcode::State:
-                if (Arena::State const* state = Read<Arena::State>(payload))
-                    OnState(*state);
+            case Arena::Opcode::Units:
+                if (Arena::Units const* units = Read<Arena::Units>(payload))
+                {
+                    if (units->units())
+                        for (Arena::UnitInfo const* unit : *units->units())
+                            _maxHealth[unit->id()] = unit->maxHealth();
+                    if (units->gone())
+                        for (uint32 id : *units->gone())
+                            _maxHealth.erase(id);
+                }
+                break;
+            case Arena::Opcode::Frame:
+                if (Arena::Frame const* frame = Read<Arena::Frame>(payload); frame && frame->tick() > _lastTick)
+                {
+                    _lastTick = frame->tick();
+                    OnFrame(*frame);
+                }
                 break;
             case Arena::Opcode::CombatLog:
                 if (Arena::CombatLog const* log = Read<Arena::CombatLog>(payload))
@@ -187,14 +201,14 @@ private:
         }
     }
 
-    void OnState(Arena::State const& state)
+    void OnFrame(Arena::Frame const& frame)
     {
-        if (!_id || !state.players())
+        if (!_id || !frame.units())
             return;
 
         _seen.clear();
-        for (Arena::PlayerState const* player : *state.players())
-            _seen[player->id()] = { player->x(), player->y(), player->health(), player->maxHealth() };
+        for (Arena::UnitMotion const* unit : *frame.units())
+            _seen[unit->id()] = { unit->x(), unit->y(), unit->health(), _maxHealth[unit->id()] };
 
         auto me = _seen.find(_id);
         if (me == _seen.end() || !me->second.Health)
@@ -312,6 +326,8 @@ private:
     Clock::time_point _nextHammer;
     Clock::time_point _nextPoison;
     std::unordered_map<uint32, Seen> _seen;
+    std::unordered_map<uint32, uint32> _maxHealth;      // Units'
+    uint32 _lastTick = 0;
 };
 
 struct Login
@@ -405,7 +421,7 @@ void PrintStats(char const* title, double seconds, uint32 bots)
     std::print("\ndamage done {}, combat logs {}\n", uint64(stats.Damage), uint64(stats.CombatLogs));
 
     double perBot = bots && seconds > 0 ? 1.0 / (bots * seconds) : 0.0;
-    std::print("per bot per second: {:.1f} KB reliable (combat, chat), {:.1f} KB unreliable (state), {:.1f} packets\n",
+    std::print("per bot per second: {:.1f} KB reliable (units, combat, chat), {:.1f} KB unreliable (frames), {:.1f} packets\n",
         stats.ReliableBytes * perBot / 1024, stats.UnreliableBytes * perBot / 1024, stats.Packets * perBot);
     std::fflush(stdout);
 }

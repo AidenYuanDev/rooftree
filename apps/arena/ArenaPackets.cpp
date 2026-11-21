@@ -49,12 +49,13 @@ constexpr PacketType ServerPackets[] =
 {
     { Arena::Opcode::Welcome,       "welcome", "Arena.Welcome",       nullptr },
     { Arena::Opcode::Pong,          "pong",    "Arena.Pong",          nullptr },
-    { Arena::Opcode::State,         "state",   "Arena.State",         nullptr },
     { Arena::Opcode::ChatMessage,   "chat",    "Arena.ChatMessage",   nullptr },
     { Arena::Opcode::SystemMessage, "system",  "Arena.SystemMessage", nullptr },
     { Arena::Opcode::Spells,        "spells",     "Arena.Spells",     nullptr },
     { Arena::Opcode::CastFailed,    "castFailed", "Arena.CastFailed", nullptr },
     { Arena::Opcode::CombatLog,     "combat",     "Arena.CombatLog",  nullptr },
+    { Arena::Opcode::Frame,         "frame",      "Arena.Frame",      nullptr },
+    { Arena::Opcode::Units,         "units",      "Arena.Units",      nullptr },
 };
 
 template <std::size_t N>
@@ -68,7 +69,7 @@ FlatJsonSchema const& GetArenaSchema()
 {
     static FlatJsonSchema const schema = []
     {
-        FlatJsonSchema loaded(Arena::StateBinarySchema::data());
+        FlatJsonSchema loaded(Arena::FrameBinarySchema::data());
         Rooftree::Result<> ok = loaded.Load();
         ASSERT(ok, "Arena.fbs: %s", ok ? "" : ok.error().c_str());
         return loaded;

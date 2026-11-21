@@ -187,9 +187,9 @@ Arena:
 #    Arena.World.ViewDistance, Arena.World.MaxVisible
 #        Description: A client hears only of what its player sees: the players within ViewDistance
 #                     units (the nearest MaxVisible of them, itself included; 0 for no limit), the
-#                     coins within it and the combat of the players it sees. A player is about 75 bytes
-#                     of the State: more than about 15 no longer fit a datagram, the State then goes
-#                     reliably. Reloadable.
+#                     coins within it and the combat of the players it sees. A player is 24 bytes of
+#                     the Frame, a coin 16: up to about 35 players with 15 coins fit a datagram, more
+#                     and the Frame goes reliably. Reloadable.
 #        Default:     600, 30
 #
 #    Arena.Coins.Max, Arena.Coins.SpawnInterval

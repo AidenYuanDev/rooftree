@@ -288,7 +288,7 @@ void ArenaSession::HandleCastSpell(Arena::CastSpell const& castSpell)
 
 void ArenaSession::HandleAttack(Arena::Attack const& attack)
 {
-    // A refusal needs no answer: the State's attackTarget stays as it was
+    // A refusal needs no answer: UnitInfo.attackTarget stays as it was
     if (!attack.target())
         _player->StopAttack();
     else

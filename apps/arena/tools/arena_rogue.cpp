@@ -137,15 +137,15 @@ public:
         return { Events.begin() + std::min(start, Events.size()), Events.end() };
     }
 
-    // The next State after now
-    bool WaitState(Clock::duration timeout = 1s)
+    // The next Frame after now
+    bool WaitFrame(Clock::duration timeout = 1s)
     {
-        uint64 states;
+        uint64 frames;
         {
             std::lock_guard lock(Lock);
-            states = States;
+            frames = Frames;
         }
-        return Wait([&] { return States > states; }, timeout);
+        return Wait([&] { return Frames > frames; }, timeout);
     }
 
     std::function<void(Probe&)> OnOpenHook;
@@ -156,8 +156,18 @@ public:
     float Radius = 16.0f;
     float Width = 0.0f;
     float Height = 0.0f;
-    std::unordered_map<uint32, Seen> Players;
-    uint64 States = 0;
+    // What Units said, the rest of what a Frame has
+    struct Info
+    {
+        uint32 MaxHealth = 0;
+        uint32 MaxMana = 0;
+        uint32 Target = 0;
+    };
+
+    std::unordered_map<uint32, Seen> Players;       // as of the last Frame
+    std::unordered_map<uint32, Info> Infos;
+    uint32 LastTick = 0;
+    uint64 Frames = 0;
     std::vector<std::pair<uint32, Arena::CastError>> Failed;     // castId, error
     std::vector<Event> Events;
     std::vector<std::string> Chats;
@@ -198,13 +208,29 @@ protected:
                     Height = welcome->height();
                 }
                 break;
-            case Arena::Opcode::State:
-                if (Arena::State const* state = Read<Arena::State>(payload); state && state->players())
+            case Arena::Opcode::Units:
+                if (Arena::Units const* units = Read<Arena::Units>(payload))
                 {
+                    if (units->units())
+                        for (Arena::UnitInfo const* unit : *units->units())
+                            Infos[unit->id()] = { unit->maxHealth(), unit->maxMana(), unit->target() };
+                    if (units->gone())
+                        for (uint32 id : *units->gone())
+                            Infos.erase(id);
+                }
+                break;
+            case Arena::Opcode::Frame:
+                // An older one than the last, come late, is stale
+                if (Arena::Frame const* frame = Read<Arena::Frame>(payload); frame && frame->units() && frame->tick() > LastTick)
+                {
+                    LastTick = frame->tick();
                     Players.clear();
-                    for (Arena::PlayerState const* player : *state->players())
-                        Players[player->id()] = { player->x(), player->y(), player->health(), player->maxHealth(), player->mana(), player->maxMana(), player->target() };
-                    ++States;
+                    for (Arena::UnitMotion const* unit : *frame->units())
+                    {
+                        Info const& info = Infos[unit->id()];
+                        Players[unit->id()] = { unit->x(), unit->y(), unit->health(), info.MaxHealth, unit->mana(), info.MaxMana, info.Target };
+                    }
+                    ++Frames;
                 }
                 break;
             case Arena::Opcode::CastFailed:
@@ -386,7 +412,7 @@ struct Rogue
         return probe;
     }
 
-    // Logged in, the Welcome and a State with itself in it
+    // Logged in, the Welcome and a Frame with itself in it
     std::shared_ptr<Probe> Join(std::string const& name)
     {
         Optional<Login> login = LogIn(name);
@@ -405,7 +431,7 @@ struct Rogue
         int8 lastX = 0, lastY = 0;
         while (Clock::now() < end)
         {
-            probe.WaitState();
+            probe.WaitFrame();
             Optional<Probe::Seen> me = probe.Get(probe.Id);
             Optional<Probe::Seen> target = probe.Get(targetId);
             if (!me || !target)
@@ -416,8 +442,8 @@ struct Rogue
             if (std::hypot(dx, dy) - 2 * probe.Radius <= edgeDistance)
             {
                 SendInput(probe, 0, 0);
-                probe.WaitState();
-                probe.WaitState();
+                probe.WaitFrame();
+                probe.WaitFrame();
                 return true;
             }
 
@@ -500,8 +526,8 @@ void Rogue::PacketChecks()
     CloseResult serverOpcode = SendAndWatch([](Probe& probe)
     {
         flatbuffers::FlatBufferBuilder builder;
-        builder.Finish(Arena::CreateStateDirect(builder));
-        probe.Send(MakePacket(Arena::Opcode::State, builder));
+        builder.Finish(Arena::CreateFrameDirect(builder));
+        probe.Send(MakePacket(Arena::Opcode::Frame, builder));
     });
     Check("a server opcode from the client is ignored", !serverOpcode.Closed && serverOpcode.Pongs, Describe(serverOpcode));
 
@@ -586,20 +612,20 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     }
 
     SendSetTarget(rogue, 4000000000u);
-    rogue.WaitState();
-    rogue.WaitState();
+    rogue.WaitFrame();
+    rogue.WaitFrame();
     Optional<Probe::Seen> seen = rogue.Get(r);
     Check("SetTarget at a unit that isn't there is no target", seen && seen->Target == 0, std::format("target {}", seen ? seen->Target : 0));
 
     // Walking: a cast with a cast time is refused, one started is broken off by a step
     SendInput(rogue, 1, 0);
-    rogue.WaitState();
-    rogue.WaitState();
+    rogue.WaitFrame();
+    rogue.WaitFrame();
     Optional<Arena::CastError> moving = WaitFailed(rogue, SendCast(rogue, SPELL_FIREBALL, v));
     Check("Fireball while walking is Moving", moving == Arena::CastError::Moving, ErrorName(moving));
     SendInput(rogue, 0, 0);
-    rogue.WaitState();
-    rogue.WaitState();
+    rogue.WaitFrame();
+    rogue.WaitFrame();
 
     // Fireball's range is 300
     if (!WalkTo(rogue, v, 200.0f))
@@ -653,12 +679,12 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
     victim.Wait([&] { return std::ranges::any_of(victim.Events, [&](Probe::Event const& e) { return e.Type == Arena::CombatEventType::AuraApplied && e.Target == v; }); }, 1s);
     SendInput(victim, 1, 1);
     Optional<Arena::CastError> stunnedCast = WaitFailed(victim, SendCast(victim, SPELL_STRIKE, r));
-    victim.WaitState();
-    victim.WaitState();
+    victim.WaitFrame();
+    victim.WaitFrame();
     Optional<Probe::Seen> during = victim.Get(v);
     bool held = before && during && std::hypot(during->X - before->X, during->Y - before->Y) < 1.0f;
     Check("Hammer lands", !hammer, ErrorName(hammer));
-    Check("a stunned victim can't walk", held, before && during ? std::format("moved {:.1f}", std::hypot(during->X - before->X, during->Y - before->Y)) : "no state");
+    Check("a stunned victim can't walk", held, before && during ? std::format("moved {:.1f}", std::hypot(during->X - before->X, during->Y - before->Y)) : "no frame");
     Check("a stunned victim can't cast", stunnedCast == Arena::CastError::Stunned, ErrorName(stunnedCast));
     SendInput(victim, 0, 0);
 
@@ -686,7 +712,7 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
             ++poisons;
         std::this_thread::sleep_for(750ms);
     }
-    rogue.WaitState();
+    rogue.WaitFrame();
     Optional<Probe::Seen> drained = rogue.Get(r);
     Check("Poison until NoMana, mana never below 0", poison == Arena::CastError::NoMana && drained && drained->Mana < 15 && drained->Mana <= drained->MaxMana,
         std::format("{} after {} casts, mana {}", ErrorName(poison), poisons, drained ? drained->Mana : 0));
@@ -711,13 +737,13 @@ void Rogue::RuleChecks(Probe& rogue, Probe& victim)
 
     before = victim.Get(v);
     SendInput(victim, -1, -1);
-    victim.WaitState();
-    victim.WaitState();
-    victim.WaitState();
+    victim.WaitFrame();
+    victim.WaitFrame();
+    victim.WaitFrame();
     during = victim.Get(v);
     SendInput(victim, 0, 0);
     Check("a dead victim can't walk", before && during && std::hypot(during->X - before->X, during->Y - before->Y) < 1.0f,
-        before && during ? std::format("moved {:.1f}", std::hypot(during->X - before->X, during->Y - before->Y)) : "no state");
+        before && during ? std::format("moved {:.1f}", std::hypot(during->X - before->X, during->Y - before->Y)) : "no frame");
 }
 
 void Rogue::SessionChecks(std::shared_ptr<Probe>& rogue, std::shared_ptr<Probe>& victim)
@@ -740,7 +766,7 @@ void Rogue::SessionChecks(std::shared_ptr<Probe>& rogue, std::shared_ptr<Probe>&
     rogue = Join(Prefix + "_r");
     Optional<Probe::Seen> healed = rogue ? rogue->Get(rogue->Id) : Optional<Probe::Seen>();
     Check("a hurt player logging in again is still hurt", hurt && healed && hurt->Health < hurt->MaxHealth && healed->Health == hurt->Health,
-        hurt && healed ? std::format("health {} -> {}, mana {} -> {}", hurt->Health, healed->Health, hurt->Mana, healed->Mana) : "no state");
+        hurt && healed ? std::format("health {} -> {}, mana {} -> {}", hurt->Health, healed->Health, hurt->Mana, healed->Mana) : "no frame");
 
     if (rogue && victim && WalkTo(*rogue, victim->Id, 2.0f))
     {

@@ -142,7 +142,7 @@ void World::Update(uint32 diff)
     UpdateCombat(diff);
     UpdateEvents(diff);
     _scheduler.Update(Milliseconds(diff));
-    SendState();
+    SendFrames();
 
     auto took = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start);
     ++_updateStats.Updates;
@@ -158,9 +158,10 @@ void World::LogUpdateStats()
 
     RT_LOG_INFO("arena.world", "{} players, {} updates in 10 s: {} us on average, {} us at most, {} combat events",
         _sessions.size(), stats.Updates, stats.Total.count() / stats.Updates, stats.Max.count(), stats.CombatEvents);
-    if (stats.States)
-        RT_LOG_INFO("arena.world", "States: {} players and {} bytes in one on average, {}% sent reliably (over a datagram)",
-            stats.StatePlayers / stats.States, stats.StateBytes / stats.States, stats.StatesReliable * 100 / stats.States);
+    if (stats.Frames)
+        RT_LOG_INFO("arena.world", "Frames: {} units and {} bytes in one on average, {}% sent reliably (over a datagram); {} bytes of Units a frame",
+            stats.FrameUnits / stats.Frames, stats.FrameBytes / stats.Frames, stats.FramesReliable * 100 / stats.Frames,
+            stats.UnitsBytes / stats.Frames);
 }
 
 void World::AddQueuedSessions()
@@ -485,11 +486,14 @@ void World::SendGlobalMessage(ServerPacket const& packet, bool unreliable /*= fa
             session->Send(packet, unreliable);
 }
 
-void World::SendState()
+void World::SendFrames()
 {
+    ++_tick;
     float const range = _settings.ViewDistance * _settings.ViewDistance;
-    std::vector<flatbuffers::Offset<Arena::PlayerState>> players;
-    std::vector<flatbuffers::Offset<Arena::CoinState>> coins;
+    std::vector<Arena::UnitMotion> motions;
+    std::vector<Arena::CoinSpot> coins;
+    std::vector<flatbuffers::Offset<Arena::UnitInfo>> infos;
+    std::vector<uint32> gone;
 
     // Each client its own: what its player sees
     for (auto& [id, session] : _sessions)
@@ -498,18 +502,59 @@ void World::SendState()
         if (!viewer || session->GetStatus() != STATUS_IN_GAME)
             continue;
 
-        flatbuffers::FlatBufferBuilder builder;
-        players.clear();
-        for (uint32 visibleId : _visibility.GetVisible(viewer->GetId()))
+        std::vector<uint32> const& visible = _visibility.GetVisible(viewer->GetId());
+        std::unordered_map<uint32, ArenaSession::SentUnitInfo>& sent = session->GetSentUnits();
+        flatbuffers::FlatBufferBuilder unitsBuilder;
+        motions.clear();
+        infos.clear();
+        gone.clear();
+        for (uint32 visibleId : visible)
         {
             Player* player = FindPlayer(visibleId);
             if (!player)
                 continue;
-            players.push_back(Arena::CreatePlayerStateDirect(builder, player->GetId(), player->GetName().c_str(), player->GetX(), player->GetY(),
-                player->GetScore(), player->GetTotalCoins(), player->GetHealth(), player->GetMaxHealth(), player->GetMana(), player->GetMaxMana(),
-                player->GetTargetId(), player->GetKills(), player->GetDeaths(), player->GetFacing(), player->GetAttackTargetId(),
-                Arena::PlayerClass(player->GetClass().Class), Arena::PowerType(player->GetClass().Power), uint8(player->GetComboPoints()),
-                _settings.PlayerSpeed * player->GetSpeedMultiplier()));
+            motions.emplace_back(player->GetId(), player->GetX(), player->GetY(), player->GetFacing(), player->GetHealth(), player->GetMana());
+
+            ArenaSession::SentUnitInfo info
+            {
+                .MaxHealth = player->GetMaxHealth(),
+                .MaxMana = player->GetMaxMana(),
+                .Power = uint8(player->GetClass().Power),
+                .Class = uint8(player->GetClass().Class),
+                .Target = player->GetTargetId(),
+                .AttackTarget = player->GetAttackTargetId(),
+                .ComboPoints = uint8(player->GetComboPoints()),
+                .Speed = _settings.PlayerSpeed * player->GetSpeedMultiplier(),
+                .Score = player->GetScore(),
+                .Total = player->GetTotalCoins(),
+                .Kills = player->GetKills(),
+                .Deaths = player->GetDeaths(),
+            };
+            auto [known, added] = sent.try_emplace(visibleId, info);
+            if (!added && known->second == info)
+                continue;
+            known->second = info;
+            infos.push_back(Arena::CreateUnitInfoDirect(unitsBuilder, player->GetId(), player->GetName().c_str(), info.MaxHealth, info.MaxMana,
+                Arena::PowerType(info.Power), Arena::PlayerClass(info.Class), info.Target, info.AttackTarget, info.ComboPoints, info.Speed,
+                info.Score, info.Total, info.Kills, info.Deaths));
+        }
+
+        // Out of sight, or gone from the world: forgotten, all of it is sent again if it comes back
+        std::erase_if(sent, [&](auto const& entry)
+        {
+            if (std::ranges::any_of(motions, [&](Arena::UnitMotion const& motion) { return motion.id() == entry.first; }))
+                return false;
+            gone.push_back(entry.first);
+            return true;
+        });
+
+        // First, reliably: KCP flushes it before the unreliable Frame, which then rarely comes first
+        if (!infos.empty() || !gone.empty())
+        {
+            unitsBuilder.Finish(Arena::CreateUnitsDirect(unitsBuilder, &infos, &gone));
+            ServerPacket units(Arena::Opcode::Units, unitsBuilder);
+            _updateStats.UnitsBytes += units.GetPacket().size();
+            session->Send(units);
         }
 
         coins.clear();
@@ -518,18 +563,19 @@ void World::SendState()
             float dx = coin.X - viewer->GetX();
             float dy = coin.Y - viewer->GetY();
             if (dx * dx + dy * dy <= range)
-                coins.push_back(Arena::CreateCoinState(builder, coin.Id, coin.X, coin.Y, coin.Value));
+                coins.emplace_back(coin.Id, coin.X, coin.Y, coin.Value);
         }
 
-        builder.Finish(Arena::CreateStateDirect(builder, &players, &coins, _goldRush));
-        ServerPacket packet(Arena::Opcode::State, builder);
-        ++_updateStats.States;
-        _updateStats.StateBytes += packet.GetPacket().size();
-        _updateStats.StatePlayers += players.size();
-        if (packet.GetPacket().size() > Rooftree::Net::Kcp::MaxBodySize)
-            ++_updateStats.StatesReliable;
+        flatbuffers::FlatBufferBuilder builder;
+        builder.Finish(Arena::CreateFrameDirect(builder, _tick, &motions, &coins, _goldRush));
+        ServerPacket frame(Arena::Opcode::Frame, builder);
+        ++_updateStats.Frames;
+        _updateStats.FrameBytes += frame.GetPacket().size();
+        _updateStats.FrameUnits += motions.size();
+        if (frame.GetPacket().size() > Rooftree::Net::Kcp::MaxBodySize)
+            ++_updateStats.FramesReliable;
 
         // Every tick, the next one replaces it: over KCP it may be lost rather than hold up the ones after it
-        session->Send(packet, true);
+        session->Send(frame, true);
     }
 }

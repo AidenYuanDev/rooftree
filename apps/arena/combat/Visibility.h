@@ -3,7 +3,7 @@
  *
  * Who sees whom, the area of interest: each viewer sees the units within ViewDistance of it, nearest
  * first, at most MaxVisible of them counting itself, which comes first. The world gives each client only
- * what its player sees (its State, its combat log), so what one client gets no longer grows with
+ * what its player sees (its Frame and Units, its combat log), so what one client gets no longer grows with
  * everyone online.
  *
  * Update rebuilds it all from the positions, once a world update after the units moved: a uniform
