@@ -16,23 +16,22 @@
 
 #include "Define.h"
 #include "Duration.h"
+
 #include <istream>
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace Blog
-{
-struct ZipEntry
-{
-    std::string Name;           // in the zip, with / between folders; a folder ends with /
-    std::string Path;           // on the disk, empty for a folder
-    uint64 Size = 0;
-    SystemTimePoint Modified;
+namespace Blog {
+struct ZipEntry {
+  std::string Name;  // in the zip, with / between folders; a folder ends with /
+  std::string Path;  // on the disk, empty for a folder
+  uint64 Size = 0;
+  SystemTimePoint Modified;
 };
 
 // The zip of entries, and its length in bytes
 std::pair<std::shared_ptr<std::istream>, uint64> MakeZipStream(std::vector<ZipEntry> entries);
-}
+}  // namespace Blog
 
-#endif // BLOG_ZIP_STREAM_H
+#endif  // BLOG_ZIP_STREAM_H

@@ -7,37 +7,35 @@
 
 #include "Appender.h"
 #include "LogMessage.h"
+
 #include <atomic>
 #include <string>
 #include <vector>
 
 // A name lines are written to ("server.http") with its level, and the appenders they go to
-class Logger
-{
-public:
-    Logger(std::string name, LogLevel level, std::vector<Appender*> appenders)
-        : _name(std::move(name)), _level(level), _appenders(std::move(appenders)) { }
+class Logger {
+ public:
+  Logger(std::string name, LogLevel level, std::vector<Appender*> appenders)
+      : _name(std::move(name)), _level(level), _appenders(std::move(appenders)) {}
 
-    std::string const& GetName() const { return _name; }
-    LogLevel GetLevel() const { return _level; }
-    void SetLevel(LogLevel level) { _level = level; }
+  std::string const& GetName() const { return _name; }
+  LogLevel GetLevel() const { return _level; }
+  void SetLevel(LogLevel level) { _level = level; }
 
-    bool IsEnabled(LogLevel level) const
-    {
-        LogLevel own = _level;
-        return own != LOG_LEVEL_DISABLED && level >= own;
-    }
+  bool IsEnabled(LogLevel level) const {
+    LogLevel own = _level;
+    return own != LOG_LEVEL_DISABLED && level >= own;
+  }
 
-    void Write(LogMessage const& message) const
-    {
-        for (Appender* appender : _appenders)
-            appender->Append(message);
-    }
+  void Write(LogMessage const& message) const {
+    for (Appender* appender : _appenders)
+      appender->Append(message);
+  }
 
-private:
-    std::string _name;
-    std::atomic<LogLevel> _level;
-    std::vector<Appender*> _appenders;
+ private:
+  std::string _name;
+  std::atomic<LogLevel> _level;
+  std::vector<Appender*> _appenders;
 };
 
-#endif // ROOFTREE_LOGGER_H
+#endif  // ROOFTREE_LOGGER_H

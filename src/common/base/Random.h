@@ -19,4 +19,4 @@ float frand(float min, float max);
 Milliseconds randtime(Milliseconds min, Milliseconds max);
 uint32 rand32();
 
-#endif // ROOFTREE_RANDOM_H
+#endif  // ROOFTREE_RANDOM_H

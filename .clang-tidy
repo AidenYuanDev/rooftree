@@ -1,0 +1,9 @@
+# Bodies that span more than one line get braces; a one-line body may go without
+#   if (x)
+#     return;
+Checks: '-*,readability-braces-around-statements'
+WarningsAsErrors: ''
+HeaderFilterRegex: '^.*/(src|apps|tests|benchmarks|examples)/'
+ExcludeHeaderFilterRegex: '_generated|/deps/|/contrib/'
+CheckOptions:
+  readability-braces-around-statements.ShortStatementLines: 2

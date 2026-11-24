@@ -11,16 +11,14 @@
 #include "Define.h"
 #include "Duration.h"
 
-inline uint32 getMSTime()
-{
-    static TimePoint const start = TimePoint::clock::now();
-    return uint32(std::chrono::duration_cast<Milliseconds>(TimePoint::clock::now() - start).count());
+inline uint32 getMSTime() {
+  static TimePoint const start = TimePoint::clock::now();
+  return uint32(std::chrono::duration_cast<Milliseconds>(TimePoint::clock::now() - start).count());
 }
 
 // From earlier to later, also across a wrap
-inline uint32 getMSTimeDiff(uint32 earlier, uint32 later)
-{
-    return later - earlier;
+inline uint32 getMSTimeDiff(uint32 earlier, uint32 later) {
+  return later - earlier;
 }
 
-#endif // ROOFTREE_TIMER_H
+#endif  // ROOFTREE_TIMER_H

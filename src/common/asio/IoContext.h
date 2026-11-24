@@ -12,15 +12,13 @@
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/post.hpp>
 
-namespace Rooftree::Asio
-{
-class IoContext : public boost::asio::io_context
-{
-public:
-    using io_context::io_context;
+namespace Rooftree::Asio {
+class IoContext : public boost::asio::io_context {
+ public:
+  using io_context::io_context;
 };
 
 using IoContextExecutor = boost::asio::io_context::executor_type;
-}
+}  // namespace Rooftree::Asio
 
-#endif // ROOFTREE_IO_CONTEXT_H
+#endif  // ROOFTREE_IO_CONTEXT_H

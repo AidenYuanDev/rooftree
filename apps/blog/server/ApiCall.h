@@ -1,10 +1,10 @@
 /*
  * This file is part of Rooftree, under the GNU GPL, version 3 or later: see COPYING.
  *
- * What an operation of the API does, in FlatBuffers: its route, its packet (ApiPackets.h) and, for the
- * admin's, the console's commands (ConsoleAdmin.cpp) run the same function, an ApiOp, found by its row
- * in ApiOperations.h. It gets an ApiCall holding its request table (schema/Admin.fbs, Reader.fbs) and
- * who is calling, and answers with its response table or an error:
+ * What an operation of the API does, in FlatBuffers: its route, its packet (ApiPackets.h) and, for
+ * the admin's, the console's commands (ConsoleAdmin.cpp) run the same function, an ApiOp, found by
+ * its row in ApiOperations.h. It gets an ApiCall holding its request table (schema/Admin.fbs,
+ * Reader.fbs) and who is calling, and answers with its response table or an error:
  *
  *   Admin::TagInput const& input = request->Get<Admin::TagInput>();
  *   TableFields fields(request->GetErrors());
@@ -18,8 +18,8 @@
  * (ApiJson.h), which also turns the answer back into JSON; what of that JSON didn't fit the table
  * (a number for a string) is in GetErrors(), for the handler's 400 to name with the rest.
  *
- * The caller has checked who may call it, as its row says (ApiAccess): RequireUser and the like for a
- * request, the login of the connection for a packet, nothing for the console, which calls as the
+ * The caller has checked who may call it, as its row says (ApiAccess): RequireUser and the like for
+ * a request, the login of the connection for a packet, nothing for the console, which calls as the
  * admin. An operation anyone may call has a login or not (GetLogin).
  */
 
@@ -32,92 +32,99 @@
 #include "Reader_generated.h"
 #include "Task.h"
 #include "Validation.h"
+
 #include <boost/asio/ip/address.hpp>
 #include <boost/beast/http/status.hpp>
 #include <boost/json/object.hpp>
+
 #include <atomic>
 #include <functional>
 #include <memory>
 
-namespace Rooftree::Server
-{
+namespace Rooftree::Server {
 class Session;
 }
 
-namespace Blog
-{
-// What an operation did to the login it was called with, for its edge to carry out with the answer: a
-// route clears or sets the cookie, a packet's connection calls as the new login from then on
-struct LoginChange
-{
-    bool Ended = false;             // logged out
-    std::string NewToken;           // a new session of the same account (the cookie's value), its hash
-    std::string NewHash;
-    Optional<SystemTimePoint> NewExpiresAt;
+namespace Blog {
+// What an operation did to the login it was called with, for its edge to carry out with the answer:
+// a route clears or sets the cookie, a packet's connection calls as the new login from then on
+struct LoginChange {
+  bool Ended = false;    // logged out
+  std::string NewToken;  // a new session of the same account (the cookie's value), its hash
+  std::string NewHash;
+  Optional<SystemTimePoint> NewExpiresAt;
 };
 
-class ApiCall
-{
-public:
-    // Main thread, once: the response table (a status below 300) or a Rooftree.Packets.Error, and what
-    // the operation did to the caller's login
-    using Done = std::function<void(boost::beast::http::status status, std::string payload, LoginChange const& login)>;
+class ApiCall {
+ public:
+  // Main thread, once: the response table (a status below 300) or a Rooftree.Packets.Error, and
+  // what the operation did to the caller's login
+  using Done = std::function<
+      void(boost::beast::http::status status, std::string payload, LoginChange const& login)>;
 
-    struct Params
-    {
-        Optional<AuthInfo> Auth;        // none: anonymous
-        uint16 Opcode = 0;              // the operation's, for its errors
-        std::string Request;            // a verified buffer of the operation's request table
-        FieldErrors Errors;             // of the JSON it was made from
-        boost::asio::ip::address ClientAddress;
-        std::string UserAgent;          // the request's, or the handshake's of a packet's connection
-    };
+  struct Params {
+    Optional<AuthInfo> Auth;  // none: anonymous
+    uint16 Opcode = 0;        // the operation's, for its errors
+    std::string Request;      // a verified buffer of the operation's request table
+    FieldErrors Errors;       // of the JSON it was made from
+    boost::asio::ip::address ClientAddress;
+    std::string UserAgent;  // the request's, or the handshake's of a packet's connection
+  };
 
-    ApiCall(Params params, Done done) : _params(std::move(params)), _done(std::move(done)) { }
-    ApiCall(ApiCall const&) = delete;
-    ApiCall& operator=(ApiCall const&) = delete;
-    // Never answered: 500, like a request
-    ~ApiCall();
+  ApiCall(Params params, Done done) : _params(std::move(params)), _done(std::move(done)) {}
+  ApiCall(ApiCall const&) = delete;
+  ApiCall& operator=(ApiCall const&) = delete;
+  // Never answered: 500, like a request
+  ~ApiCall();
 
-    // An operation that needs a login has one (asserted)
-    AuthInfo const& GetAuth() const;
-    // The login, null without one
-    AuthInfo const* GetLogin() const { return _params.Auth ? &*_params.Auth : nullptr; }
-    boost::asio::ip::address const& GetClientAddress() const { return _params.ClientAddress; }
-    std::string const& GetUserAgent() const { return _params.UserAgent; }
-    uint16 GetOpcode() const { return _params.Opcode; }
+  // An operation that needs a login has one (asserted)
+  AuthInfo const& GetAuth() const;
+  // The login, null without one
+  AuthInfo const* GetLogin() const { return _params.Auth ? &*_params.Auth : nullptr; }
+  boost::asio::ip::address const& GetClientAddress() const { return _params.ClientAddress; }
+  std::string const& GetUserAgent() const { return _params.UserAgent; }
+  uint16 GetOpcode() const { return _params.Opcode; }
 
-    // The request table, of the operation's type
-    template<typename Table>
-    Table const& Get() const { return *flatbuffers::GetRoot<Table>(_params.Request.data()); }
-    FieldErrors const& GetErrors() const { return _params.Errors; }
+  // The request table, of the operation's type
+  template <typename Table>
+  Table const& Get() const {
+    return *flatbuffers::GetRoot<Table>(_params.Request.data());
+  }
+  FieldErrors const& GetErrors() const { return _params.Errors; }
 
-    // A finished buffer of the operation's response table, or its bytes (a worker's, Bytes())
-    void Respond(flatbuffers::FlatBufferBuilder const& builder, boost::beast::http::status status = boost::beast::http::status::ok);
-    void Respond(std::string payload, boost::beast::http::status status = boost::beast::http::status::ok);
-    // fields: a validation_failed's or conflict's {"slug": "taken"}
-    void RespondError(boost::beast::http::status status, std::string_view code, std::string_view message = {}, boost::json::object const& fields = {});
-    // With what more it says (Packet.h): its seconds to wait, its details
-    void RespondError(Rooftree::Server::PacketError const& error);
-    bool HasResponded() const { return _responded; }
+  // A finished buffer of the operation's response table, or its bytes (a worker's, Bytes())
+  void Respond(
+      flatbuffers::FlatBufferBuilder const& builder,
+      boost::beast::http::status status = boost::beast::http::status::ok);
+  void Respond(
+      std::string payload,
+      boost::beast::http::status status = boost::beast::http::status::ok);
+  // fields: a validation_failed's or conflict's {"slug": "taken"}
+  void RespondError(
+      boost::beast::http::status status,
+      std::string_view code,
+      std::string_view message = {},
+      boost::json::object const& fields = {});
+  // With what more it says (Packet.h): its seconds to wait, its details
+  void RespondError(Rooftree::Server::PacketError const& error);
+  bool HasResponded() const { return _responded; }
 
-    // Before answering: the caller's login ended, or goes on as a new session (a password change ends
-    // every session of the account)
-    void EndLogin() { _login.Ended = true; }
-    void StartLogin(std::string token, std::string hash, SystemTimePoint expiresAt)
-    {
-        _login.NewToken = std::move(token);
-        _login.NewHash = std::move(hash);
-        _login.NewExpiresAt = expiresAt;
-    }
+  // Before answering: the caller's login ended, or goes on as a new session (a password change ends
+  // every session of the account)
+  void EndLogin() { _login.Ended = true; }
+  void StartLogin(std::string token, std::string hash, SystemTimePoint expiresAt) {
+    _login.NewToken = std::move(token);
+    _login.NewHash = std::move(hash);
+    _login.NewExpiresAt = expiresAt;
+  }
 
-private:
-    void Answer(boost::beast::http::status status, std::string payload);
+ private:
+  void Answer(boost::beast::http::status status, std::string payload);
 
-    Params _params;
-    Done _done;
-    LoginChange _login;
-    std::atomic<bool> _responded = false;
+  Params _params;
+  Done _done;
+  LoginChange _login;
+  std::atomic<bool> _responded = false;
 };
 
 using ApiRequest = std::shared_ptr<ApiCall>;
@@ -128,7 +135,8 @@ using ApiOp = Rooftree::Task<void> (*)(Rooftree::Server::Session& session, ApiRe
 void RespondValidation(ApiRequest const& request, boost::json::object fields);
 void RespondNotFound(ApiRequest const& request);
 void RespondInternalError(ApiRequest const& request);
-// {ok: true}, for what has nothing more to say: the Ok of the operation's schema (Admin.fbs, Reader.fbs)
+// {ok: true}, for what has nothing more to say: the Ok
+// of the operation's schema (Admin.fbs, Reader.fbs)
 void RespondOk(ApiRequest const& request);
 // 403 banned, until when and why
 void RespondBanned(ApiRequest const& request, UserRow const& user);
@@ -138,11 +146,15 @@ void RespondNotInLang(ApiRequest const& request, std::vector<std::string> const&
 // What RespondBanned says, for the edges that check a login before an operation runs
 Rooftree::Server::PacketError BannedError(UserRow const& user);
 
-// The picture captcha of a request that mails someone, once its other fields are valid: adds the field
-// error captcha "required" or "wrong" unless it is right. Always right with Blog.Captcha.Enable off
-bool CheckCaptcha(TableFields& fields, flatbuffers::String const* id, flatbuffers::String const* answer);
-// One mail to an address per Blog.Auth.MailInterval; answers 429 too_many_mails, when to retry, when
-// it is too soon
+// The picture captcha of a request that mails someone, once its other fields are valid: adds the
+// field error captcha "required" or "wrong" unless it is right. Always
+// right with Blog.Captcha.Enable off
+bool CheckCaptcha(
+    TableFields& fields,
+    flatbuffers::String const* id,
+    flatbuffers::String const* answer);
+// One mail to an address per Blog.Auth.MailInterval; answers 429 too_many_mails, when to retry,
+// when it is too soon
 bool CheckMailInterval(ApiRequest const& request, std::string const& email);
 
 // A request's lang: zh unless en
@@ -154,24 +166,35 @@ std::string ReadText(flatbuffers::String const* text);
 std::string Bytes(flatbuffers::FlatBufferBuilder const& builder);
 
 // For answers: an ISO 8601 time, absent (null) for none
-flatbuffers::Offset<flatbuffers::String> TimeString(flatbuffers::FlatBufferBuilder& builder, Optional<SystemTimePoint> time);
-flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> StringList(flatbuffers::FlatBufferBuilder& builder,
+flatbuffers::Offset<flatbuffers::String> TimeString(
+    flatbuffers::FlatBufferBuilder& builder,
+    Optional<SystemTimePoint> time);
+flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> StringList(
+    flatbuffers::FlatBufferBuilder& builder,
     std::vector<std::string> const& values);
 // Whether a table of a request has nothing set: an empty language is one to delete (json_null)
 bool IsEmptyTable(flatbuffers::Table const* table);
 // A table of generated code, which is a flatbuffers::Table (privately)
-template<typename Table>
-bool IsEmptyTable(Table const* table) { return IsEmptyTable(reinterpret_cast<flatbuffers::Table const*>(table)); }
+template <typename Table>
+bool IsEmptyTable(Table const* table) {
+  return IsEmptyTable(reinterpret_cast<flatbuffers::Table const*>(table));
+}
 
 // The readers' operations, by file
 // UserFriendHandlers.cpp
 Rooftree::Task<void> ListUserFriends(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> ListUserFriendRequests(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> SendUserFriendRequest(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AcceptUserFriendRequest(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> RejectUserFriendRequest(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> AcceptUserFriendRequest(
+    Rooftree::Server::Session& session,
+    ApiRequest request);
+Rooftree::Task<void> RejectUserFriendRequest(
+    Rooftree::Server::Session& session,
+    ApiRequest request);
 Rooftree::Task<void> RemoveUserFriend(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> GetUserFriendshipStatus(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> GetUserFriendshipStatus(
+    Rooftree::Server::Session& session,
+    ApiRequest request);
 
 // ChatHandlers.cpp
 Rooftree::Task<void> ListChatChannels(Rooftree::Server::Session& session, ApiRequest request);
@@ -276,7 +299,9 @@ Rooftree::Task<void> AdminGetPost(Rooftree::Server::Session& session, ApiRequest
 Rooftree::Task<void> AdminPostRevisions(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> AdminPostRevision(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> AdminSavePostVersion(Rooftree::Server::Session& session, ApiRequest request);
-Rooftree::Task<void> AdminRestorePostRevision(Rooftree::Server::Session& session, ApiRequest request);
+Rooftree::Task<void> AdminRestorePostRevision(
+    Rooftree::Server::Session& session,
+    ApiRequest request);
 Rooftree::Task<void> AdminCreatePost(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> AdminUpdatePost(Rooftree::Server::Session& session, ApiRequest request);
 Rooftree::Task<void> AdminDeletePost(Rooftree::Server::Session& session, ApiRequest request);
@@ -328,6 +353,6 @@ Rooftree::Task<void> AdminListComments(Rooftree::Server::Session& session, ApiRe
 Rooftree::Task<void> AdminModerateComment(Rooftree::Server::Session& session, ApiRequest request);
 // DriveHandlers.cpp
 Rooftree::Task<void> AdminDrives(Rooftree::Server::Session& session, ApiRequest request);
-}
+}  // namespace Blog
 
-#endif // BLOG_API_CALL_H
+#endif  // BLOG_API_CALL_H

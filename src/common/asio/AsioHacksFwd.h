@@ -8,11 +8,10 @@
 #ifndef ROOFTREE_ASIO_FWD_H
 #define ROOFTREE_ASIO_FWD_H
 
-namespace Rooftree::Asio
-{
+namespace Rooftree::Asio {
 class DeadlineTimer;
 class IoContext;
 class Strand;
-}
+}  // namespace Rooftree::Asio
 
-#endif // ROOFTREE_ASIO_FWD_H
+#endif  // ROOFTREE_ASIO_FWD_H

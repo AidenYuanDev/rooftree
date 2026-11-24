@@ -14,85 +14,81 @@
 #include "Log.h"
 #include "SocketMgr.h"
 #include "WebSocketSocket.h"
-#include <print>
+
 #include <boost/asio/signal_set.hpp>
+
+#include <print>
 
 using namespace Rooftree::Net;
 
-class EchoWebSocket final : public WebSocket::BaseSocket<>
-{
-public:
-    using BaseSocket::BaseSocket;
+class EchoWebSocket final : public WebSocket::BaseSocket<> {
+ public:
+  using BaseSocket::BaseSocket;
 
-protected:
-    bool OnHandshake(Http::Request const& request, Http::Response& response) override
-    {
-        if (request.target() == "/echo")
-            return true;
+ protected:
+  bool OnHandshake(Http::Request const& request, Http::Response& response) override {
+    if (request.target() == "/echo")
+      return true;
 
-        response.result(boost::beast::http::status::not_found);
-        return false;
+    response.result(boost::beast::http::status::not_found);
+    return false;
+  }
+
+  void OnOpen() override {
+    RT_LOG_INFO("websocket", "{} connected", GetClientInfo());
+    SendText("welcome, everything you send comes back");
+  }
+
+  void OnMessage(WebSocket::Opcode opcode, std::string&& payload) override {
+    if (opcode == WebSocket::Opcode::Binary) {
+      SendBinary(payload);
+    } else {
+      SendText(payload);
     }
+  }
 
-    void OnOpen() override
-    {
-        RT_LOG_INFO("websocket", "{} connected", GetClientInfo());
-        SendText("welcome, everything you send comes back");
-    }
-
-    void OnMessage(WebSocket::Opcode opcode, std::string&& payload) override
-    {
-        if (opcode == WebSocket::Opcode::Binary)
-            SendBinary(payload);
-        else
-            SendText(payload);
-    }
-
-    void OnClose() override
-    {
-        RT_LOG_INFO("websocket", "{} disconnected", GetClientInfo());
-    }
+  void OnClose() override { RT_LOG_INFO("websocket", "{} disconnected", GetClientInfo()); }
 };
 
-class EchoWebSocketNetworkThread final : public NetworkThread<EchoWebSocket, EchoWebSocketNetworkThread> { };
+class EchoWebSocketNetworkThread final
+    : public NetworkThread<EchoWebSocket, EchoWebSocketNetworkThread> {};
 
 class EchoWebSocketServer;
 
-struct EchoWebSocketServerTraits
-{
-    using Self = EchoWebSocketServer;
-    using SocketType = EchoWebSocket;
-    using ThreadType = EchoWebSocketNetworkThread;
+struct EchoWebSocketServerTraits {
+  using Self = EchoWebSocketServer;
+  using SocketType = EchoWebSocket;
+  using ThreadType = EchoWebSocketNetworkThread;
 };
 
-class EchoWebSocketServer final : public SocketMgr<EchoWebSocketServerTraits> { };
+class EchoWebSocketServer final : public SocketMgr<EchoWebSocketServerTraits> {};
 
-int main(int argc, char** argv)
-{
-    std::string configFile = argc > 1 ? argv[1] : "rooftree.yaml";
-    if (Rooftree::Result<> loaded = sConfigMgr->LoadFile(configFile); !loaded)
-        std::print(stderr, "Could not load {} ({}), using defaults\n", configFile, loaded.error());
+int main(int argc, char** argv) {
+  std::string configFile = argc > 1 ? argv[1] : "rooftree.yaml";
+  if (Rooftree::Result<> loaded = sConfigMgr->LoadFile(configFile); !loaded)
+    std::print(stderr, "Could not load {} ({}), using defaults\n", configFile, loaded.error());
 
-    sLog->LoadFromConfig();
+  sLog->LoadFromConfig();
 
-    Rooftree::Asio::IoContext ioContext;
+  Rooftree::Asio::IoContext ioContext;
 
-    std::shared_ptr<Config const> config = sConfigMgr->GetConfig();
-    std::string bindIp = config->Get<std::string>("WebSocket.BindIP", "0.0.0.0");
-    uint16 port = config->Get<uint16>("WebSocket.Port", 7001);
-    int threads = config->Get<int>("WebSocket.NetworkThreads", 1);
+  std::shared_ptr<Config const> config = sConfigMgr->GetConfig();
+  std::string bindIp = config->Get<std::string>("WebSocket.BindIP", "0.0.0.0");
+  uint16 port = config->Get<uint16>("WebSocket.Port", 7001);
+  int threads = config->Get<int>("WebSocket.NetworkThreads", 1);
 
-    EchoWebSocketServer server;
-    if (!server.StartNetwork(ioContext, bindIp, port, threads))
-        return 1;
+  EchoWebSocketServer server;
+  if (!server.StartNetwork(ioContext, bindIp, port, threads))
+    return 1;
 
-    RT_LOG_INFO("websocket", "Listening on ws://{}:{}/echo, Ctrl+C to stop", bindIp, port);
+  RT_LOG_INFO("websocket", "Listening on ws://{}:{}/echo, Ctrl+C to stop", bindIp, port);
 
-    boost::asio::basic_signal_set<Rooftree::Asio::IoContextExecutor> signals(ioContext, SIGINT, SIGTERM);
-    signals.async_wait([&](boost::system::error_code const&, int) { ioContext.stop(); });
+  boost::asio::basic_signal_set<Rooftree::Asio::IoContextExecutor> signals(
+      ioContext, SIGINT, SIGTERM);
+  signals.async_wait([&](boost::system::error_code const&, int) { ioContext.stop(); });
 
-    ioContext.run();
+  ioContext.run();
 
-    server.StopNetwork();
-    return 0;
+  server.StopNetwork();
+  return 0;
 }

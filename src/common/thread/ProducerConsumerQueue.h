@@ -18,74 +18,66 @@
 #include <deque>
 #include <mutex>
 
-template<typename T>
-class ProducerConsumerQueue
-{
-public:
-    // Does nothing once cancelled
-    void Push(T item)
+template <typename T>
+class ProducerConsumerQueue {
+ public:
+  // Does nothing once cancelled
+  void Push(T item) {
     {
-        {
-            std::scoped_lock lock(_mutex);
-            if (_cancelled)
-                return;
-            _items.push_back(std::move(item));
-        }
-        _ready.notify_one();
+      std::scoped_lock lock(_mutex);
+      if (_cancelled)
+        return;
+      _items.push_back(std::move(item));
     }
+    _ready.notify_one();
+  }
 
-    // Without waiting; false when empty or cancelled
-    bool Pop(T& item)
+  // Without waiting; false when empty or cancelled
+  bool Pop(T& item) {
+    std::scoped_lock lock(_mutex);
+    return Take(item);
+  }
+
+  // Waits for an item; false once cancelled
+  bool WaitAndPop(T& item) {
+    std::unique_lock lock(_mutex);
+    _ready.wait(lock, [this] { return !_items.empty() || _cancelled; });
+    return Take(item);
+  }
+
+  void Cancel() {
     {
-        std::scoped_lock lock(_mutex);
-        return Take(item);
+      std::scoped_lock lock(_mutex);
+      _cancelled = true;
+      _items.clear();
     }
+    _ready.notify_all();
+  }
 
-    // Waits for an item; false once cancelled
-    bool WaitAndPop(T& item)
-    {
-        std::unique_lock lock(_mutex);
-        _ready.wait(lock, [this] { return !_items.empty() || _cancelled; });
-        return Take(item);
-    }
+  bool IsCancelled() const {
+    std::scoped_lock lock(_mutex);
+    return _cancelled;
+  }
 
-    void Cancel()
-    {
-        {
-            std::scoped_lock lock(_mutex);
-            _cancelled = true;
-            _items.clear();
-        }
-        _ready.notify_all();
-    }
+  std::size_t Size() const {
+    std::scoped_lock lock(_mutex);
+    return _items.size();
+  }
 
-    bool IsCancelled() const
-    {
-        std::scoped_lock lock(_mutex);
-        return _cancelled;
-    }
+ private:
+  // Under the lock
+  bool Take(T& item) {
+    if (_cancelled || _items.empty())
+      return false;
+    item = std::move(_items.front());
+    _items.pop_front();
+    return true;
+  }
 
-    std::size_t Size() const
-    {
-        std::scoped_lock lock(_mutex);
-        return _items.size();
-    }
-
-private:
-    // Under the lock
-    bool Take(T& item)
-    {
-        if (_cancelled || _items.empty())
-            return false;
-        item = std::move(_items.front());
-        _items.pop_front();
-        return true;
-    }
-
-    mutable std::mutex _mutex;
-    std::condition_variable _ready;
-    std::deque<T> _items;
-    bool _cancelled = false;
+  mutable std::mutex _mutex;
+  std::condition_variable _ready;
+  std::deque<T> _items;
+  bool _cancelled = false;
 };
 
-#endif // ROOFTREE_PRODUCER_CONSUMER_QUEUE_H
+#endif  // ROOFTREE_PRODUCER_CONSUMER_QUEUE_H

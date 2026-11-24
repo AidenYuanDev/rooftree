@@ -29,8 +29,9 @@ using uint16 = std::uint16_t;
 using uint32 = std::uint32_t;
 using uint64 = std::uint64_t;
 
-// A function taking a printf format at argument formatIndex and its arguments from firstIndex on: the
-// compiler checks them
-#define ROOFTREE_PRINTF(formatIndex, firstIndex) __attribute__((format(printf, formatIndex, firstIndex)))
+// A function taking a printf format at argument formatIndex and its arguments from firstIndex on:
+// the compiler checks them
+#define ROOFTREE_PRINTF(formatIndex, firstIndex) \
+  __attribute__((format(printf, formatIndex, firstIndex)))
 
-#endif // ROOFTREE_DEFINE_H
+#endif  // ROOFTREE_DEFINE_H

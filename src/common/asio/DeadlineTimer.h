@@ -8,17 +8,19 @@
 #define ROOFTREE_DEADLINE_TIMER_H
 
 #include "IoContext.h"
+
 #include <boost/asio/basic_waitable_timer.hpp>
+
 #include <chrono>
 
-namespace Rooftree::Asio
-{
-class DeadlineTimer : public boost::asio::basic_waitable_timer<std::chrono::steady_clock, boost::asio::wait_traits<std::chrono::steady_clock>,
-    IoContextExecutor>
-{
-public:
-    using basic_waitable_timer::basic_waitable_timer;
+namespace Rooftree::Asio {
+class DeadlineTimer : public boost::asio::basic_waitable_timer<
+                          std::chrono::steady_clock,
+                          boost::asio::wait_traits<std::chrono::steady_clock>,
+                          IoContextExecutor> {
+ public:
+  using basic_waitable_timer::basic_waitable_timer;
 };
-}
+}  // namespace Rooftree::Asio
 
-#endif // ROOFTREE_DEADLINE_TIMER_H
+#endif  // ROOFTREE_DEADLINE_TIMER_H

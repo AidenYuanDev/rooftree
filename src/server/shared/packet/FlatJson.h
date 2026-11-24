@@ -8,18 +8,19 @@
  * per message.
  *
  * Tables, structs, strings, scalars, enums (by name in JSON) and vectors of them; unions and fixed
- * arrays aren't supported (Load says which field has one). Field names are the JSON keys as they are.
- * A struct is an object of all its fields both ways: one absent from a table is null, a field the
- * JSON leaves out of one is 0 (a struct has no absent field), one that doesn't fit leaves out the
- * whole struct. json_null changes nothing for a struct, json_closed applies.
+ * arrays aren't supported (Load says which field has one). Field names are the JSON keys as they
+ * are. A struct is an object of all its fields both ways: one absent from a table is null, a field
+ * the JSON leaves out of one is 0 (a struct has no absent field), one that doesn't fit leaves out
+ * the whole struct. json_null changes nothing for a struct, json_closed applies.
  *
- *  JSON to a   keys the schema doesn't have are left out, so are nulls; a value of the wrong type or
- *  table       out of its type's range is left out too and named in the errors ("posts.0.id",
- *              "out_of_range"), so one request gets told of all of them. Every scalar the JSON has is
- *              stored, its default too, so an optional one (= null) tells "not sent" from 0
- *  a table to  every field is in the object, what isn't in the buffer as JSON says nothing: "" for a
- *  JSON        string, [] for a vector, null for a table or an optional scalar, the default for
- *              another scalar
+ *  JSON to a   keys the schema doesn't have are left out, so are nulls; a value of the wrong
+ *  table       type or out of its type's range is left out too and named in the errors
+ *              ("posts.0.id", "out_of_range"), so one request gets told of all of them. Every
+ *              scalar the JSON has is stored, its default too, so an optional one (= null) tells
+ *              "not sent" from 0
+ *  a table to  every field is in the object, what isn't in the buffer as JSON says nothing: ""
+ *  JSON        for a string, [] for a vector, null for a table or an optional scalar, the default
+ *              for another scalar
  *
  * Four attributes, which a schema using them declares (attribute "json_null";):
  *
@@ -27,8 +28,8 @@
  *              empty, 0 or absent one is null. How a request says "remove this", or "the root" of
  *              an id where 0 is none
  *  json_omit   absent from the buffer, absent from the JSON: an answer's fields that only some have
- *  json_closed an object whose keys must all be fields of its table, else unknown_key (still built):
- *              a map of languages, say, where any other key is a mistake
+ *  json_closed an object whose keys must all be fields of its table, else unknown_key (still
+ *              built): a map of languages, say, where any other key is a mistake
  *  json_map    a vector of tables with a string field "key" is an object of what they hold by key:
  *              the one other field's value, or an object of the others ({"/a.png": {"width": 1}})
  */
@@ -39,55 +40,60 @@
 #include "Define.h"
 #include "Optional.h"
 #include "Result.h"
+
 #include <boost/json/object.hpp>
+
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
-namespace reflection
-{
+namespace reflection {
 struct Object;
 struct Schema;
-}
+}  // namespace reflection
 
-namespace Rooftree::Server
-{
+namespace Rooftree::Server {
 // (path, code): "translations.zh.title", "not_a_string"
 using FlatJsonErrors = std::vector<std::pair<std::string, std::string>>;
 
-class FlatJsonSchema
-{
-public:
-    // bfbs, a binary schema (XBinarySchema::data()), outlives this
-    explicit FlatJsonSchema(uint8 const* bfbs);
+class FlatJsonSchema {
+ public:
+  // bfbs, a binary schema (XBinarySchema::data()), outlives this
+  explicit FlatJsonSchema(uint8 const* bfbs);
 
-    // Once, before use: the error names what isn't supported
-    Rooftree::Result<> Load();
+  // Once, before use: the error names what isn't supported
+  Rooftree::Result<> Load();
 
-    // "Namespace.Table"
-    reflection::Object const* Find(std::string_view name) const;
+  // "Namespace.Table"
+  reflection::Object const* Find(std::string_view name) const;
 
-    // Whether buffer is a valid one of object, before anything reads it
-    bool Verify(reflection::Object const& object, std::span<uint8 const> buffer) const;
+  // Whether buffer is a valid one of object, before anything reads it
+  bool Verify(reflection::Object const& object, std::span<uint8 const> buffer) const;
 
-    // A verified buffer
-    boost::json::object ToJson(reflection::Object const& object, std::span<uint8 const> buffer) const;
+  // A verified buffer
+  boost::json::object ToJson(reflection::Object const& object, std::span<uint8 const> buffer) const;
 
-    // A finished buffer of object, without what didn't fit, which errors names
-    std::string FromJson(reflection::Object const& object, boost::json::object const& json, FlatJsonErrors& errors) const;
+  // A finished buffer of object, without what didn't fit, which errors names
+  std::string FromJson(
+      reflection::Object const& object,
+      boost::json::object const& json,
+      FlatJsonErrors& errors) const;
 
-    // The names of object's fields, deprecated ones aside
-    std::vector<std::string_view> GetFieldNames(reflection::Object const& object) const;
+  // The names of object's fields, deprecated ones aside
+  std::vector<std::string_view> GetFieldNames(reflection::Object const& object) const;
 
-    // text (of a URL's path or query) as the JSON value of the field name: a number for a number,
-    // true/false for a bool, else the text. None if it isn't one, or there is no such field
-    Optional<boost::json::value> FromText(reflection::Object const& object, std::string_view name, std::string_view text) const;
+  // text (of a URL's path or query) as the JSON value of the field name: a number for a number,
+  // true/false for a bool, else the text. None if it isn't one, or there is no such field
+  Optional<boost::json::value> FromText(
+      reflection::Object const& object,
+      std::string_view name,
+      std::string_view text) const;
 
-private:
-    reflection::Schema const* _schema;
+ private:
+  reflection::Schema const* _schema;
 };
-}
+}  // namespace Rooftree::Server
 
-#endif // ROOFTREE_FLAT_JSON_H
+#endif  // ROOFTREE_FLAT_JSON_H

@@ -13,73 +13,74 @@
 #define ARENA_COMBAT_MAP_H
 
 #include "Define.h"
+
 #include <random>
 #include <unordered_map>
 #include <vector>
 
 class Unit;
 
-enum class CombatEventType : uint8
-{
-    CastStart,          // Duration: the cast time
-    SpellGo,            // the cast completed, instant ones too; the effects' events follow
-    CastInterrupted,    // Reason
-    Damage,             // Amount done, Crit, Periodic (Spell is then the aura's)
-    Heal,               // Amount done, Crit
-    AuraApplied,        // Spell: the aura, Duration; also when one is refreshed
-    AuraRemoved,        // Spell: the aura
-    Death,              // Caster: the killer
-    Swing               // an auto attack's blow at Target; its Damage (Spell 0) follows
+enum class CombatEventType : uint8 {
+  CastStart,        // Duration: the cast time
+  SpellGo,          // the cast completed, instant ones too; the effects' events follow
+  CastInterrupted,  // Reason
+  Damage,           // Amount done, Crit, Periodic (Spell is then the aura's)
+  Heal,             // Amount done, Crit
+  AuraApplied,      // Spell: the aura, Duration; also when one is refreshed
+  AuraRemoved,      // Spell: the aura
+  Death,            // Caster: the killer
+  Swing             // an auto attack's blow at Target; its Damage (Spell 0) follows
 };
 
-struct CombatEvent
-{
-    CombatEventType Type;
-    uint32 Caster;
-    uint32 Target;
-    uint32 Spell;
-    uint32 Amount = 0;
-    uint32 Duration = 0;    // ms
-    bool Crit = false;
-    bool Periodic = false;
-    uint8 Reason = 0;       // InterruptReason, None for the other types
+struct CombatEvent {
+  CombatEventType Type;
+  uint32 Caster;
+  uint32 Target;
+  uint32 Spell;
+  uint32 Amount = 0;
+  uint32 Duration = 0;  // ms
+  bool Crit = false;
+  bool Periodic = false;
+  uint8 Reason = 0;  // InterruptReason, None for the other types
 };
 
-class CombatMap
-{
-public:
-    CombatMap();
-    // Rolls the same numbers each time, for tests
-    explicit CombatMap(uint32 seed);
-    ~CombatMap();
+class CombatMap {
+ public:
+  CombatMap();
+  // Rolls the same numbers each time, for tests
+  explicit CombatMap(uint32 seed);
+  ~CombatMap();
 
-    CombatMap(CombatMap const&) = delete;
-    CombatMap& operator=(CombatMap const&) = delete;
+  CombatMap(CombatMap const&) = delete;
+  CombatMap& operator=(CombatMap const&) = delete;
 
-    // Ids are unique in a map. Adding a unit already in it does nothing
-    void AddUnit(Unit& unit);
-    void RemoveUnit(Unit& unit);
-    Unit* FindUnit(uint32 id) const;
-    std::size_t GetUnitCount() const { return _units.size(); }
+  // Ids are unique in a map. Adding a unit already in it does nothing
+  void AddUnit(Unit& unit);
+  void RemoveUnit(Unit& unit);
+  Unit* FindUnit(uint32 id) const;
+  std::size_t GetUnitCount() const { return _units.size(); }
 
-    void Update(uint32 diff);
+  void Update(uint32 diff);
 
-    void AddEvent(CombatEvent const& event) { _events.push_back(event); }
-    std::vector<CombatEvent> TakeEvents();
+  void AddEvent(CombatEvent const& event) { _events.push_back(event); }
+  std::vector<CombatEvent> TakeEvents();
 
-    // Both ends included
-    uint32 Roll(uint32 min, uint32 max);
+  // Both ends included
+  uint32 Roll(uint32 min, uint32 max);
 
-    // Where a unit may stand, for what moves units (Shadowstep); unbounded until told
-    void SetField(float width, float height) { _width = width; _height = height; }
-    void ClampToField(float& x, float& y, float radius) const;
+  // Where a unit may stand, for what moves units (Shadowstep); unbounded until told
+  void SetField(float width, float height) {
+    _width = width;
+    _height = height;
+  }
+  void ClampToField(float& x, float& y, float radius) const;
 
-private:
-    std::unordered_map<uint32, Unit*> _units;
-    std::vector<CombatEvent> _events;
-    std::mt19937 _random;
-    float _width = 0.0f;
-    float _height = 0.0f;
+ private:
+  std::unordered_map<uint32, Unit*> _units;
+  std::vector<CombatEvent> _events;
+  std::mt19937 _random;
+  float _width = 0.0f;
+  float _height = 0.0f;
 };
 
-#endif // ARENA_COMBAT_MAP_H
+#endif  // ARENA_COMBAT_MAP_H

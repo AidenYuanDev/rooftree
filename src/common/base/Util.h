@@ -10,15 +10,15 @@
 #include "Define.h"
 #include "Duration.h"
 #include "Optional.h"
+
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
-namespace Rooftree
-{
-// The parts of text between the separators, views into text (which has to outlive them). keepEmpty: also
-// the empty ones, "a,,b" gives three
+namespace Rooftree {
+// The parts of text between the separators, views into text (which has to outlive them). keepEmpty:
+// also the empty ones, "a,,b" gives three
 std::vector<std::string_view> Tokenize(std::string_view text, char separator, bool keepEmpty);
 
 // ASCII letters in any case
@@ -26,8 +26,12 @@ bool StringEqualI(std::string_view a, std::string_view b);
 bool StringStartsWithI(std::string_view text, std::string_view prefix);
 
 // ASCII only, other bytes stay (the C functions depend on the locale and take an int)
-constexpr char CharToLower(char c) { return c >= 'A' && c <= 'Z' ? char(c - 'A' + 'a') : c; }
-constexpr char CharToUpper(char c) { return c >= 'a' && c <= 'z' ? char(c - 'a' + 'A') : c; }
+constexpr char CharToLower(char c) {
+  return c >= 'A' && c <= 'Z' ? char(c - 'A' + 'a') : c;
+}
+constexpr char CharToUpper(char c) {
+  return c >= 'a' && c <= 'z' ? char(c - 'a' + 'A') : c;
+}
 
 // Upper case hex, two digits a byte (the hashes stored in the database are)
 std::string ToHex(std::span<uint8 const> bytes);
@@ -44,6 +48,6 @@ void Utf8Truncate(std::string& text, std::size_t length);
 Optional<Seconds> ParseDuration(std::string_view text);
 // The other way: 1d2h3m4s, units that are 0 left out ("0s" for none)
 std::string FormatDuration(Seconds duration);
-}
+}  // namespace Rooftree
 
-#endif // ROOFTREE_UTIL_H
+#endif  // ROOFTREE_UTIL_H

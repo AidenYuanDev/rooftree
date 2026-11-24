@@ -4,17 +4,12 @@
 
 #include "StringFormat.h"
 
-namespace Rooftree
-{
-std::string StringVFormat(FormatStringView format, FormatArgs args) noexcept
-{
-    try
-    {
-        return std::vformat(format, args);
-    }
-    catch (std::exception const& error)
-    {
-        return std::format("(cannot format \"{}\": {})", format, error.what());
-    }
+namespace Rooftree {
+std::string StringVFormat(FormatStringView format, FormatArgs args) noexcept {
+  try {
+    return std::vformat(format, args);
+  } catch (std::exception const& error) {
+    return std::format("(cannot format \"{}\": {})", format, error.what());
+  }
 }
-}
+}  // namespace Rooftree

@@ -33,13 +33,12 @@
 
 class Config;
 
-namespace LogConfig
-{
+namespace LogConfig {
 // The config line for "Appender.<name>": the value itself, or built from its mapping
 std::string GetAppenderConfigLine(Config const& config, std::string const& key);
 
 // The config line for "Logger.<name>": the value itself, or built from its mapping
 std::string GetLoggerConfigLine(Config const& config, std::string const& key);
-}
+}  // namespace LogConfig
 
-#endif // ROOFTREE_LOGCONFIG_H
+#endif  // ROOFTREE_LOGCONFIG_H

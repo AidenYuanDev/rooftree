@@ -8,11 +8,10 @@
 #include <concepts>
 #include <type_traits>
 
-namespace Rooftree
-{
+namespace Rooftree {
 // Callable with Args, giving something that converts to R
-template<typename Callable, typename R, typename... Args>
+template <typename Callable, typename R, typename... Args>
 concept invocable_r = std::is_invocable_r_v<R, Callable, Args...>;
-}
+}  // namespace Rooftree
 
-#endif // ROOFTREE_CONCEPTS_H
+#endif  // ROOFTREE_CONCEPTS_H

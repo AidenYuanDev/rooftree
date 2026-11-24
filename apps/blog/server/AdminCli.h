@@ -11,20 +11,18 @@
 
 #include <string>
 
-namespace Blog
-{
+namespace Blog {
 struct BlogSettings;
 
-struct CreateAdminArguments
-{
-    std::string Username;
-    std::string Email;
-    std::string DisplayName;    // Username when empty
-    bool Totp = false;
+struct CreateAdminArguments {
+  std::string Username;
+  std::string Email;
+  std::string DisplayName;  // Username when empty
+  bool Totp = false;
 };
 
 // With the database open. The process' exit code: 0 created, 1 refused (printed on stderr)
 int CreateAdmin(CreateAdminArguments const& arguments, BlogSettings const& settings);
-}
+}  // namespace Blog
 
-#endif // BLOG_ADMIN_CLI_H
+#endif  // BLOG_ADMIN_CLI_H

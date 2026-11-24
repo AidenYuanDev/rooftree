@@ -8,6 +8,7 @@
 #include "Duration.h"
 #include "Errors.h"
 #include "Log.h"
+
 #include <algorithm>
 #include <memory>
 #include <string>

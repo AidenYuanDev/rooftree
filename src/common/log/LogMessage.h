@@ -6,18 +6,18 @@
 #define ROOFTREE_LOG_MESSAGE_H
 
 #include "LogCommon.h"
+
 #include <ctime>
 #include <string>
 
-struct LogMessage
-{
-    LogLevel Level;
-    std::string Type;       // the logger's name it was written to, "server.http"
-    std::string Text;
-    time_t Time;
+struct LogMessage {
+  LogLevel Level;
+  std::string Type;  // the logger's name it was written to, "server.http"
+  std::string Text;
+  time_t Time;
 
-    // Local time, 2026-11-07_19:31:48
-    std::string FormatTime() const;
+  // Local time, 2026-11-07_19:31:48
+  std::string FormatTime() const;
 };
 
-#endif // ROOFTREE_LOG_MESSAGE_H
+#endif  // ROOFTREE_LOG_MESSAGE_H

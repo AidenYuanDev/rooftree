@@ -20,7 +20,7 @@ class DatabaseConnection;
 struct DatabaseConnectionInfo;
 class PreparedStatementBase;
 
-template<typename T>
+template <typename T>
 class PreparedStatement;
 
 class QueryCallback;
@@ -29,13 +29,13 @@ class SQLQueryHolderCallback;
 class TransactionBase;
 class TransactionCallback;
 
-template<typename T>
+template <typename T>
 class SQLQueryHolder;
 
-template<typename T>
+template <typename T>
 class Transaction;
 
-template<typename T>
+template <typename T>
 using SQLTransaction = std::shared_ptr<Transaction<T>>;
 
-#endif // ROOFTREE_DATABASE_ENV_FWD_H
+#endif  // ROOFTREE_DATABASE_ENV_FWD_H

@@ -7,14 +7,12 @@
 
 #include "BaseHttpSocket.h"
 
-namespace Rooftree::Net::Http
-{
+namespace Rooftree::Net::Http {
 // Plain HTTP; a RequestHandler of its own makes it a server's (examples/http_server.cpp)
-class Socket : public BaseSocket<Impl::BoostBeastSocketWrapper>
-{
-public:
-    explicit Socket(IoContextTcpSocket&& socket) : BaseSocket(std::move(socket)) { }
+class Socket : public BaseSocket<Impl::BoostBeastSocketWrapper> {
+ public:
+  explicit Socket(IoContextTcpSocket&& socket) : BaseSocket(std::move(socket)) {}
 };
-}
+}  // namespace Rooftree::Net::Http
 
-#endif // ROOFTREE_HTTP_SOCKET_H
+#endif  // ROOFTREE_HTTP_SOCKET_H

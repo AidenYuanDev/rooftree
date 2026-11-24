@@ -17,42 +17,50 @@
 #include "Define.h"
 #include "HttpCommon.h"
 #include "Optional.h"
+
 #include <boost/json/object.hpp>
 #include <boost/json/parse.hpp>
 #include <boost/json/value.hpp>
 #include <boost/json/value_to.hpp>
+
 #include <string_view>
 
-namespace Rooftree::Server
-{
-void SetJsonResponse(Net::Http::Response& response, boost::beast::http::status status, boost::json::value const& body);
+namespace Rooftree::Server {
+void SetJsonResponse(
+    Net::Http::Response& response,
+    boost::beast::http::status status,
+    boost::json::value const& body);
 
-void SetJsonError(Net::Http::Response& response, boost::beast::http::status status, std::string_view code,
-    std::string_view message = {}, boost::json::object fields = {});
+void SetJsonError(
+    Net::Http::Response& response,
+    boost::beast::http::status status,
+    std::string_view code,
+    std::string_view message = {},
+    boost::json::object fields = {});
 
 // Empty if the body is not JSON or not an object
 Optional<boost::json::object> ParseJsonObject(std::string_view body);
 
-// The body decoded as T (a described struct, a map, ...). Empty if it is not JSON or doesn't convert
-template<typename T>
-Optional<T> ParseJsonBody(std::string_view body)
-{
-    boost::system::error_code error;
-    boost::json::value value = boost::json::parse(body, error);
-    if (error)
-        return {};
+// The body decoded as T (a described struct, a map,
+// ...). Empty if it is not JSON or doesn't convert
+template <typename T>
+Optional<T> ParseJsonBody(std::string_view body) {
+  boost::system::error_code error;
+  boost::json::value value = boost::json::parse(body, error);
+  if (error)
+    return {};
 
-    boost::system::result<T> result = boost::json::try_value_to<T>(value);
-    if (!result)
-        return {};
+  boost::system::result<T> result = boost::json::try_value_to<T>(value);
+  if (!result)
+    return {};
 
-    return std::move(*result);
+  return std::move(*result);
 }
 
 // Typed reads of an object member, empty if missing or of another type
 Optional<std::string_view> GetJsonString(boost::json::object const& object, std::string_view key);
 Optional<int64> GetJsonInt(boost::json::object const& object, std::string_view key);
 Optional<bool> GetJsonBool(boost::json::object const& object, std::string_view key);
-}
+}  // namespace Rooftree::Server
 
-#endif // ROOFTREE_JSON_HTTP_H
+#endif  // ROOFTREE_JSON_HTTP_H

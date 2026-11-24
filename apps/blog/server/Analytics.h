@@ -15,49 +15,50 @@
 
 #include "Define.h"
 #include "Duration.h"
+
 #include <map>
 #include <string>
 #include <unordered_set>
 
-namespace Blog
-{
-class Analytics
-{
-public:
-    // A page read: path ("/zh/posts/hello"), the other site the reader came from (a host, or empty),
-    // who they are (address and browser, hashed here)
-    void Count(std::string const& path, std::string const& referrer, std::string_view visitor, SystemTimePoint now);
+namespace Blog {
+class Analytics {
+ public:
+  // A page read: path ("/zh/posts/hello"), the other site the reader came from (a host, or empty),
+  // who they are (address and browser, hashed here)
+  void Count(
+      std::string const& path,
+      std::string const& referrer,
+      std::string_view visitor,
+      SystemTimePoint now);
 
-    // The sums since the last write, of one day
-    struct Pending
-    {
-        struct Counts
-        {
-            uint32 Views = 0;
-            uint32 Visitors = 0;
-        };
-
-        std::string Day;
-        std::map<std::string, Counts> Pages;    // "": the whole site
-        std::map<std::string, uint32> Referrers;
+  // The sums since the last write, of one day
+  struct Pending {
+    struct Counts {
+      uint32 Views = 0;
+      uint32 Visitors = 0;
     };
 
-    // The sums since the last write, taken to be written
-    Pending Take();
-    // Into the database: queued (main thread, never blocks), or right away (a worker, before reading)
-    static void Write(Pending const& pending, bool now);
-    void Flush() { Write(Take(), false); }
+    std::string Day;
+    std::map<std::string, Counts> Pages;  // "": the whole site
+    std::map<std::string, uint32> Referrers;
+  };
 
-    void SetDayOffset(Minutes offset) { _dayOffset = offset; }
-    // "2026-10-29": the day of that time, where the stats' day is
-    std::string DayOf(SystemTimePoint time) const;
+  // The sums since the last write, taken to be written
+  Pending Take();
+  // Into the database: queued (main thread, never blocks), or right away (a worker, before reading)
+  static void Write(Pending const& pending, bool now);
+  void Flush() { Write(Take(), false); }
 
-private:
-    Minutes _dayOffset = 0min;
-    std::string _salt;
-    std::unordered_set<uint64> _seen;           // a visitor of the site, and of each page, today
-    Pending _pending;                           // today's, not written yet
+  void SetDayOffset(Minutes offset) { _dayOffset = offset; }
+  // "2026-10-29": the day of that time, where the stats' day is
+  std::string DayOf(SystemTimePoint time) const;
+
+ private:
+  Minutes _dayOffset = 0min;
+  std::string _salt;
+  std::unordered_set<uint64> _seen;  // a visitor of the site, and of each page, today
+  Pending _pending;                  // today's, not written yet
 };
-}
+}  // namespace Blog
 
-#endif // BLOG_ANALYTICS_H
+#endif  // BLOG_ANALYTICS_H

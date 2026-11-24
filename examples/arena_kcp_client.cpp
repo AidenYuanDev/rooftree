@@ -15,232 +15,231 @@
 #include "IoContext.h"
 #include "KcpClient.h"
 #include "Util.h"
+
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/json.hpp>
-#include <print>
+
 #include <atomic>
+#include <print>
 #include <thread>
 
 using namespace std::chrono_literals;
 namespace http = boost::beast::http;
 namespace Kcp = Rooftree::Net::Kcp;
 
-namespace
-{
+namespace {
 constexpr std::size_t PacketHeaderSize = 8;
 
-std::string MakePacket(Arena::Opcode opcode, flatbuffers::FlatBufferBuilder const& builder)
-{
-    std::string packet(PacketHeaderSize, '\0');
-    packet[0] = char(uint16(opcode) & 0xFF);
-    packet[1] = char(uint16(opcode) >> 8);
-    packet.append(reinterpret_cast<char const*>(builder.GetBufferPointer()), builder.GetSize());
-    return packet;
+std::string MakePacket(Arena::Opcode opcode, flatbuffers::FlatBufferBuilder const& builder) {
+  std::string packet(PacketHeaderSize, '\0');
+  packet[0] = char(uint16(opcode) & 0xFF);
+  packet[1] = char(uint16(opcode) >> 8);
+  packet.append(reinterpret_cast<char const*>(builder.GetBufferPointer()), builder.GetSize());
+  return packet;
 }
 
 // A field the server left out is null, as any table's
-std::string_view Str(flatbuffers::String const* string)
-{
-    return string ? string->string_view() : std::string_view();
+std::string_view Str(flatbuffers::String const* string) {
+  return string ? string->string_view() : std::string_view();
 }
 
-double Now()
-{
-    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+double Now() {
+  return std::chrono::duration<double, std::milli>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
 }
 
-class ArenaClient final : public Kcp::Client
-{
-public:
-    using Client::Client;
+class ArenaClient final : public Kcp::Client {
+ public:
+  using Client::Client;
 
-    std::atomic<bool> Done = false;
-    std::atomic<uint32> Frames = 0;
+  std::atomic<bool> Done = false;
+  std::atomic<uint32> Frames = 0;
 
-protected:
-    void OnOpen() override
-    {
-        std::print("connected, conv {}\n", GetConv());
-    }
+ protected:
+  void OnOpen() override { std::print("connected, conv {}\n", GetConv()); }
 
-    void OnMessage(std::string&& packet, bool reliable) override
-    {
-        if (packet.size() < PacketHeaderSize)
-            return;
+  void OnMessage(std::string&& packet, bool reliable) override {
+    if (packet.size() < PacketHeaderSize)
+      return;
 
-        // Copied to an 8-aligned buffer: the verifier checks alignment, and a table is read in place.
-        // Verified before anything reads it, as a server's packet is no more trusted than any input
-        Arena::Opcode opcode = Arena::Opcode(uint8(packet[0]) | uint8(packet[1]) << 8);
-        std::vector<uint8> payload(packet.begin() + PacketHeaderSize, packet.end());
-        flatbuffers::Verifier verifier(payload.data(), payload.size());
-        char const* tag = reliable ? "reliable  " : "unreliable";
+    // Copied to an 8-aligned buffer: the verifier checks alignment, and a table is read in place.
+    // Verified before anything reads it, as a server's packet is no more trusted than any input
+    Arena::Opcode opcode = Arena::Opcode(uint8(packet[0]) | uint8(packet[1]) << 8);
+    std::vector<uint8> payload(packet.begin() + PacketHeaderSize, packet.end());
+    flatbuffers::Verifier verifier(payload.data(), payload.size());
+    char const* tag = reliable ? "reliable  " : "unreliable";
 
-        switch (opcode)
-        {
-            case Arena::Opcode::Welcome:
-            {
-                if (!verifier.VerifyBuffer<Arena::Welcome>(nullptr))
-                    break;
-                Arena::Welcome const* welcome = flatbuffers::GetRoot<Arena::Welcome>(payload.data());
-                std::print("{} Welcome {} (id {}), field {}x{}, {} coins so far\n", tag, Str(welcome->name()), welcome->id(),
-                    welcome->width(), welcome->height(), welcome->totalCoins());
+    switch (opcode) {
+      case Arena::Opcode::Welcome: {
+        if (!verifier.VerifyBuffer<Arena::Welcome>(nullptr))
+          break;
+        Arena::Welcome const* welcome = flatbuffers::GetRoot<Arena::Welcome>(payload.data());
+        std::print(
+            "{} Welcome {} (id {}), field {}x{}, {} coins so far\n", tag, Str(welcome->name()),
+            welcome->id(), welcome->width(), welcome->height(), welcome->totalCoins());
 
-                // In game: the server ignores inputs and chat before
-                flatbuffers::FlatBufferBuilder builder;
-                builder.Finish(Arena::CreateChatDirect(builder, "hello over KCP"));
-                Send(MakePacket(Arena::Opcode::Chat, builder));
+        // In game: the server ignores inputs and chat before
+        flatbuffers::FlatBufferBuilder builder;
+        builder.Finish(Arena::CreateChatDirect(builder, "hello over KCP"));
+        Send(MakePacket(Arena::Opcode::Chat, builder));
 
-                builder.Clear();
-                builder.Finish(Arena::CreateInput(builder, 1, 0));
-                Send(MakePacket(Arena::Opcode::Input, builder));
+        builder.Clear();
+        builder.Finish(Arena::CreateInput(builder, 1, 0));
+        Send(MakePacket(Arena::Opcode::Input, builder));
 
-                builder.Clear();
-                builder.Finish(Arena::CreatePing(builder, Now()));
-                Send(MakePacket(Arena::Opcode::Ping, builder));
-                break;
-            }
-            case Arena::Opcode::Units:
-                if (verifier.VerifyBuffer<Arena::Units>(nullptr))
-                {
-                    Arena::Units const* units = flatbuffers::GetRoot<Arena::Units>(payload.data());
-                    std::print("{} Units, {} bytes:", tag, packet.size());
-                    if (units->units())
-                        for (Arena::UnitInfo const* unit : *units->units())
-                            std::print(" {} is {}", unit->id(), Str(unit->name()));
-                    std::print(", {} gone\n", units->gone() ? units->gone()->size() : 0);
-                }
-                break;
-            case Arena::Opcode::Frame:
-            {
-                // 20 frames a second, print the first and then one a second
-                if (!verifier.VerifyBuffer<Arena::Frame>(nullptr) || Frames++ % 20)
-                    break;
-                Arena::Frame const* frame = flatbuffers::GetRoot<Arena::Frame>(payload.data());
-                std::print("{} Frame {}, {} bytes:", tag, frame->tick(), packet.size());
-                if (frame->units())
-                    for (Arena::UnitMotion const* unit : *frame->units())
-                        std::print(" {} at ({:.0f}, {:.0f})", unit->id(), unit->x(), unit->y());
-                std::print(", {} coins{}\n", frame->coins() ? frame->coins()->size() : 0, frame->goldRush() ? ", gold rush" : "");
-                break;
-            }
-            case Arena::Opcode::ChatMessage:
-                if (verifier.VerifyBuffer<Arena::ChatMessage>(nullptr))
-                {
-                    Arena::ChatMessage const* chat = flatbuffers::GetRoot<Arena::ChatMessage>(payload.data());
-                    std::print("{} ChatMessage {}: {}\n", tag, Str(chat->from()), Str(chat->text()));
-                }
-                break;
-            case Arena::Opcode::SystemMessage:
-                if (verifier.VerifyBuffer<Arena::SystemMessage>(nullptr))
-                    std::print("{} SystemMessage {}\n", tag, Str(flatbuffers::GetRoot<Arena::SystemMessage>(payload.data())->text()));
-                break;
-            case Arena::Opcode::Pong:
-                if (verifier.VerifyBuffer<Arena::Pong>(nullptr))
-                    std::print("{} Pong, {:.1f} ms\n", tag, Now() - flatbuffers::GetRoot<Arena::Pong>(payload.data())->t());
-                break;
-            default:
-                // A newer server's: ignored
-                break;
+        builder.Clear();
+        builder.Finish(Arena::CreatePing(builder, Now()));
+        Send(MakePacket(Arena::Opcode::Ping, builder));
+        break;
+      }
+      case Arena::Opcode::Units:
+        if (verifier.VerifyBuffer<Arena::Units>(nullptr)) {
+          Arena::Units const* units = flatbuffers::GetRoot<Arena::Units>(payload.data());
+          std::print("{} Units, {} bytes:", tag, packet.size());
+          if (units->units()) {
+            for (Arena::UnitInfo const* unit : *units->units())
+              std::print(" {} is {}", unit->id(), Str(unit->name()));
+          }
+          std::print(", {} gone\n", units->gone() ? units->gone()->size() : 0);
         }
+        break;
+      case Arena::Opcode::Frame: {
+        // 20 frames a second, print the first and then one a second
+        if (!verifier.VerifyBuffer<Arena::Frame>(nullptr) || Frames++ % 20)
+          break;
+        Arena::Frame const* frame = flatbuffers::GetRoot<Arena::Frame>(payload.data());
+        std::print("{} Frame {}, {} bytes:", tag, frame->tick(), packet.size());
+        if (frame->units()) {
+          for (Arena::UnitMotion const* unit : *frame->units())
+            std::print(" {} at ({:.0f}, {:.0f})", unit->id(), unit->x(), unit->y());
+        }
+        std::print(
+            ", {} coins{}\n", frame->coins() ? frame->coins()->size() : 0,
+            frame->goldRush() ? ", gold rush" : "");
+        break;
+      }
+      case Arena::Opcode::ChatMessage:
+        if (verifier.VerifyBuffer<Arena::ChatMessage>(nullptr)) {
+          Arena::ChatMessage const* chat = flatbuffers::GetRoot<Arena::ChatMessage>(payload.data());
+          std::print("{} ChatMessage {}: {}\n", tag, Str(chat->from()), Str(chat->text()));
+        }
+        break;
+      case Arena::Opcode::SystemMessage:
+        if (verifier.VerifyBuffer<Arena::SystemMessage>(nullptr)) {
+          std::print(
+              "{} SystemMessage {}\n", tag,
+              Str(flatbuffers::GetRoot<Arena::SystemMessage>(payload.data())->text()));
+        }
+        break;
+      case Arena::Opcode::Pong:
+        if (verifier.VerifyBuffer<Arena::Pong>(nullptr)) {
+          std::print(
+              "{} Pong, {:.1f} ms\n", tag,
+              Now() - flatbuffers::GetRoot<Arena::Pong>(payload.data())->t());
+        }
+        break;
+      default:
+        // A newer server's: ignored
+        break;
     }
+  }
 
-    void OnClose(uint16 code, std::string_view reason) override
-    {
-        std::print("closed: {} {}\n", code, reason);
-        Done = true;
-    }
+  void OnClose(uint16 code, std::string_view reason) override {
+    std::print("closed: {} {}\n", code, reason);
+    Done = true;
+  }
 };
-}
+}  // namespace
 
-int main(int argc, char** argv)
-{
-    if (argc < 3)
-    {
-        std::print(stderr, "Usage: {} <username> <password> [host] [http port] [seconds]\n", argv[0]);
-        return 1;
+int main(int argc, char** argv) {
+  if (argc < 3) {
+    std::print(stderr, "Usage: {} <username> <password> [host] [http port] [seconds]\n", argv[0]);
+    return 1;
+  }
+
+  std::string host = argc > 3 ? argv[3] : "127.0.0.1";
+  std::string httpPort = argc > 4 ? argv[4] : "8090";
+  int seconds = argc > 5 ? std::atoi(argv[5]) : 5;
+
+  // 1. Log in. A real client does this over HTTPS: the key must stay secret
+  boost::json::object login;
+  try {
+    boost::asio::io_context io;
+    boost::asio::ip::tcp::resolver resolver(io);
+    boost::asio::ip::tcp::socket socket(io);
+    boost::asio::connect(socket, resolver.resolve(host, httpPort));
+
+    http::request<http::string_body> request(http::verb::post, "/api/login", 11);
+    request.set(http::field::host, host);
+    request.set(http::field::content_type, "application/json");
+    request.body() =
+        boost::json::serialize(boost::json::object{{"username", argv[1]}, {"password", argv[2]}});
+    request.prepare_payload();
+    http::write(socket, request);
+
+    boost::beast::flat_buffer buffer;
+    http::response<http::string_body> response;
+    http::read(socket, buffer, response);
+    login = boost::json::parse(response.body()).as_object();
+    if (response.result() != http::status::ok) {
+      std::print(stderr, "login failed: {}\n", response.body());
+      return 1;
     }
+  } catch (std::exception const& e) {
+    std::print(stderr, "login failed: {}\n", e.what());
+    return 1;
+  }
 
-    std::string host = argc > 3 ? argv[3] : "127.0.0.1";
-    std::string httpPort = argc > 4 ? argv[4] : "8090";
-    int seconds = argc > 5 ? std::atoi(argv[5]) : 5;
+  if (!login.contains("kcpPort")) {
+    std::print(stderr, "the server has KCP off (Arena.Kcp.Enabled)\n");
+    return 1;
+  }
 
-    // 1. Log in. A real client does this over HTTPS: the key must stay secret
-    boost::json::object login;
-    try
-    {
-        boost::asio::io_context io;
-        boost::asio::ip::tcp::resolver resolver(io);
-        boost::asio::ip::tcp::socket socket(io);
-        boost::asio::connect(socket, resolver.resolve(host, httpPort));
+  std::string ticket(login.at("ticket").as_string());
+  std::vector<uint8> keyBytes =
+      Rooftree::FromHex(login.at("kcpKey").as_string()).value_or(std::vector<uint8>());
+  Kcp::Key key;
+  if (keyBytes.size() != key.size()) {
+    std::print(stderr, "unexpected key size {}\n", keyBytes.size());
+    return 1;
+  }
+  std::copy(keyBytes.begin(), keyBytes.end(), key.begin());
 
-        http::request<http::string_body> request(http::verb::post, "/api/login", 11);
-        request.set(http::field::host, host);
-        request.set(http::field::content_type, "application/json");
-        request.body() = boost::json::serialize(boost::json::object{ { "username", argv[1] }, { "password", argv[2] } });
-        request.prepare_payload();
-        http::write(socket, request);
+  // 2. Connect over UDP
+  Rooftree::Asio::IoContext ioContext;
+  boost::asio::ip::udp::resolver resolver(ioContext);
+  boost::asio::ip::udp::endpoint server =
+      *resolver
+           .resolve(
+               boost::asio::ip::udp::v4(), host, std::to_string(login.at("kcpPort").as_int64()))
+           .begin();
 
-        boost::beast::flat_buffer buffer;
-        http::response<http::string_body> response;
-        http::read(socket, buffer, response);
-        login = boost::json::parse(response.body()).as_object();
-        if (response.result() != http::status::ok)
-        {
-            std::print(stderr, "login failed: {}\n", response.body());
-            return 1;
-        }
-    }
-    catch (std::exception const& e)
-    {
-        std::print(stderr, "login failed: {}\n", e.what());
-        return 1;
-    }
+  // Pinging every second instead of every 5 shows the round trip sooner
+  Kcp::Settings settings;
+  settings.PingInterval = 1s;
+  auto client = std::make_shared<ArenaClient>(ioContext, settings);
+  client->Connect(server, ticket, key);
+  std::thread ioThread([&ioContext] { ioContext.run(); });
 
-    if (!login.contains("kcpPort"))
-    {
-        std::print(stderr, "the server has KCP off (Arena.Kcp.Enabled)\n");
-        return 1;
-    }
+  // 3. Play for a while, then leave
+  auto end = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+  while (!client->Done && std::chrono::steady_clock::now() < end)
+    std::this_thread::sleep_for(50ms);
 
-    std::string ticket(login.at("ticket").as_string());
-    std::vector<uint8> keyBytes = Rooftree::FromHex(login.at("kcpKey").as_string()).value_or(std::vector<uint8>());
-    Kcp::Key key;
-    if (keyBytes.size() != key.size())
-    {
-        std::print(stderr, "unexpected key size {}\n", keyBytes.size());
-        return 1;
-    }
-    std::copy(keyBytes.begin(), keyBytes.end(), key.begin());
+  if (!client->Done) {
+    std::print(
+        "round trip {} ms, {} frames received, leaving\n", client->GetRoundTripTime(),
+        uint32(client->Frames));
+    client->Close();
+    while (!client->Done)
+      std::this_thread::sleep_for(10ms);
+  }
 
-    // 2. Connect over UDP
-    Rooftree::Asio::IoContext ioContext;
-    boost::asio::ip::udp::resolver resolver(ioContext);
-    boost::asio::ip::udp::endpoint server = *resolver.resolve(boost::asio::ip::udp::v4(), host, std::to_string(login.at("kcpPort").as_int64())).begin();
-
-    // Pinging every second instead of every 5 shows the round trip sooner
-    Kcp::Settings settings;
-    settings.PingInterval = 1s;
-    auto client = std::make_shared<ArenaClient>(ioContext, settings);
-    client->Connect(server, ticket, key);
-    std::thread ioThread([&ioContext] { ioContext.run(); });
-
-    // 3. Play for a while, then leave
-    auto end = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
-    while (!client->Done && std::chrono::steady_clock::now() < end)
-        std::this_thread::sleep_for(50ms);
-
-    if (!client->Done)
-    {
-        std::print("round trip {} ms, {} frames received, leaving\n", client->GetRoundTripTime(), uint32(client->Frames));
-        client->Close();
-        while (!client->Done)
-            std::this_thread::sleep_for(10ms);
-    }
-
-    ioContext.stop();
-    ioThread.join();
-    return 0;
+  ioContext.stop();
+  ioThread.join();
+  return 0;
 }

@@ -20,13 +20,13 @@
 #include "Define.h"
 #include "HttpCommon.h"
 #include "Optional.h"
+
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
-namespace Rooftree::Server
-{
+namespace Rooftree::Server {
 // RFC 4648 base64 with padding, e.g. for data: URLs
 std::string Base64Encode(std::span<uint8 const> data);
 std::string Base64UrlEncode(std::span<uint8 const> data);
@@ -56,7 +56,10 @@ bool CheckOrigin(Net::Http::Request const& request, std::span<std::string const>
 bool CheckCsrfToken(Net::Http::Request const& request, std::string_view expectedToken);
 
 // otpauth://totp/<issuer>:<account>?secret=<base32>&issuer=<issuer>
-std::string BuildTotpUri(std::string_view issuer, std::string_view account, std::span<uint8 const> secret);
-}
+std::string BuildTotpUri(
+    std::string_view issuer,
+    std::string_view account,
+    std::span<uint8 const> secret);
+}  // namespace Rooftree::Server
 
-#endif // ROOFTREE_SECURITY_UTILS_H
+#endif  // ROOFTREE_SECURITY_UTILS_H

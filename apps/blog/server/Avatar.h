@@ -17,17 +17,16 @@
 #include "Define.h"
 #include "Optional.h"
 #include "Result.h"
+
 #include <string>
 #include <string_view>
 
-namespace Blog
-{
+namespace Blog {
 inline constexpr std::size_t MaxAvatarSize = 512 * 1024;
 
-struct ImageType
-{
-    std::string_view Mime;
-    std::string_view Extension;
+struct ImageType {
+  std::string_view Mime;
+  std::string_view Extension;
 };
 
 // By content: a picture a page may show (JPEG, PNG, GIF, WebP), whatever the file is called. Posts'
@@ -37,8 +36,8 @@ Optional<ImageType> DetectImage(std::string_view data);
 // "png", "jpg" or "webp" by the content, empty for anything else (GIFs included: no animations)
 std::string_view AvatarExtension(std::string_view data);
 
-// Worker: data stored as userId's picture, its previous file removed. The new name, or empty when the
-// file could not be written
+// Worker: data stored as userId's picture, its previous file removed. The new name, or empty when
+// the file could not be written
 std::string WorkerSaveAvatar(uint32 userId, std::string_view data, std::string const& directory);
 
 // Worker: userId's picture removed, back to its initials
@@ -47,9 +46,11 @@ void WorkerRemoveAvatar(uint32 userId, std::string const& directory);
 // Worker: the file of a picture name removed, when there is one
 void RemoveAvatarFile(std::string const& directory, std::string_view name);
 
-// Worker: the picture at a provider's address (asked for at 256 pixels), or why not: it didn't come or
-// isn't a picture we take
-Rooftree::Result<std::string> WorkerFetchProviderAvatar(std::string_view provider, std::string const& url);
-}
+// Worker: the picture at a provider's address (asked for at 256 pixels), or why not: it didn't come
+// or isn't a picture we take
+Rooftree::Result<std::string> WorkerFetchProviderAvatar(
+    std::string_view provider,
+    std::string const& url);
+}  // namespace Blog
 
-#endif // BLOG_AVATAR_H
+#endif  // BLOG_AVATAR_H

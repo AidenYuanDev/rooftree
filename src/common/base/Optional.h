@@ -7,7 +7,7 @@
 
 #include <optional>
 
-template<typename T>
+template <typename T>
 using Optional = std::optional<T>;
 
-#endif // ROOFTREE_OPTIONAL_H
+#endif  // ROOFTREE_OPTIONAL_H

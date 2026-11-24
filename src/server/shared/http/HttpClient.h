@@ -14,34 +14,32 @@
 
 #include "Define.h"
 #include "Duration.h"
+
 #include <string>
 #include <utility>
 #include <vector>
 
-namespace Rooftree::Server
-{
-struct HttpClientRequest
-{
-    std::string Method = "GET";
-    std::string Url;
-    std::vector<std::pair<std::string, std::string>> Headers;
-    std::string Body;
-    Seconds Timeout = 15s;
-    std::size_t MaxResponseSize = 1024 * 1024;      // a larger body is an error
+namespace Rooftree::Server {
+struct HttpClientRequest {
+  std::string Method = "GET";
+  std::string Url;
+  std::vector<std::pair<std::string, std::string>> Headers;
+  std::string Body;
+  Seconds Timeout = 15s;
+  std::size_t MaxResponseSize = 1024 * 1024;  // a larger body is an error
 };
 
-struct HttpClientResponse
-{
-    uint32 Status = 0;          // 0 when no response came: Error says why
-    std::string ContentType;
-    std::string Body;
-    std::string Error;
+struct HttpClientResponse {
+  uint32 Status = 0;  // 0 when no response came: Error says why
+  std::string ContentType;
+  std::string Body;
+  std::string Error;
 };
 
 HttpClientResponse HttpFetch(HttpClientRequest const& request);
 
 // application/x-www-form-urlencoded: "a=1&b=x%20y"
 std::string FormUrlEncode(std::vector<std::pair<std::string, std::string>> const& fields);
-}
+}  // namespace Rooftree::Server
 
-#endif // ROOFTREE_HTTP_CLIENT_H
+#endif  // ROOFTREE_HTTP_CLIENT_H

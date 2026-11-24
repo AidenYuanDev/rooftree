@@ -7,21 +7,22 @@
 
 #include <string>
 
-namespace Rooftree::Server
-{
+namespace Rooftree::Server {
 class StaticSiteHolder;
 class WorldHttpService;
-}
+}  // namespace Rooftree::Server
 
-namespace Blog
-{
+namespace Blog {
 // Every /api route, each with the message type its AntiDOS limit is configured by
 void RegisterRoutes(Rooftree::Server::WorldHttpService& service);
 
-// The site, the uploads, the ACME challenges (empty acmeDirectory: none) and the redirects, answered on
-// the network threads (StaticHandlers.cpp). site outlives the service
-void RegisterStaticRoutes(Rooftree::Server::WorldHttpService& service, Rooftree::Server::StaticSiteHolder const& site,
-    std::string uploadDirectory, std::string acmeDirectory);
-}
+// The site, the uploads, the ACME challenges (empty acmeDirectory: none) and the redirects,
+// answered on the network threads (StaticHandlers.cpp). site outlives the service
+void RegisterStaticRoutes(
+    Rooftree::Server::WorldHttpService& service,
+    Rooftree::Server::StaticSiteHolder const& site,
+    std::string uploadDirectory,
+    std::string acmeDirectory);
+}  // namespace Blog
 
-#endif // BLOG_ROUTES_H
+#endif  // BLOG_ROUTES_H

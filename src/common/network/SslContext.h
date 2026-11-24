@@ -3,11 +3,11 @@
  *
  * The TLS context of a server
  * facing browsers, from the PEM files certbot writes. TLS 1.2 and 1.3 only, forward secret AEAD
- * ciphers (Mozilla's "intermediate"), so any browser of the last years connects and nothing weaker is
- * offered.
+ * ciphers (Mozilla's "intermediate"), so any browser of the last years connects and nothing weaker
+ * is offered.
  *
- * A context is never changed once built: a renewed certificate is a new context, new connections get
- * it and the open ones keep theirs (each holds its shared_ptr).
+ * A context is never changed once built: a renewed certificate is a new context, new connections
+ * get it and the open ones keep theirs (each holds its shared_ptr).
  */
 
 #ifndef ROOFTREE_SSL_CONTEXT_H
@@ -15,16 +15,18 @@
 
 #include "Define.h"
 #include "Result.h"
+
 #include <boost/asio/ssl/context.hpp>
+
 #include <memory>
 #include <string>
 
-namespace Rooftree::Net
-{
+namespace Rooftree::Net {
 // certificateChainFile: the certificate followed by the intermediates (certbot's fullchain.pem).
 // The error says why if a file can't be read or the key doesn't belong to the certificate
-Result<std::shared_ptr<boost::asio::ssl::context>> CreateServerSslContext(std::string const& certificateChainFile,
+Result<std::shared_ptr<boost::asio::ssl::context>> CreateServerSslContext(
+    std::string const& certificateChainFile,
     std::string const& privateKeyFile);
-}
+}  // namespace Rooftree::Net
 
-#endif // ROOFTREE_SSL_CONTEXT_H
+#endif  // ROOFTREE_SSL_CONTEXT_H

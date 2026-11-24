@@ -1,0 +1,73 @@
+# Rooftree: Chromium 为底，只改下面这些
+BasedOnStyle: Chromium
+Standard: c++20
+
+# 行宽：现有代码 p95 是 106 列，80 太窄
+ColumnLimit: 100
+
+# 换行后的参数统一缩进 4 格，不对齐到左括号：否则长 lambda、长类型会一路右漂
+AlignAfterOpenBracket: AlwaysBreak
+
+# public:/private: 缩进 1 格（Chromium 默认，写明以免被改）
+AccessModifierOffset: -1
+
+# 调用的实参：8 个以内放得下就紧凑排；超过 8 个一律一个一行（FlatBuffers 的 CreateXxx）
+# 声明的形参：一行放得下就一行，放不下一律一个一行
+PackArguments:
+  BinPack: UseBreakAfter
+  BreakAfter: 8
+BinPackParameters: OnePerLine
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: false
+
+# 长注释是手写排版的，不让工具折行
+ReflowComments: false
+# 长字符串（主要是 SQL）手工按子句断开，不让工具按宽度从子句中间切
+BreakStringLiterals: false
+
+# 短的东西允许留在一行
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortEnumsOnASingleLine: true
+
+# 行尾注释：对齐，但不跨空行强行拉齐
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+SpacesBeforeTrailingComments: 2
+
+# 枚举值把 = 对齐；普通赋值不对齐，免得函数里拉出大空隙
+# 不开 AlignArrayOfStructures：它对所有花括号列表生效（json 对象、映射表），长行时右括号补出大片空格
+AlignConsecutiveAssignments:
+  Enabled: false
+  EnumAssignments: true
+
+# 构造函数初始化列表：冒号开头，一个成员一行
+BreakConstructorInitializers: BeforeColon
+PackConstructorInitializers: NextLine
+
+# 模板声明总换行
+BreakTemplateDeclarations: Yes
+
+# 宁可在参数里换行，也不要把返回类型孤零零地放一行
+PenaltyReturnTypeOnItsOwnLine: 200
+PenaltyBreakAssignment: 20
+PenaltyBreakOpenParenthesis: 30
+
+# include：保留空行分组，组内排序；组顺序 = 本文件对应头 / 项目头 / 第三方 / 标准库
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"'
+    Priority: 2
+  - Regex: '^<[a-z_]+>$'      # 标准库：无扩展名、无路径
+    Priority: 4
+  - Regex: '^<'                # 其余尖括号：boost、openssl、系统头等
+    Priority: 3
+IncludeIsMainRegex: '$'
+SortIncludes: CaseSensitive
+
+InsertNewlineAtEOF: true
+KeepEmptyLines:
+  AtStartOfBlock: false
+MaxEmptyLinesToKeep: 1

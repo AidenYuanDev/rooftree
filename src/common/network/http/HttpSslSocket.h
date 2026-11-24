@@ -8,19 +8,17 @@
 #include "BaseHttpSocket.h"
 #include "SslStream.h"
 
-namespace Rooftree::Net::Http
-{
+namespace Rooftree::Net::Http {
 // HTTPS: the TLS handshake, then HTTP. sslContext has to outlive the socket
-class SslSocket : public BaseSocket<SslStream<Impl::BoostBeastSocketWrapper>>
-{
-public:
-    SslSocket(IoContextTcpSocket&& socket, boost::asio::ssl::context& sslContext) : BaseSocket(std::move(socket), sslContext) { }
+class SslSocket : public BaseSocket<SslStream<Impl::BoostBeastSocketWrapper>> {
+ public:
+  SslSocket(IoContextTcpSocket&& socket, boost::asio::ssl::context& sslContext)
+      : BaseSocket(std::move(socket), sslContext) {}
 
-    void Start() override
-    {
-        AcceptTls(*this, [](SslSocket& socket) { socket.StartHttp(); });
-    }
+  void Start() override {
+    AcceptTls(*this, [](SslSocket& socket) { socket.StartHttp(); });
+  }
 };
-}
+}  // namespace Rooftree::Net::Http
 
-#endif // ROOFTREE_HTTP_SSL_SOCKET_H
+#endif  // ROOFTREE_HTTP_SSL_SOCKET_H
