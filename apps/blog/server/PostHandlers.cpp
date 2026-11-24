@@ -1286,8 +1286,8 @@ Rooftree::Task<void> AdminUpdatePost(Session& session, ApiRequest request) {
   bool replaced = !input->Translations.empty();
   bool review = NeedsReview(request->GetAuth().User);
   auto by = request->GetAuth().User.Username;
-  Result result = co_await session.OnWorker([input = std::move(*input), id = *id,
-                                             user = request->GetAuth().User,
+  UserRow user = request->GetAuth().User;
+  Result result = co_await session.OnWorker([input = std::move(*input), id = *id, user,
                                              snapshots = std::move(snapshots), review] {
     Result result;
     Optional<PostAccess> access = WorkerPostAccess(id, user);
@@ -1548,9 +1548,11 @@ Rooftree::Task<void> AdminPublishPost(Session& session, ApiRequest request) {
   };
 
   auto by = request->GetAuth().User.Username;
-  Result result = co_await session.OnWorker([id = *id, user = request->GetAuth().User,
-                                             snapshots = sWorld->GetCollab().GetSnapshots(*id),
-                                             review = NeedsReview(request->GetAuth().User)] {
+  UserRow user = request->GetAuth().User;
+  std::vector<DocSnapshot> snapshots = sWorld->GetCollab().GetSnapshots(*id);
+  bool review = NeedsReview(user);
+  Result result = co_await session.OnWorker([id = *id, user, snapshots = std::move(snapshots),
+                                             review] {
     Result result;
     Optional<PostAccess> access = WorkerPostAccess(id, user);
     Optional<PostRow> current = access && access->CanEdit() ? WorkerLoadPost(id, false)
@@ -2140,8 +2142,8 @@ Rooftree::Task<void> AdminRemovePostEditor(Session& session, ApiRequest request)
 
   auto by = request->GetAuth().User.Username;
   auto editorId = *in.user();
-  EditorsResult result = co_await session.OnWorker([id = *in.id(), editorId = *in.user(),
-                                                    user = request->GetAuth().User] {
+  UserRow user = request->GetAuth().User;
+  EditorsResult result = co_await session.OnWorker([id = *in.id(), editorId, user] {
     Optional<PostAccess> access;
     EditorsResult result = WorkerEditorsOf(id, user, access);
     if (!result.Post)

@@ -227,12 +227,15 @@ Rooftree::Task<void> React(Session& session, ApiRequest request) {
           BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_COMMENT);
           stmt->setUInt32(0, target.Id);
           PreparedQueryResult row = BlogDatabase.Query(stmt);
-          Field* fields = row ? row->Fetch() : nullptr;
-          result.Page = fields ? (fields[1].GetString() == "guestbook"
-                                      ? std::string("guestbook")
-                                      : Rooftree::StringFormat(
-                                            "{}:{}", fields[1].GetString(), fields[2].GetUInt32()))
-                               : std::string();
+          result.Page.clear();
+          if (Field* fields = row ? row->Fetch() : nullptr) {
+            std::string kind = fields[1].GetString();
+            if (kind == "guestbook") {
+              result.Page = kind;
+            } else {
+              result.Page = Rooftree::StringFormat("{}:{}", kind, fields[2].GetUInt32());
+            }
+          }
         }
         return result;
       });

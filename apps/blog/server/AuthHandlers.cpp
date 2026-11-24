@@ -1165,65 +1165,65 @@ Rooftree::Task<void> BlogSession::HandleOAuthCallback(Request request) {
   std::string userAgent = GetUserAgent(request);
   bool ipBanned = sWorld->IsIpBanned(request->GetClientAddress());
   std::string uploadDirectory = sWorld->GetSettings().UploadDirectory;
-  Result result =
-      co_await OnWorker([provider = *provider, redirectUri = OAuthRedirectUri(providerName), code,
-                         flow = *flow, ip, userAgent, lifetime, ipBanned, uploadDirectory] {
-        Result result;
-        Rooftree::Result<OAuthIdentity> identity =
-            WorkerFetchOAuthIdentity(provider, redirectUri, code, flow.CodeVerifier);
-        if (!identity) {
-          result.Error = "oauth_failed";
-          result.Detail = std::move(identity.error());
-          return result;
-        }
-        result.Identity = *identity;
+  std::string redirectUri = OAuthRedirectUri(providerName);
+  Result result = co_await OnWorker([provider = *provider, redirectUri, code, flow = *flow, ip,
+                                     userAgent, lifetime, ipBanned, uploadDirectory] {
+    Result result;
+    Rooftree::Result<OAuthIdentity> identity =
+        WorkerFetchOAuthIdentity(provider, redirectUri, code, flow.CodeVerifier);
+    if (!identity) {
+      result.Error = "oauth_failed";
+      result.Detail = std::move(identity.error());
+      return result;
+    }
+    result.Identity = *identity;
 
-        Optional<UserRow> owner = WorkerFindUserByIdentity(provider.Name, identity->ProviderUserId);
-        if (owner)
-          WorkerRefreshIdentity(provider.Name, *identity);
-        if (flow.LinkUserId) {
-          if (owner && owner->Id != flow.LinkUserId) {
-            result.Error = "identity_taken";
-          } else if (!owner && !WorkerInsertIdentity(flow.LinkUserId, provider.Name, *identity)) {
-            result.Error = "already_linked";
-          }
-          return result;
-        }
+    Optional<UserRow> owner = WorkerFindUserByIdentity(provider.Name, identity->ProviderUserId);
+    if (owner)
+      WorkerRefreshIdentity(provider.Name, *identity);
+    if (flow.LinkUserId) {
+      if (owner && owner->Id != flow.LinkUserId) {
+        result.Error = "identity_taken";
+      } else if (!owner && !WorkerInsertIdentity(flow.LinkUserId, provider.Name, *identity)) {
+        result.Error = "already_linked";
+      }
+      return result;
+    }
 
-        if (!owner) {
-          if (identity->Email.empty()) {
-            result.Error = "oauth_no_email";
-          } else if (FindUser(BLOG_SEL_USER_BY_EMAIL, identity->Email)) {
-            result.Error = "email_taken";
-          } else if (ipBanned) {
-            result.Error = "ip_banned";
-          }
-          if (!result.Error.empty())
-            return result;
-
-          owner = WorkerCreateOAuthUser(*identity, flow.Lang);
-          if (!owner || !WorkerInsertIdentity(owner->Id, provider.Name, *identity)) {
-            result.Error = "email_taken";
-            return result;
-          }
-          result.Created = true;
-
-          // A new account starts with the provider's picture; without one if it doesn't come
-          if (!identity->AvatarUrl.empty()) {
-            if (Rooftree::Result<std::string> picture =
-                    WorkerFetchProviderAvatar(provider.Name, identity->AvatarUrl))
-              owner->Avatar = WorkerSaveAvatar(owner->Id, *picture, uploadDirectory);
-          }
-        }
-
-        if (owner->IsBanned()) {
-          result.Error = "banned";
-        } else if (!owner->TotpSecret) {
-          result.Session = WorkerCreateAuthSession(owner->Id, lifetime, ip, userAgent);
-        }
-        result.User = std::move(owner);
+    if (!owner) {
+      if (identity->Email.empty()) {
+        result.Error = "oauth_no_email";
+      } else if (FindUser(BLOG_SEL_USER_BY_EMAIL, identity->Email)) {
+        result.Error = "email_taken";
+      } else if (ipBanned) {
+        result.Error = "ip_banned";
+      }
+      if (!result.Error.empty())
         return result;
-      });
+
+      owner = WorkerCreateOAuthUser(*identity, flow.Lang);
+      if (!owner || !WorkerInsertIdentity(owner->Id, provider.Name, *identity)) {
+        result.Error = "email_taken";
+        return result;
+      }
+      result.Created = true;
+
+      // A new account starts with the provider's picture; without one if it doesn't come
+      if (!identity->AvatarUrl.empty()) {
+        if (Rooftree::Result<std::string> picture =
+                WorkerFetchProviderAvatar(provider.Name, identity->AvatarUrl))
+          owner->Avatar = WorkerSaveAvatar(owner->Id, *picture, uploadDirectory);
+      }
+    }
+
+    if (owner->IsBanned()) {
+      result.Error = "banned";
+    } else if (!owner->TotpSecret) {
+      result.Session = WorkerCreateAuthSession(owner->Id, lifetime, ip, userAgent);
+    }
+    result.User = std::move(owner);
+    return result;
+  });
   std::string const& origin = sWorld->GetSettings().PublicOrigin;
   if (!result.Error.empty()) {
     RT_LOG_INFO(
@@ -1445,10 +1445,10 @@ Rooftree::Task<void> UploadAvatar(Rooftree::Server::Session& session, ApiRequest
     co_return RespondValidation(request, {{"file", "unsupported_type"}});
   if (!sWorld->GetAvatarLimiter().Allow(user.Id))
     co_return request->RespondError(http::status::too_many_requests, "too_many_avatar_changes");
+  std::string directory = sWorld->GetSettings().UploadDirectory;
 
   Optional<UserRow> changed =
-      co_await session.OnWorker([userId = user.Id, data = std::move(data),
-                                 directory = sWorld->GetSettings().UploadDirectory] {
+      co_await session.OnWorker([userId = user.Id, data = std::move(data), directory] {
         if (WorkerSaveAvatar(userId, data, directory).empty()) {
           RT_LOG_ERROR(
               "blog.auth", "Could not write the picture of user {} into Blog.Uploads.Directory",
@@ -1477,9 +1477,9 @@ Rooftree::Task<void> UseProviderAvatar(Rooftree::Server::Session& session, ApiRe
     std::string Detail;  // for the log
     Optional<UserRow> User;
   };
+  std::string directory = sWorld->GetSettings().UploadDirectory;
 
-  Result result = co_await session.OnWorker([userId = user.Id, provider,
-                                             directory = sWorld->GetSettings().UploadDirectory] {
+  Result result = co_await session.OnWorker([userId = user.Id, provider, directory] {
     Result result;
     BlogDatabasePreparedStatement* stmt =
         BlogDatabase.GetPreparedStatement(BLOG_SEL_IDENTITY_AVATAR_URL);

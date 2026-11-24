@@ -440,10 +440,10 @@ Rooftree::Task<void> AdminUpload(Session& session, ApiRequest request) {
   Optional<ImageUpload> upload = ReadImageUpload(request, request->Get<Admin::UploadRequest>());
   if (!upload)
     co_return;
+  std::string directory = sWorld->GetSettings().UploadDirectory;
+  uint32 userId = request->GetAuth().User.Id;
 
-  bool written = co_await session.OnWorker([upload = *upload,
-                                            directory = sWorld->GetSettings().UploadDirectory,
-                                            userId = request->GetAuth().User.Id] {
+  bool written = co_await session.OnWorker([upload = *upload, directory, userId] {
     return WorkerStoreUpload(upload, directory, userId, {}, {});
   });
   if (!written) {
@@ -468,9 +468,10 @@ Rooftree::Task<void> AdminPostUpload(Session& session, ApiRequest request) {
     co_return;
 
   enum class Outcome { Stored, NotFound, NoDrive, Full, Failed };
-  Outcome outcome = co_await session.OnWorker([upload = *upload, postId = *in.id(),
-                                               user = request->GetAuth().User,
-                                               settings = sWorld->GetSettings()] {
+  uint32 postId = *in.id();
+  UserRow user = request->GetAuth().User;
+  BlogSettings settings = sWorld->GetSettings();
+  Outcome outcome = co_await session.OnWorker([upload = *upload, postId, user, settings] {
     Optional<PostAccess> access = WorkerPostAccess(postId, user);
     if (!access || !access->CanEdit())
       return Outcome::NotFound;

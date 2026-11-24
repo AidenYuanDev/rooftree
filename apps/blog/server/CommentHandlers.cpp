@@ -295,10 +295,11 @@ flatbuffers::Offset<Reader::Comment> ReaderCommentTable(
         comment.Avatar.empty() ? 0 : builder.CreateString("/uploads/" + comment.Avatar),
         comment.AuthorDeleted);
   }
-  auto replyTo = comment.ReplyToUserId ? Reader::CreateCommentReplyTo(
-                                             builder, *comment.ReplyToUserId,
-                                             builder.CreateString(comment.ReplyToName))
-                                       : 0;
+  flatbuffers::Offset<Reader::CommentReplyTo> replyTo;
+  if (comment.ReplyToUserId) {
+    replyTo = Reader::CreateCommentReplyTo(
+        builder, *comment.ReplyToUserId, builder.CreateString(comment.ReplyToName));
+  }
   // Its block as it was only once the post no longer has it: the page finds the rest in the post
   flatbuffers::Offset<Reader::CommentAnchor> anchor;
   if (CommentAnchorRow const* passage = comment.Anchor ? &*comment.Anchor : nullptr) {
@@ -407,10 +408,11 @@ flatbuffers::Offset<Admin::Comment> CommentTable(
         comment.Avatar.empty() ? 0 : builder.CreateString("/uploads/" + comment.Avatar),
         comment.AuthorDeleted);
   }
-  auto replyTo = comment.ReplyToUserId ? Admin::CreateCommentReplyTo(
-                                             builder, *comment.ReplyToUserId,
-                                             builder.CreateString(comment.ReplyToName))
-                                       : 0;
+  flatbuffers::Offset<Admin::CommentReplyTo> replyTo;
+  if (comment.ReplyToUserId) {
+    replyTo = Admin::CreateCommentReplyTo(
+        builder, *comment.ReplyToUserId, builder.CreateString(comment.ReplyToName));
+  }
   flatbuffers::Offset<Admin::CommentPassage> passage;
   if (comment.Anchor) {
     passage = Admin::CreateCommentPassage(

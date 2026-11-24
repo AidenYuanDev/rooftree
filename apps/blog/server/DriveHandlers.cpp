@@ -382,9 +382,12 @@ struct ShareItem {
   static ShareItem FromFields(Field const* fields, std::map<uint32, FolderRow> const& folders) {
     Optional<uint32> fileFolder = fields[11].GetUInt32OrNull();
     // What it shows is in the trash: the link answers 404 until it is restored
-    bool trashed = fields[2].IsNull() ? !folders.contains(fields[3].GetUInt32())
-                                      : fields[12].GetInt64() != 0 ||
-                                            (fileFolder && !folders.contains(*fileFolder));
+    bool trashed;
+    if (fields[2].IsNull()) {  // a folder
+      trashed = !folders.contains(fields[3].GetUInt32());
+    } else {
+      trashed = fields[12].GetInt64() != 0 || (fileFolder && !folders.contains(*fileFolder));
+    }
     return {
         .Id = fields[0].GetUInt32(),
         .Token = fields[1].GetString(),
@@ -750,8 +753,8 @@ Rooftree::Task<void> DeleteDriveFolder(Session& session, ApiRequest request) {
   auto id = *in.id();
 
   bool trash = Drive::TrashDaysOf(owner, sWorld->GetSettings()) > 0;
-  bool found = co_await session.OnWorker([userId = owner.Id, id, trash,
-                                          directory = sWorld->GetSettings().DriveDirectory] {
+  std::string directory = sWorld->GetSettings().DriveDirectory;
+  bool found = co_await session.OnWorker([userId = owner.Id, id, trash, directory] {
     if (!Drive::WorkerFolder(userId, id))
       return false;
     if (trash) {
@@ -839,8 +842,8 @@ Rooftree::Task<void> DeleteDriveFile(Session& session, ApiRequest request) {
   auto id = *in.id();
 
   bool trash = Drive::TrashDaysOf(owner, sWorld->GetSettings()) > 0;
-  bool found = co_await session.OnWorker([userId = owner.Id, id, trash,
-                                          directory = sWorld->GetSettings().DriveDirectory] {
+  std::string directory = sWorld->GetSettings().DriveDirectory;
+  bool found = co_await session.OnWorker([userId = owner.Id, id, trash, directory] {
     Optional<FileRow> file = Drive::WorkerFile(userId, id);
     if (!file)
       return false;
@@ -998,9 +1001,9 @@ Rooftree::Task<void> PurgeFromTrash(Session& session, ApiRequest request) {
     co_return;
   UserRow const& owner = *drive;
   auto id = *in.id();
+  std::string directory = sWorld->GetSettings().DriveDirectory;
 
-  bool found = co_await session.OnWorker([userId = owner.Id, id, kind,
-                                          directory = sWorld->GetSettings().DriveDirectory] {
+  bool found = co_await session.OnWorker([userId = owner.Id, id, kind, directory] {
     if (kind == "file") {
       Optional<FileRow> file = Drive::WorkerFile(userId, id, true);
       if (!file || !file->TrashedAt)
@@ -1157,9 +1160,9 @@ Rooftree::Task<void> BlogSession::HandleDriveZip(Request request) {
   std::string name = request->GetQueryParameter("name").value_or("");
   if (!Drive::IsValidName(name))
     name.clear();
+  std::string directory = sWorld->GetSettings().DriveDirectory;
 
-  Optional<Zip> zip = co_await OnWorker([userId = owner.Id, fileIds, folderIds, name,
-                                         directory = sWorld->GetSettings().DriveDirectory] {
+  Optional<Zip> zip = co_await OnWorker([userId = owner.Id, fileIds, folderIds, name, directory] {
     std::map<uint32, FolderRow> folders = Drive::WorkerAllFolders(userId);
     std::string zipName = name;
     if (zipName.empty()) {
@@ -1205,11 +1208,11 @@ Rooftree::Task<void> CreateDriveUpload(Session& session, ApiRequest request) {
     std::string_view Error;
     std::string Id;
   };
-
-  Result result = co_await session.OnWorker([userId = owner.Id,
-                                             quota = Drive::QuotaOf(owner, settings),
-                                             minFree = settings.DriveMinFreeSpace,
-                                             directory = settings.DriveDirectory, folder, name,
+  uint32 userId = owner.Id;
+  uint64 quota = Drive::QuotaOf(owner, settings);
+  uint64 minFree = settings.DriveMinFreeSpace;
+  std::string directory = settings.DriveDirectory;
+  Result result = co_await session.OnWorker([userId, quota, minFree, directory, folder, name,
                                              size] {
     Result result;
     if (folder && !Drive::WorkerFolder(userId, *folder)) {
@@ -1288,8 +1291,8 @@ Rooftree::Task<void> BlogSession::HandleDriveUploadChunk(Request request) {
   };
 
   // The body is only read: the worker reads it from the request, no copy of the piece
-  Result result = co_await OnWorker([request, userId = owner.Id, id, offset = *offset,
-                                     directory = sWorld->GetSettings().DriveDirectory] {
+  std::string directory = sWorld->GetSettings().DriveDirectory;
+  Result result = co_await OnWorker([request, userId = owner.Id, id, offset = *offset, directory] {
     Result result;
     BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_DRIVE_UPLOAD);
     stmt->setString(0, id);
@@ -1371,8 +1374,8 @@ Rooftree::Task<void> CompleteDriveUpload(Session& session, ApiRequest request) {
   };
 
   auto user = owner.Username;
-  Result result = co_await session.OnWorker([userId = owner.Id, id,
-                                             directory = sWorld->GetSettings().DriveDirectory] {
+  std::string directory = sWorld->GetSettings().DriveDirectory;
+  Result result = co_await session.OnWorker([userId = owner.Id, id, directory] {
     Result result;
     BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_DRIVE_UPLOAD);
     stmt->setString(0, id);
@@ -1454,9 +1457,9 @@ Rooftree::Task<void> CancelDriveUpload(Session& session, ApiRequest request) {
     co_return;
   UserRow const& owner = *drive;
   auto id = ReadText(in.id());
+  std::string directory = sWorld->GetSettings().DriveDirectory;
 
-  bool found = co_await session.OnWorker([userId = owner.Id, id,
-                                          directory = sWorld->GetSettings().DriveDirectory] {
+  bool found = co_await session.OnWorker([userId = owner.Id, id, directory] {
     BlogDatabasePreparedStatement* stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_DRIVE_UPLOAD);
     stmt->setString(0, id);
     stmt->setUInt32(1, userId);
@@ -1816,9 +1819,10 @@ Rooftree::Task<void> BlogSession::HandleShareZip(Request request) {
     bool Locked = false;
     Optional<Zip> File;
   };
+  uint32 viewerId = auth->User.Id;
+  std::string directory = sWorld->GetSettings().DriveDirectory;
 
-  Result result = co_await OnWorker([viewerId = auth->User.Id, token, folder,
-                                     directory = sWorld->GetSettings().DriveDirectory] {
+  Result result = co_await OnWorker([viewerId, token, folder, directory] {
     Result result;
     result.Share = WorkerFindShare(token, viewerId);
     if (!result.Share || result.Share->Expired)
@@ -1867,9 +1871,10 @@ Rooftree::Task<void> BlogSession::HandleShareThumb(Request request) {
     std::string Type;
     std::string Bytes;
   };
+  uint32 viewerId = auth->User.Id;
+  std::string directory = sWorld->GetSettings().DriveDirectory;
 
-  Result result = co_await OnWorker([viewerId = auth->User.Id, token, id = *id,
-                                     directory = sWorld->GetSettings().DriveDirectory] {
+  Result result = co_await OnWorker([viewerId, token, id = *id, directory] {
     Result result;
     result.Share = WorkerFindShare(token, viewerId);
     if (!result.Share || result.Share->Expired)
@@ -1915,10 +1920,11 @@ Rooftree::Task<void> BlogSession::HandleShareDownload(Request request) {
     bool Locked = false;
     Optional<Download> File;
   };
+  uint32 viewerId = auth->User.Id;
+  std::string range(request->GetHeader(http::field::range));
+  std::string directory = sWorld->GetSettings().DriveDirectory;
 
-  Result result = co_await OnWorker([viewerId = auth->User.Id, token, id = *id, attachment,
-                                     range = std::string(request->GetHeader(http::field::range)),
-                                     directory = sWorld->GetSettings().DriveDirectory] {
+  Result result = co_await OnWorker([viewerId, token, id = *id, attachment, range, directory] {
     Result result;
     result.Share = WorkerFindShare(token, viewerId);
     if (!result.Share || result.Share->Expired)
@@ -1958,11 +1964,13 @@ Rooftree::Task<void> BlogSession::HandleShareDownload(Request request) {
 // not those in a deleted folder)
 Rooftree::Task<void> AdminDrives(Session& session, ApiRequest request) {
   BlogSettings const& settings = sWorld->GetSettings();
-  std::string payload = co_await session.OnWorker([directory = settings.DriveDirectory,
-                                                   quota = settings.DriveQuota,
-                                                   adminQuota = settings.DriveAdminQuota,
-                                                   trashDays = settings.DriveTrashDays,
-                                                   minFree = settings.DriveMinFreeSpace] {
+  std::string directory = settings.DriveDirectory;
+  uint64 quota = settings.DriveQuota;
+  uint64 adminQuota = settings.DriveAdminQuota;
+  uint32 trashDays = settings.DriveTrashDays;
+  uint64 minFree = settings.DriveMinFreeSpace;
+  std::string payload = co_await session.OnWorker([directory, quota, adminQuota, trashDays,
+                                                   minFree] {
     flatbuffers::FlatBufferBuilder builder;
     std::vector<flatbuffers::Offset<Admin::DriveAccount>> accounts;
     uint64 quotas = 0;

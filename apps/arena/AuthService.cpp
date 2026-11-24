@@ -73,8 +73,9 @@ UnitClass ReadClass(Rooftree::Net::Http::RequestContext const& context) {
   boost::json::value body = boost::json::parse(context.request.body(), error);
   boost::json::object const* object = error ? nullptr : body.if_object();
   boost::json::value const* name = object ? object->if_contains("class") : nullptr;
-  return name && name->is_string() && name->get_string() == "rogue" ? UnitClass::Rogue
-                                                                    : UnitClass::Adventurer;
+  if (name && name->is_string() && name->get_string() == "rogue")
+    return UnitClass::Rogue;
+  return UnitClass::Adventurer;
 }
 
 bool IsValidUsername(std::string_view name) {

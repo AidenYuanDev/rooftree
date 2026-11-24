@@ -1104,9 +1104,10 @@ Rooftree::Task<void> EditChatMessage(Session& session, ApiRequest request) {
   std::string content = fields.Text("content", in.content(), 0, MaxMessageLength, false, true);
   if (!fields.IsValid())
     co_return RespondValidation(request, fields.TakeErrors());
+  uint64 id = in.id();
+  Seconds window = sWorld->GetSettings().ChatEditWindow;
 
-  OwnMessageChange res = co_await session.OnWorker([callerId, id = in.id(), content,
-                                                    window = sWorld->GetSettings().ChatEditWindow] {
+  OwnMessageChange res = co_await session.OnWorker([callerId, id, content, window] {
     std::string stored;
     OwnMessageChange change = WorkerOwnMessage(callerId, id, window, stored);
     if (!change.Error.empty())

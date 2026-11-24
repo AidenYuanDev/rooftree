@@ -483,57 +483,57 @@ Rooftree::Task<void> AdminDeleteUser(Session& session, ApiRequest request) {
   };
 
   auto by = auth->User.Username;
-  Result result =
-      co_await session.OnWorker([id, purge, directory = sWorld->GetSettings().UploadDirectory,
-                                 driveDirectory = sWorld->GetSettings().DriveDirectory] {
-        Result result;
-        // An account deleted before, its comments kept, may still be purged
-        Optional<UserRow> user = WorkerFindManagedUser(id, result.Error, purge);
-        if (!user)
-          return result;
-        result.User = std::move(*user);
+  std::string directory = sWorld->GetSettings().UploadDirectory;
+  std::string driveDirectory = sWorld->GetSettings().DriveDirectory;
+  Result result = co_await session.OnWorker([id, purge, directory, driveDirectory] {
+    Result result;
+    // An account deleted before, its comments kept, may still be purged
+    Optional<UserRow> user = WorkerFindManagedUser(id, result.Error, purge);
+    if (!user)
+      return result;
+    result.User = std::move(*user);
 
-        // Its address isn't a subscriber's any more either
-        BlogDatabasePreparedStatement* stmt =
-            BlogDatabase.GetPreparedStatement(BLOG_DEL_SUBSCRIBER_BY_EMAIL);
-        stmt->setString(0, result.User.Email);
-        BlogDatabase.DirectExecute(stmt);
+    // Its address isn't a subscriber's any more either
+    BlogDatabasePreparedStatement* stmt =
+        BlogDatabase.GetPreparedStatement(BLOG_DEL_SUBSCRIBER_BY_EMAIL);
+    stmt->setString(0, result.User.Email);
+    BlogDatabase.DirectExecute(stmt);
 
-        if (purge) {
-          // Posts and uploads keep their user (no ON DELETE): the admin's, moved elsewhere first
-          stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_USER_OWNED_CONTENT);
-          stmt->setUInt32(0, id);
-          stmt->setUInt32(1, id);
-          if (PreparedQueryResult owned = BlogDatabase.Query(stmt);
-              owned && (owned->Fetch()[0].GetInt64() || owned->Fetch()[1].GetInt64())) {
-            result.Error = "has_content";
-            return result;
-          }
-
-          // Its drive and links first, while its rows say
-          // which files are its; the files it sent in chats
-          Drive::WorkerDeleteAccountDrive(id, driveDirectory);
-          WorkerDeleteUserChatFiles(id, directory);
-          stmt = BlogDatabase.GetPreparedStatement(BLOG_DEL_USER);
-          stmt->setUInt32(0, id);
-          BlogDatabase.DirectExecute(stmt);
-        } else {
-          Drive::WorkerDeleteAccountDrive(id, driveDirectory);
-          for (BlogDatabaseStatements statement :
-               {BLOG_DEL_USER_IDENTITIES, BLOG_DEL_USER_ALL_EMAIL_TOKENS, BLOG_DEL_USER_SESSIONS}) {
-            stmt = BlogDatabase.GetPreparedStatement(statement);
-            stmt->setUInt32(0, id);
-            BlogDatabase.DirectExecute(stmt);
-          }
-
-          stmt = BlogDatabase.GetPreparedStatement(BLOG_UPD_USER_ANONYMIZE);
-          stmt->setUInt32(0, id);
-          BlogDatabase.DirectExecute(stmt);
-        }
-
-        RemoveAvatarFile(directory, result.User.Avatar);
+    if (purge) {
+      // Posts and uploads keep their user (no ON DELETE): the admin's, moved elsewhere first
+      stmt = BlogDatabase.GetPreparedStatement(BLOG_SEL_USER_OWNED_CONTENT);
+      stmt->setUInt32(0, id);
+      stmt->setUInt32(1, id);
+      if (PreparedQueryResult owned = BlogDatabase.Query(stmt);
+          owned && (owned->Fetch()[0].GetInt64() || owned->Fetch()[1].GetInt64())) {
+        result.Error = "has_content";
         return result;
-      });
+      }
+
+      // Its drive and links first, while its rows say
+      // which files are its; the files it sent in chats
+      Drive::WorkerDeleteAccountDrive(id, driveDirectory);
+      WorkerDeleteUserChatFiles(id, directory);
+      stmt = BlogDatabase.GetPreparedStatement(BLOG_DEL_USER);
+      stmt->setUInt32(0, id);
+      BlogDatabase.DirectExecute(stmt);
+    } else {
+      Drive::WorkerDeleteAccountDrive(id, driveDirectory);
+      for (BlogDatabaseStatements statement :
+           {BLOG_DEL_USER_IDENTITIES, BLOG_DEL_USER_ALL_EMAIL_TOKENS, BLOG_DEL_USER_SESSIONS}) {
+        stmt = BlogDatabase.GetPreparedStatement(statement);
+        stmt->setUInt32(0, id);
+        BlogDatabase.DirectExecute(stmt);
+      }
+
+      stmt = BlogDatabase.GetPreparedStatement(BLOG_UPD_USER_ANONYMIZE);
+      stmt->setUInt32(0, id);
+      BlogDatabase.DirectExecute(stmt);
+    }
+
+    RemoveAvatarFile(directory, result.User.Avatar);
+    return result;
+  });
   if (result.Error == "has_content")
     co_return request->RespondError(http::status::conflict, "has_content");
   if (!result.Error.empty())

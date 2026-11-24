@@ -237,9 +237,9 @@ Rooftree::Task<void> SetSubscription(Session& session, ApiRequest request) {
     fields.AddError("subscribed", "required");
   if (!fields.IsValid())
     co_return RespondValidation(request, fields.TakeErrors());
+  std::string email = ToLower(user.Email);
 
-  bool on = co_await session.OnWorker([email = ToLower(user.Email), lang = user.Locale,
-                                       on = *subscribed] {
+  bool on = co_await session.OnWorker([email, lang = user.Locale, on = *subscribed] {
     WorkerSetSubscribed(email, lang, on);
     return on;
   });

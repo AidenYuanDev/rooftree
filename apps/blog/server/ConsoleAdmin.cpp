@@ -402,10 +402,10 @@ void PrintPost(CommandHandler& handler, boost::json::value const& post, std::str
     }
   }
   std::string tags = Join(Get(post, "tags"));
+  bool commentsOff = Get(post, "commentsEnabled").is_bool() &&
+                     !Get(post, "commentsEnabled").as_bool();
   out += Rooftree::StringFormat(
-      "\n  tags: {}, comments {}{}", tags.empty() ? "none" : tags,
-      Get(post, "commentsEnabled").is_bool() && !Get(post, "commentsEnabled").as_bool() ? "off"
-                                                                                        : "on",
+      "\n  tags: {}, comments {}{}", tags.empty() ? "none" : tags, commentsOff ? "off" : "on",
       Str(post, "cover").empty() ? "" : ", cover " + Str(post, "cover"));
   handler.SendSysMessage(out);
 }
@@ -942,6 +942,7 @@ bool HandleCommentList(CommandHandler& handler, std::string_view args) {
           boost::json::value const& author = Get(comment, "author");
           std::string where = Str(comment, "postSlug").empty() ? Str(comment, "target")
                                                                : Str(comment, "postSlug");
+          bool banned = Get(author, "banned").is_bool() && Get(author, "banned").as_bool();
           out += Rooftree::StringFormat(
               "{}{:>5}  {:<7}  {} {}  {:<16} {:<24} {}",
               out.empty() ? "" : "\n",
@@ -949,9 +950,7 @@ bool HandleCommentList(CommandHandler& handler, std::string_view args) {
               Str(comment, "status"),
               ShortTime(Str(comment, "createdAt")),
               Str(comment, "ip"),
-              Str(author, "username") +
-                  (Get(author, "banned").is_bool() && Get(author, "banned").as_bool() ? " (banned)"
-                                                                                      : ""),
+              Str(author, "username") + (banned ? " (banned)" : ""),
               Excerpt(where, 24),
               Excerpt(Str(comment, "body"), 50));
           // On a passage: what was selected, and whether the post still has it

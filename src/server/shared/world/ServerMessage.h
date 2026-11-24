@@ -60,7 +60,7 @@ enum class RejectReason {
   RateLimited,    // AntiDOS refused it
   Overloaded,     // the server's or the session's queue is full
   SessionClosed,  // the session went away before running it
-  Blocked  // its address is blocked (AntiDosSettings::BlockAfter): drop the connection, answer nothing
+  Blocked         // address blocked (AntiDosSettings::BlockAfter): drop the connection, no answer
 };
 
 class Message {
