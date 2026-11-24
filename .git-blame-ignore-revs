@@ -1,0 +1,6 @@
+# Formatting only: git blame skips these with
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub reads this file by itself)
+
+# Style: clang-format and clang-tidy for the whole tree
+dbab31ccc95cfb65907b788f80aef5bb311c8831
